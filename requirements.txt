@@ -1,0 +1,5 @@
+# wasmtime Python bindings
+wasmtime==38.*
+
+# (Optional) TOML parser for Python < 3.11
+tomli; python_version < "3.11"

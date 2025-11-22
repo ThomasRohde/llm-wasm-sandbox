@@ -1,0 +1,2 @@
+# This directory will contain the python.wasm binary
+# Download it using: .\scripts\fetch_wlr_python.ps1
