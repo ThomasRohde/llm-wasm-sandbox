@@ -106,22 +106,31 @@ class PythonSandbox(BaseSandbox):
         try:
             raw_result = run_untrusted_python(
                 wasm_path=self.wasm_binary_path,
-                workspace_dir=str(self.workspace)
+                workspace_dir=str(self.workspace),
+                policy=self.policy
             )
         except Exception as e:
             # WASM runtime errors (OutOfFuel, ExitTrap, etc.) are captured here
             # These are execution artifacts, not errors - guest code failures are expected
             duration_seconds = time.perf_counter() - start_time
 
+            msg = f"WASM runtime error: {type(e).__name__}: {e!s}"
+            trap_reason = "memory_limit" if "memory" in msg.lower() else "host_error"
+            mem_len = int(self.policy.memory_bytes)
+            mem_pages = max(1, mem_len // 65536)
+
             # Create minimal result for error cases
             from sandbox.host import SandboxResult as HostSandboxResult
             raw_result = HostSandboxResult(
                 stdout="",
-                stderr=f"WASM runtime error: {type(e).__name__}: {e!s}",
+                stderr=msg,
                 fuel_consumed=None,
-                mem_pages=0,
-                mem_len=0,
-                logs_dir=""
+                mem_pages=mem_pages,
+                mem_len=mem_len,
+                logs_dir="",
+                exit_code=1,
+                trapped=True,
+                trap_reason=trap_reason
             )
 
         duration_seconds = time.perf_counter() - start_time
@@ -274,20 +283,47 @@ class PythonSandbox(BaseSandbox):
         Returns:
             SandboxResult Pydantic model with all fields populated
         """
+        exit_code = getattr(raw_result, "exit_code", None)
+        trapped = bool(getattr(raw_result, "trapped", False))
+        trap_reason = getattr(raw_result, "trap_reason", None)
+        trap_message = getattr(raw_result, "trap_message", None)
+        stdout_truncated = bool(getattr(raw_result, "stdout_truncated", False))
+        stderr_truncated = bool(getattr(raw_result, "stderr_truncated", False))
+
+        # Default exit_code if not provided by host
+        if exit_code is None:
+            exit_code = 1 if trapped else 0
+
         metadata = {
             "memory_pages": raw_result.mem_pages,
             "logs_dir": raw_result.logs_dir,
+            "stdout_truncated": stdout_truncated,
+            "stderr_truncated": stderr_truncated,
+            "exit_code": exit_code,
+            "trapped": trapped,
         }
 
         # Include session_id in metadata if provided
         if session_id is not None:
             metadata["session_id"] = session_id
 
+        if trap_reason is not None:
+            metadata["trap_reason"] = trap_reason
+        if trap_message is not None:
+            metadata["trap_message"] = trap_message
+
+        # Determine success based on exit code, traps, and stderr contents
+        success = self._determine_success(
+            exit_code=exit_code,
+            trapped=trapped,
+            stderr=raw_result.stderr
+        )
+
         return SandboxResult(
-            success=True,  # If we get here, execution completed (guest errors in stderr)
+            success=success,
             stdout=raw_result.stdout,
             stderr=raw_result.stderr,
-            exit_code=0,  # WASM _start doesn't return exit codes currently
+            exit_code=exit_code,
             duration_ms=duration_seconds * 1000,  # Convert to milliseconds
             fuel_consumed=raw_result.fuel_consumed,
             memory_used_bytes=raw_result.mem_len,
@@ -296,6 +332,19 @@ class PythonSandbox(BaseSandbox):
             workspace_path=str(self.workspace),
             metadata=metadata
         )
+
+    @staticmethod
+    def _determine_success(exit_code: int, trapped: bool, stderr: str) -> bool:
+        """Determine execution success based on exit codes, traps, and stderr content."""
+        if trapped:
+            return False
+
+        if exit_code != 0:
+            return False
+
+        lowered = (stderr or "").lower()
+        failure_tokens = ("traceback", "exception", "outoffuel", "memoryerror")
+        return not any(token in lowered for token in failure_tokens)
 
     def _update_session_timestamp(self) -> None:
         """Update the updated_at timestamp in session metadata after execution.

@@ -51,18 +51,10 @@ class TestSessionLifecycleLogging:
         )
         session_id = sandbox.session_id
 
-        # Verify either log_session_created OR log_session_retrieved was called
-        # (depends on timing - metadata creation happens before logging decision)
-        assert (mock_logger.log_session_created.called or
-                mock_logger.log_session_retrieved.called)
-
-        # Verify session_id is in the logged call
-        if mock_logger.log_session_created.called:
-            call_args = mock_logger.log_session_created.call_args
-            assert call_args[0][0] == session_id
-        elif mock_logger.log_session_retrieved.called:
-            call_args = mock_logger.log_session_retrieved.call_args
-            assert call_args[0][0] == session_id
+        mock_logger.log_session_created.assert_called_once()
+        mock_logger.log_session_retrieved.assert_not_called()
+        call_args = mock_logger.log_session_created.call_args
+        assert call_args[0][0] == session_id
 
     def test_get_session_logs_event(
         self, temp_workspace: Path, mock_logger: Mock

@@ -15,10 +15,11 @@ from __future__ import annotations
 
 import os
 import tempfile
+from typing import Tuple
 
-from wasmtime import Config, Engine, Linker, Module, Store, Trap, WasiConfig
+from wasmtime import Config, Engine, ExitTrap, Linker, Module, Store, Trap, WasiConfig
 
-from .policies import load_policy
+from .core.models import ExecutionPolicy
 
 
 class SandboxResult:
@@ -34,16 +35,29 @@ class SandboxResult:
     """
 
     def __init__(self, stdout: str, stderr: str, fuel_consumed: int | None,
-                 mem_pages: int, mem_len: int, logs_dir: str):
+                 mem_pages: int, mem_len: int, logs_dir: str,
+                 exit_code: int | None = None, trapped: bool = False,
+                 trap_reason: str | None = None, trap_message: str | None = None,
+                 stdout_truncated: bool = False, stderr_truncated: bool = False):
         self.stdout = stdout
         self.stderr = stderr
         self.fuel_consumed = fuel_consumed
         self.mem_pages = mem_pages
         self.mem_len = mem_len
         self.logs_dir = logs_dir
+        self.exit_code = exit_code
+        self.trapped = trapped
+        self.trap_reason = trap_reason
+        self.trap_message = trap_message
+        self.stdout_truncated = stdout_truncated
+        self.stderr_truncated = stderr_truncated
 
 
-def run_untrusted_python(wasm_path: str = "bin/python.wasm", workspace_dir: str | None = None) -> SandboxResult:
+def run_untrusted_python(
+    wasm_path: str = "bin/python.wasm",
+    workspace_dir: str | None = None,
+    policy: ExecutionPolicy | None = None
+) -> SandboxResult:
     """Execute untrusted Python code in a WASM sandbox with security constraints.
 
     Creates a Wasmtime environment with WASI capabilities, loads the CPython WASM
@@ -61,6 +75,8 @@ def run_untrusted_python(wasm_path: str = "bin/python.wasm", workspace_dir: str 
         wasm_path: Path to the CPython WASM binary (WLR AIO build).
         workspace_dir: Override for the writable workspace directory mounted at
             guest_mount_path. If None, uses policy default (mount_host_dir).
+        policy: ExecutionPolicy to enforce for this execution. If None, uses
+            the default ExecutionPolicy() values.
 
     Returns:
         SandboxResult containing captured outputs, resource consumption metrics,
@@ -71,7 +87,7 @@ def run_untrusted_python(wasm_path: str = "bin/python.wasm", workspace_dir: str 
         wasmtime.WasmtimeError: If WASM module fails to load or link.
         OSError: If temporary directory creation fails.
     """
-    policy = load_policy()
+    policy = policy or ExecutionPolicy()
 
     cfg = Config()
     cfg.consume_fuel = True
@@ -126,11 +142,26 @@ def run_untrusted_python(wasm_path: str = "bin/python.wasm", workspace_dir: str 
     start = instance.exports(store)["_start"]
     memory = instance.exports(store)["memory"]
 
+    trapped = False
+    trap_reason: str | None = None
+    trap_message: str | None = None
+    exit_code: int | None = None
+
     try:
         start(store)  # type: ignore[operator]
-    except Trap:
-        # Expected for OutOfFuel or other policy violations - not an error
-        pass
+        exit_code = 0
+    except ExitTrap as trap:
+        # Normal WASI proc_exit - use exit code to determine success
+        exit_code = trap.code
+        if trap.code != 0:
+            trap_message = str(trap)
+            trap_reason = "proc_exit"
+    except Trap as trap:
+        # OutOfFuel or other WASM traps
+        trapped = True
+        trap_message = str(trap)
+        trap_reason = _classify_trap(trap_message)
+        exit_code = 1
 
     try:
         fuel_remaining = store.get_fuel()
@@ -138,25 +169,32 @@ def run_untrusted_python(wasm_path: str = "bin/python.wasm", workspace_dir: str 
     except Exception:
         fuel_consumed = None
 
-    def read_capped(path: str, cap: int) -> str:
-        """Read file up to cap bytes to prevent DoS from unbounded output.
-
-        Args:
-            path: Log file path to read.
-            cap: Maximum bytes to return.
-
-        Returns:
-            File contents truncated to cap bytes, decoded as UTF-8.
-        """
+    def read_capped(path: str, cap: int) -> Tuple[str, bool]:
+        """Read file up to cap bytes to prevent DoS from unbounded output."""
         try:
             with open(path, "rb") as f:
                 data = f.read(cap + 1)
-            return data[:cap].decode("utf-8", errors="replace")
+            truncated = len(data) > cap
+            return data[:cap].decode("utf-8", errors="replace"), truncated
         except FileNotFoundError:
-            return ""
+            return "", False
 
-    stdout = read_capped(out_log, int(policy.stdout_max_bytes))
-    stderr = read_capped(err_log, int(policy.stderr_max_bytes))
+    stdout, stdout_truncated = read_capped(out_log, int(policy.stdout_max_bytes))
+    stderr, stderr_truncated = read_capped(err_log, int(policy.stderr_max_bytes))
+
+    if trap_reason == "out_of_fuel":
+        # Ensure OutOfFuel is visible to callers even if the guest wrote nothing
+        trap_notice = "Execution trapped: OutOfFuel"
+        if trap_notice not in stderr:
+            stderr = f"{stderr.rstrip()}\n{trap_notice}".strip()
+    elif trap_reason is not None and trap_message:
+        trap_notice = f"Execution trapped: {trap_message}"
+        if trap_notice not in stderr:
+            stderr = f"{stderr.rstrip()}\n{trap_notice}".strip()
+
+    # Re-apply caps if we appended trap notices
+    stdout, stdout_truncated = _enforce_cap(stdout, int(policy.stdout_max_bytes), stdout_truncated)
+    stderr, stderr_truncated = _enforce_cap(stderr, int(policy.stderr_max_bytes), stderr_truncated)
 
     return SandboxResult(
         stdout=stdout,
@@ -165,4 +203,33 @@ def run_untrusted_python(wasm_path: str = "bin/python.wasm", workspace_dir: str 
         mem_pages=memory.size(store),  # type: ignore[union-attr,call-arg]
         mem_len=memory.data_len(store),  # type: ignore[union-attr,call-arg]
         logs_dir=tmp,
+        exit_code=exit_code,
+        trapped=trapped,
+        trap_reason=trap_reason,
+        trap_message=trap_message,
+        stdout_truncated=stdout_truncated,
+        stderr_truncated=stderr_truncated,
     )
+
+
+def _classify_trap(message: str | None) -> str | None:
+    """Classify trap reason based on message content for easier diagnostics."""
+    if message is None:
+        return None
+
+    lowered = message.lower()
+    if "fuel" in lowered or "out of fuel" in lowered or "exhausted fuel" in lowered:
+        return "out_of_fuel"
+    if "memory" in lowered:
+        return "memory_limit"
+    return "trap"
+
+
+def _enforce_cap(text: str, cap: int, already_truncated: bool) -> tuple[str, bool]:
+    """Ensure text does not exceed cap bytes while tracking truncation."""
+    data = text.encode("utf-8", errors="replace")
+    if len(data) <= cap:
+        return text, already_truncated
+
+    truncated_text = data[:cap].decode("utf-8", errors="replace")
+    return truncated_text, True

@@ -91,9 +91,10 @@ def create_sandbox(
 
     # Create or update session metadata
     metadata_path = session_workspace / ".metadata.json"
+    metadata_existed = metadata_path.exists()
     now_utc = datetime.now(UTC).isoformat()
 
-    if metadata_path.exists():
+    if metadata_existed:
         # Existing session - update timestamp only
         try:
             data = json.loads(metadata_path.read_text())
@@ -133,7 +134,7 @@ def create_sandbox(
 
     # Log session creation/retrieval
     if logger is not None:
-        if metadata_path.exists():
+        if metadata_existed:
             logger.log_session_retrieved(session_id, str(session_workspace))
         else:
             logger.log_session_created(session_id, str(session_workspace))

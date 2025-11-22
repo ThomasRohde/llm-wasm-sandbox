@@ -131,6 +131,16 @@ class SandboxLogger:
             "files_modified": len(result.files_modified),
         }
 
+        stdout_truncated = result.metadata.get("stdout_truncated")
+        stderr_truncated = result.metadata.get("stderr_truncated")
+        trap_reason = result.metadata.get("trap_reason")
+        if stdout_truncated is not None:
+            log_kwargs["stdout_truncated"] = stdout_truncated
+        if stderr_truncated is not None:
+            log_kwargs["stderr_truncated"] = stderr_truncated
+        if trap_reason is not None:
+            log_kwargs["trap_reason"] = trap_reason
+
         if session_id is not None:
             log_kwargs["session_id"] = session_id
 

@@ -245,6 +245,10 @@ sandbox = create_sandbox(runtime=RuntimeType.PYTHON, policy=policy)
 | **Filesystem** | `/app` only | Isolated workspace directory |
 | **Environment** | Whitelist only | Explicit variable approval required |
 
+Stdout/stderr buffers are capped per policy; truncation is surfaced via
+`result.metadata["stdout_truncated"]` / `["stderr_truncated"]`, and traps
+report reasons in `result.metadata["trap_reason"]` alongside non-zero exit codes.
+
 ### Loading from TOML
 
 ```python

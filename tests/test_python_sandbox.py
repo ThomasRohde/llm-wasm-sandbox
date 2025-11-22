@@ -113,8 +113,11 @@ class TestPythonSandboxExecution:
         assert result.success is True
         assert "Hello from WASM" in result.stdout
         assert result.stderr == "" or "ResourceWarning" in result.stderr  # Python may emit resource warnings
+        assert result.exit_code == 0
         assert result.fuel_consumed is None or result.fuel_consumed > 0
         assert result.duration_ms > 0
+        assert result.metadata.get("stdout_truncated") is False
+        assert result.metadata.get("stderr_truncated") is False
 
     def test_execute_with_inject_setup_true(self, python_sandbox):
         """Test execute with inject_setup=True adds sys.path for vendored packages."""
@@ -155,6 +158,7 @@ print("Error message", file=sys.stderr)
         result = python_sandbox.execute(code)
 
         assert "Error message" in result.stderr
+        assert result.metadata.get("stderr_truncated") is False
 
     def test_execute_with_guest_error(self, python_sandbox):
         """Test that guest code errors are captured (not raised as host exceptions)."""
@@ -168,6 +172,8 @@ raise ValueError("Intentional error from guest")
         # Guest errors may appear in stderr OR cause WASM exit (both are valid)
         assert ("ValueError" in result.stderr or "Intentional error" in result.stderr or
                 "exit status" in result.stderr or "ExitTrap" in result.stderr)
+        assert result.success is False
+        assert result.exit_code != 0
 
     def test_execute_captures_metrics(self, python_sandbox):
         """Test that execution metrics (duration, fuel, memory) are captured."""
@@ -309,6 +315,9 @@ while True:
         assert isinstance(result, SandboxResult)
         # Fuel should be near or at budget
         assert result.fuel_consumed >= 0
+        assert result.success is False
+        assert result.exit_code != 0
+        assert result.metadata.get("trap_reason") == "out_of_fuel"
 
     def test_filesystem_isolation_prevents_escape(self, python_sandbox):
         """Test that WASI prevents filesystem access outside preopens."""
@@ -420,3 +429,32 @@ class TestPythonSandboxWorkspace:
         assert len(result.metadata["logs_dir"]) > 0
         # Logs dir should exist
         assert Path(result.metadata["logs_dir"]).exists()
+
+
+class TestPythonSandboxTruncation:
+    """Test truncation signaling for stdout/stderr caps."""
+
+    def test_truncation_flags_set(self, temp_workspace):
+        """Ensure stdout/stderr truncation is reflected in metadata."""
+        import uuid
+
+        policy = ExecutionPolicy(stdout_max_bytes=50, stderr_max_bytes=50)
+        session_id = str(uuid.uuid4())
+        sandbox = PythonSandbox(
+            wasm_binary_path="bin/python.wasm",
+            policy=policy,
+            session_id=session_id,
+            workspace_root=temp_workspace
+        )
+
+        code = """
+import sys
+print("A" * 200)
+print("B" * 200, file=sys.stderr)
+"""
+        result = sandbox.execute(code)
+
+        assert len(result.stdout) <= policy.stdout_max_bytes
+        assert len(result.stderr) <= policy.stderr_max_bytes
+        assert result.metadata.get("stdout_truncated") is True
+        assert result.metadata.get("stderr_truncated") is True

@@ -3,7 +3,7 @@ import os
 import tempfile
 from pathlib import Path
 
-from sandbox import RuntimeType, create_sandbox
+from sandbox import ExecutionPolicy, RuntimeType, create_sandbox
 from sandbox.host import SandboxResult, run_untrusted_python
 from sandbox.policies import DEFAULT_POLICY, load_policy
 from sandbox.utils import (
@@ -21,9 +21,9 @@ from sandbox.vendor import (
 )
 
 
-def execute(code: str, inject_setup: bool = True) -> dict:
+def execute(code: str, inject_setup: bool = True, policy: ExecutionPolicy | None = None) -> dict:
     """Helper function to execute code using new API and return dict for compatibility."""
-    sandbox = create_sandbox(runtime=RuntimeType.PYTHON)
+    sandbox = create_sandbox(runtime=RuntimeType.PYTHON, policy=policy)
     result = sandbox.execute(code, inject_setup=inject_setup)
     # Convert SandboxResult to dict for backwards compatibility with existing tests
     # Map memory_used_bytes to both mem_pages (approximate) and mem_len for compatibility
@@ -36,6 +36,8 @@ def execute(code: str, inject_setup: bool = True) -> dict:
         'mem_len': result.memory_used_bytes,  # Backwards compat
         'logs_dir': result.workspace_path,  # Use workspace as logs_dir equivalent
         'success': result.success,
+        'exit_code': result.exit_code,
+        'metadata': result.metadata,
     }
 
 
@@ -44,6 +46,7 @@ class TestBasicExecution:
 
     def test_basic_smoke(self):
         """Test basic Python execution with env vars and file access."""
+        policy = ExecutionPolicy(env={"DEMO_GREETING": "Hello from custom policy"})
         code = """
 import os
 print("Hello from WASM Python")
@@ -54,10 +57,10 @@ try:
 except Exception as e:
     print("Error reading file:", e)
 """
-        result = execute(code)
+        result = execute(code, policy=policy)
 
         assert "Hello from WASM Python" in result['stdout']
-        assert "Hej fra WASM" in result['stdout']
+        assert "Hello from custom policy" in result['stdout']
         assert result['fuel_consumed'] is not None
         assert result['mem_pages'] > 0
         assert result['logs_dir'] is not None
@@ -123,17 +126,19 @@ class TestFuelExhaustion:
 
     def test_infinite_loop_exhausts_fuel(self):
         """Test that infinite loops are caught by fuel exhaustion."""
+        policy = ExecutionPolicy(fuel_budget=100_000)
         code = """
 i = 0
 while True:
     i += 1
 """
-        result = execute(code)
+        result = execute(code, policy=policy)
 
         # Fuel should be consumed (either fully exhausted or partially)
         assert result['fuel_consumed'] is not None
-        # Check if stderr has content OR fuel was consumed (indicating interruption)
-        assert len(result['stderr']) > 0 or result['fuel_consumed'] > 0
+        assert result['success'] is False
+        assert result['exit_code'] != 0
+        assert "OutOfFuel" in result['stderr'] or "fuel" in result['stderr'].lower()
 
 
 class TestMemoryLimits:
@@ -339,7 +344,13 @@ class TestHostDirect:
             fuel_consumed=1000,
             mem_pages=10,
             mem_len=65536,
-            logs_dir="/tmp/test"
+            logs_dir="/tmp/test",
+            exit_code=0,
+            trapped=False,
+            trap_reason=None,
+            trap_message=None,
+            stdout_truncated=False,
+            stderr_truncated=True
         )
 
         assert result.stdout == "test stdout"
@@ -348,6 +359,12 @@ class TestHostDirect:
         assert result.mem_pages == 10
         assert result.mem_len == 65536
         assert result.logs_dir == "/tmp/test"
+        assert result.exit_code == 0
+        assert result.trapped is False
+        assert result.trap_reason is None
+        assert result.trap_message is None
+        assert result.stdout_truncated is False
+        assert result.stderr_truncated is True
 
 
 class TestEdgeCases:
@@ -358,6 +375,7 @@ class TestEdgeCases:
         result = execute("")
         assert result['stdout'] == ""
         assert result['fuel_consumed'] is not None
+        assert result['success'] is True
 
     def test_syntax_error_in_code(self):
         """Test executing code with syntax errors causes trap."""
@@ -366,14 +384,11 @@ class TestEdgeCases:
 if True
     print('missing colon')
 """
-        # Syntax errors cause Python to exit with non-zero, which raises ExitTrap
-        try:
-            result = execute(code)
-            # If we get here, check that execution happened
-            assert result['fuel_consumed'] is not None
-        except Exception:
-            # ExitTrap is expected for syntax errors
-            pass
+        result = execute(code)
+        assert result['fuel_consumed'] is not None
+        assert result['success'] is False
+        assert result['exit_code'] != 0
+        assert "traceback" in result['stderr'].lower() or "syntax" in result['stderr'].lower()
 
     def test_import_error_handling(self):
         """Test handling of import errors."""
@@ -405,7 +420,7 @@ for i in range(5):
     def test_large_output_capped(self):
         """Test that large output is capped."""
         code = """
-# Try to generate large output (should be capped by policy)
+        # Try to generate large output (should be capped by policy)
 for i in range(100000):
     print("x" * 100)
 """
@@ -413,6 +428,7 @@ for i in range(100000):
         # Output should exist but be capped
         assert len(result['stdout']) > 0
         assert result['fuel_consumed'] is not None
+        assert result["metadata"].get("stdout_truncated") is True
 
 
 class TestVendorBootstrap:

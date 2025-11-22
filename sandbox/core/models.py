@@ -196,7 +196,7 @@ class SandboxResult(BaseModel):
 
     metadata: dict[str, Any] = Field(
         default_factory=dict,
-        description="Additional runtime-specific or execution metadata"
+        description="Additional runtime-specific or execution metadata (e.g., logs_dir, trap_reason, stdout_truncated)"
     )
 
     model_config = {
