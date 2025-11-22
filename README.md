@@ -209,6 +209,77 @@ print(result.fuel_consumed)       # Fuel units used
 print(result.duration_seconds)    # Wall-clock time
 ```
 
+### JavaScript Execution
+
+Execute untrusted JavaScript code using the QuickJS WASM runtime with the same security guarantees:
+
+```python
+from sandbox import create_sandbox, RuntimeType
+
+# Create JavaScript sandbox
+sandbox = create_sandbox(runtime=RuntimeType.JAVASCRIPT)
+
+# Execute JavaScript code
+result = sandbox.execute("""
+const data = { status: "success", value: 42 };
+console.log(JSON.stringify(data));
+""")
+
+print(result.stdout)  # {"status":"success","value":42}
+print(f"Success: {result.success}")
+print(f"Fuel consumed: {result.fuel_consumed:,}")
+```
+
+**Download QuickJS Binary:**
+
+```powershell
+# Windows (PowerShell)
+.\scripts\fetch_quickjs.ps1
+```
+
+The QuickJS binary (~1.36 MB) will be downloaded to `bin/quickjs.wasm`. This is required before executing JavaScript code.
+
+**JavaScript with Custom Policy:**
+
+```python
+from sandbox import create_sandbox, ExecutionPolicy, RuntimeType
+
+# Configure resource limits for JavaScript
+policy = ExecutionPolicy(
+    fuel_budget=500_000_000,        # 500M instructions
+    memory_bytes=32 * 1024 * 1024,  # 32 MB
+    env={"NODE_ENV": "sandbox"}     # Environment variables
+)
+
+sandbox = create_sandbox(runtime=RuntimeType.JAVASCRIPT, policy=policy)
+
+result = sandbox.execute("""
+// Access environment variable
+const env = 'NODE_ENV' in process ? process.env.NODE_ENV : 'unknown';
+console.log(`Running in: ${env}`);
+
+// Perform computation
+const factorial = n => n <= 1 ? 1 : n * factorial(n - 1);
+console.log(`5! = ${factorial(5)}`);
+""")
+
+print(result.stdout)
+```
+
+**File I/O in JavaScript:**
+
+```python
+sandbox = create_sandbox(runtime=RuntimeType.JAVASCRIPT)
+
+# JavaScript code can read/write files in /app
+result = sandbox.execute("""
+// Note: QuickJS WASI has limited file I/O APIs
+// File operations require native QuickJS APIs
+console.log("File I/O requires QuickJS-specific APIs");
+console.log("See JAVASCRIPT.md for details on limitations");
+""")
+```
+
 ### Logging and Observability
 
 Every sandbox ships with a `SandboxLogger` that works with either `structlog` or the standard `logging.Logger`. Execution lifecycle events use messages `sandbox.execution.start` / `sandbox.execution.complete` with an `event` field (`execution.start` / `execution.complete`), policy snapshots, runtime identifiers, success, duration, exit_code, fuel_consumed, and memory_used_bytes. Completion logs also include filesystem deltas (created/modified counts plus truncated path lists) so telemetry backends can ingest changes without log flooding.
@@ -360,14 +431,17 @@ print(result.stdout)
 ### Fetch WASM Binary
 
 ```powershell
-# Windows (PowerShell)
+# Windows (PowerShell) - CPython
 .\scripts\fetch_wlr_python.ps1
 
-# Unix/Linux/MacOS (Bash)
+# Windows (PowerShell) - QuickJS
+.\scripts\fetch_quickjs.ps1
+
+# Unix/Linux/MacOS (Bash) - CPython
 ./scripts/fetch_wlr_python.sh
 ```
 
-Downloads the CPython WASM binary from WebAssembly Language Runtimes (WLR) releases and saves it to `bin/python.wasm`. To update to a newer Python version, edit the `$WLR_RELEASE_TAG` and `$AIO_FILE` variables in the script.
+Downloads the CPython or QuickJS WASM binary and saves it to `bin/python.wasm` or `bin/quickjs.wasm`. To update to a newer version, edit the release tag variables in the respective script.
 
 ### Manage Vendored Packages
 
@@ -796,7 +870,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🚀 Roadmap
 
-- [ ] JavaScript runtime support
+- [x] JavaScript runtime support (QuickJS WASM)
 - [ ] Improved async execution support
 - [ ] Network sandboxing with explicit socket grants
 - [ ] Enhanced metrics and profiling

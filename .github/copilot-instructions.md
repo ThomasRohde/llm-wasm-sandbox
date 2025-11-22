@@ -45,7 +45,7 @@ sandbox/
 
 2. **Runtime Layer** (`sandbox/runtimes/`): Runtime-specific sandbox implementations
    - `PythonSandbox`: CPython WASM execution with fuel/memory limits
-   - Future: `JavaScriptSandbox` for JavaScript runtime
+   - `JavaScriptSandbox`: QuickJS WASM execution with same security model
 
 3. **Host Layer** (`sandbox/host.py`): Low-level Wasmtime/WASI configuration
    - WASM binary loading and execution
@@ -54,11 +54,13 @@ sandbox/
 
 ### Critical Files (per `WASM_SANDBOX.md`)
 - `bin/python.wasm`: WLR AIO CPython-for-WASI binary (downloaded, not source-controlled)
+- `bin/quickjs.wasm`: QuickJS-NG WASI binary for JavaScript runtime (downloaded, not source-controlled)
 - `config/policy.toml`: Tunable execution policy (fuel, memory, preopens, env vars)
 - `workspace/`: Preopened directory visible to guest as `/app` (WASI capability mount point)
 - `tests/`: Comprehensive test suite (security boundaries, type validation, API contracts)
 - `sandbox/core/models.py`: Pydantic models for type-safe configuration and results
 - `sandbox/runtimes/python/sandbox.py`: Main execution logic for Python runtime
+- `sandbox/runtimes/javascript/sandbox.py`: Main execution logic for JavaScript runtime
 
 ## Developer Workflow
 
@@ -67,11 +69,13 @@ sandbox/
 # Initial setup (uv creates venv automatically)
 uv sync
 
-# Fetch WASM binary (bash script - adapt for Windows or use Git Bash/WSL)
-./scripts/fetch_wlr_python.sh
+# Fetch WASM binaries
+.\scripts\fetch_wlr_python.ps1   # CPython runtime
+.\scripts\fetch_quickjs.ps1       # JavaScript runtime
 
 # Run commands with uv
 uv run python -c "from sandbox import create_sandbox, RuntimeType; sandbox = create_sandbox(runtime=RuntimeType.PYTHON); print(sandbox.execute('print(42)').stdout)"
+uv run python -c "from sandbox import create_sandbox, RuntimeType; sandbox = create_sandbox(runtime=RuntimeType.JAVASCRIPT); print(sandbox.execute('console.log(42)').stdout)"
 ```
 
 **Key dependency**: `wasmtime==38.*` (pin major/minor - API changes frequently). Python 3.11+ for `tomllib`; use `tomli` for older versions.
@@ -83,9 +87,16 @@ uv run python -c "from sandbox import create_sandbox, RuntimeType; sandbox = cre
 **Typed API:**
 ```python
 from sandbox import create_sandbox, RuntimeType
+
+# Python runtime
 sandbox = create_sandbox(runtime=RuntimeType.PYTHON)
 result = sandbox.execute("print('Hello from WASM')")
 # Returns: SandboxResult (Pydantic model) with typed fields
+print(result.stdout, result.fuel_consumed, result.success)
+
+# JavaScript runtime
+sandbox = create_sandbox(runtime=RuntimeType.JAVASCRIPT)
+result = sandbox.execute("console.log('Hello from QuickJS')")
 print(result.stdout, result.fuel_consumed, result.success)
 ```
 
@@ -174,13 +185,13 @@ Merge user-provided `policy.toml` with defaults using dict union (`|` operator) 
 ## Integration Points
 
 ### LLM Pipeline Flow
-1. LLM generates Python code (untrusted)
-2. Create sandbox: `sandbox = create_sandbox(runtime=RuntimeType.PYTHON, policy=custom_policy)`
+1. LLM generates code (Python or JavaScript - untrusted)
+2. Create sandbox: `sandbox = create_sandbox(runtime=RuntimeType.PYTHON|JAVASCRIPT, policy=custom_policy)`
 3. Execute code: `result = sandbox.execute(code)` → returns typed `SandboxResult`
 4. Collect metrics (`result.fuel_consumed`, `result.duration_seconds`) + output for LLM feedback loop
 5. Use structured logging via `SandboxLogger` for observability
 
-**Example Integration:**
+**Example Integration (Python):**
 ```python
 from sandbox import create_sandbox, ExecutionPolicy, RuntimeType
 
@@ -198,8 +209,27 @@ else:
     feedback = f"Success: {result.stdout}"
 ```
 
+**Example Integration (JavaScript):**
+```python
+from sandbox import create_sandbox, ExecutionPolicy, RuntimeType
+
+policy = ExecutionPolicy(fuel_budget=500_000_000, memory_bytes=32*1024*1024)
+sandbox = create_sandbox(runtime=RuntimeType.JAVASCRIPT, policy=policy)
+
+llm_js_code = generate_code_from_llm(prompt)
+result = sandbox.execute(llm_js_code)
+
+if not result.success:
+    feedback = f"Execution failed: {result.stderr}"
+elif result.fuel_consumed > 400_000_000:
+    feedback = "Code too complex, simplify"
+else:
+    feedback = f"Success: {result.stdout}"
+```
+
 ### External Dependencies
-- **WLR Python binary**: Update `scripts/fetch_wlr_python.sh` with latest [release tag](https://github.com/webassemblylabs/webassembly-language-runtimes/releases)
+- **WLR Python binary**: Update `scripts/fetch_wlr_python.ps1` with latest [release tag](https://github.com/webassemblylabs/webassembly-language-runtimes/releases)
+- **QuickJS binary**: Update `scripts/fetch_quickjs.ps1` with latest [QuickJS-NG release](https://github.com/quickjs-ng/quickjs/releases)
 - **Wasmtime versions**: Monthly releases - test before upgrading, check [changelog](https://github.com/bytecodealliance/wasmtime-py/releases)
 
 ### Defense-in-Depth (Production Hardening)
@@ -212,8 +242,9 @@ Per `WASM_SANDBOX.md` section 9:
 
 ### Fetch WASM Binary
 ```bash
-./scripts/fetch_wlr_python.sh
-# Downloads python.wasm to bin/ - ~50-100 MB AIO artifact
+./scripts/fetch_wlr_python.sh    # CPython
+./scripts/fetch_quickjs.ps1       # QuickJS (PowerShell)
+# Downloads python.wasm or quickjs.wasm to bin/ - ~50-100 MB AIO artifact for Python, ~1.4 MB for QuickJS
 ```
 
 ### Run Tests (Malicious Samples)

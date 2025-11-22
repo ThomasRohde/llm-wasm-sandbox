@@ -67,13 +67,15 @@ class TestCreateSandboxRuntimeSelection:
 
         assert isinstance(sandbox, PythonSandbox)
 
-    def test_create_sandbox_with_javascript_runtime_raises_not_implemented(self) -> None:
-        """Test create_sandbox(runtime=JAVASCRIPT) raises NotImplementedError."""
-        with pytest.raises(NotImplementedError) as exc_info:
-            create_sandbox(runtime=RuntimeType.JAVASCRIPT)
+    def test_create_sandbox_with_javascript_runtime_returns_javascript_sandbox(self) -> None:
+        """Test create_sandbox(runtime=JAVASCRIPT) returns JavaScriptSandbox."""
+        from sandbox.runtimes.javascript.sandbox import JavaScriptSandbox
+        
+        sandbox = create_sandbox(runtime=RuntimeType.JAVASCRIPT)
 
-        assert "JavaScript runtime is not yet implemented" in str(exc_info.value)
-        assert "RuntimeType.PYTHON" in str(exc_info.value)
+        assert isinstance(sandbox, JavaScriptSandbox)
+        assert sandbox.session_id is not None
+        assert sandbox.wasm_binary_path == "bin/quickjs.wasm"
 
     def test_create_sandbox_with_invalid_runtime_raises_value_error(self) -> None:
         """Test create_sandbox(runtime='invalid') raises ValueError."""
@@ -222,3 +224,103 @@ class TestCreateSandboxIntegration:
         assert hasattr(sandbox, "validate_code")
         assert callable(sandbox.execute)
         assert callable(sandbox.validate_code)
+
+
+class TestCreateSandboxJavaScriptIntegration:
+    """Integration tests for JavaScript runtime factory creation."""
+
+    def test_create_javascript_sandbox_with_default_wasm_path(self) -> None:
+        """Test create_sandbox(runtime=JAVASCRIPT) uses default bin/quickjs.wasm."""
+        from sandbox.runtimes.javascript.sandbox import JavaScriptSandbox
+
+        sandbox = create_sandbox(runtime=RuntimeType.JAVASCRIPT)
+
+        assert isinstance(sandbox, JavaScriptSandbox)
+        assert sandbox.wasm_binary_path == "bin/quickjs.wasm"
+
+    def test_create_javascript_sandbox_with_custom_policy(self) -> None:
+        """Test factory with custom policy passes policy to JavaScriptSandbox."""
+        from sandbox.runtimes.javascript.sandbox import JavaScriptSandbox
+
+        custom_policy = ExecutionPolicy(
+            fuel_budget=500_000_000,
+            memory_bytes=32 * 1024 * 1024,
+            env={"DEBUG": "1"}
+        )
+
+        sandbox = create_sandbox(runtime=RuntimeType.JAVASCRIPT, policy=custom_policy)
+
+        assert isinstance(sandbox, JavaScriptSandbox)
+        assert sandbox.policy == custom_policy
+        assert sandbox.policy.fuel_budget == 500_000_000
+        assert sandbox.policy.memory_bytes == 32 * 1024 * 1024
+        assert sandbox.policy.env["DEBUG"] == "1"
+
+    def test_create_javascript_sandbox_with_custom_wasm_binary_path(self) -> None:
+        """Test factory with custom wasm_binary_path uses correct binary."""
+        from sandbox.runtimes.javascript.sandbox import JavaScriptSandbox
+
+        custom_wasm = "custom/path/quickjs.wasm"
+
+        sandbox = create_sandbox(
+            runtime=RuntimeType.JAVASCRIPT,
+            wasm_binary_path=custom_wasm
+        )
+
+        assert isinstance(sandbox, JavaScriptSandbox)
+        assert sandbox.wasm_binary_path == custom_wasm
+
+    def test_create_javascript_sandbox_with_custom_logger(self) -> None:
+        """Test factory with custom logger passes logger to JavaScriptSandbox."""
+        from sandbox.runtimes.javascript.sandbox import JavaScriptSandbox
+        import logging
+
+        custom_logger = SandboxLogger(logging.getLogger("js-test"))
+
+        sandbox = create_sandbox(
+            runtime=RuntimeType.JAVASCRIPT,
+            logger=custom_logger
+        )
+
+        assert isinstance(sandbox, JavaScriptSandbox)
+        assert sandbox.logger == custom_logger
+
+    def test_create_javascript_sandbox_with_custom_session_id(self, tmp_path: Path) -> None:
+        """Test factory with custom session_id creates correct workspace."""
+        from sandbox.runtimes.javascript.sandbox import JavaScriptSandbox
+
+        custom_workspace = tmp_path / "js_workspace"
+
+        sandbox = create_sandbox(
+            runtime=RuntimeType.JAVASCRIPT,
+            workspace_root=custom_workspace
+        )
+
+        assert isinstance(sandbox, JavaScriptSandbox)
+        assert sandbox.workspace_root == custom_workspace
+        assert sandbox.workspace.parent == custom_workspace
+        assert str(sandbox.session_id) in str(sandbox.workspace)
+
+    def test_create_javascript_sandbox_with_all_parameters(self, tmp_path: Path) -> None:
+        """Test factory with all custom parameters for JavaScript runtime."""
+        from sandbox.runtimes.javascript.sandbox import JavaScriptSandbox
+        import logging
+
+        custom_policy = ExecutionPolicy(fuel_budget=800_000_000)
+        custom_workspace = tmp_path / "full_js_workspace"
+        custom_logger = SandboxLogger(logging.getLogger("js-integration"))
+        custom_wasm = "integration/quickjs.wasm"
+
+        sandbox = create_sandbox(
+            runtime=RuntimeType.JAVASCRIPT,
+            policy=custom_policy,
+            workspace_root=custom_workspace,
+            logger=custom_logger,
+            wasm_binary_path=custom_wasm
+        )
+
+        assert isinstance(sandbox, JavaScriptSandbox)
+        assert sandbox.policy == custom_policy
+        assert sandbox.workspace_root == custom_workspace
+        assert sandbox.logger == custom_logger
+        assert sandbox.wasm_binary_path == custom_wasm

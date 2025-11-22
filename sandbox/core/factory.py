@@ -40,6 +40,7 @@ def create_sandbox(
         logger: Optional SandboxLogger. If None, runtime creates default logger.
         **kwargs: Additional runtime-specific arguments passed to constructor.
                   For PythonSandbox: wasm_binary_path (default: "bin/python.wasm")
+                  For JavaScriptSandbox: wasm_binary_path (default: "bin/quickjs.wasm")
 
     Returns:
         BaseSandbox: Concrete sandbox instance (PythonSandbox or JavaScriptSandbox)
@@ -47,7 +48,6 @@ def create_sandbox(
 
     Raises:
         ValueError: If runtime is not a valid RuntimeType enum value
-        NotImplementedError: If runtime is JAVASCRIPT (not yet implemented)
 
     Examples:
         >>> # Create sandbox with auto-generated session ID
@@ -63,6 +63,11 @@ def create_sandbox(
         >>> # Create with custom policy
         >>> policy = ExecutionPolicy(fuel_budget=1_000_000_000)
         >>> sandbox = create_sandbox(runtime=RuntimeType.PYTHON, policy=policy)
+
+        >>> # Create JavaScript sandbox
+        >>> sandbox = create_sandbox(runtime=RuntimeType.JAVASCRIPT)
+        >>> print(sandbox.session_id)
+        '550e8400-e29b-41d4-a716-446655440001'
 
         >>> # Create with custom workspace root
         >>> sandbox = create_sandbox(workspace_root=Path("/var/lib/sandbox/sessions"))
@@ -154,9 +159,16 @@ def create_sandbox(
         )
 
     elif runtime == RuntimeType.JAVASCRIPT:
-        raise NotImplementedError(
-            "JavaScript runtime is not yet implemented. "
-            "Currently only RuntimeType.PYTHON is supported."
+        from sandbox.runtimes.javascript.sandbox import JavaScriptSandbox
+
+        wasm_binary_path = kwargs.pop("wasm_binary_path", "bin/quickjs.wasm")
+        return JavaScriptSandbox(
+            wasm_binary_path=wasm_binary_path,
+            policy=policy,
+            session_id=session_id,
+            workspace_root=workspace_root,
+            logger=logger,
+            **kwargs
         )
 
     else:

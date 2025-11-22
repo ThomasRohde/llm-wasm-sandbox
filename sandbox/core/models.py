@@ -92,7 +92,7 @@ class ExecutionPolicy(BaseModel):
 
     argv: list[str] = Field(
         default_factory=lambda: ["python", "-I", "/app/user_code.py", "-X", "utf8"],
-        description="Guest process command-line arguments"
+        description="Guest process command-line arguments (Python-specific default; runtimes may override in host layer)"
     )
 
     env: dict[str, str] = Field(
@@ -102,7 +102,7 @@ class ExecutionPolicy(BaseModel):
             "PYTHONIOENCODING": "utf-8",
             "PYTHONHASHSEED": "0",
         },
-        description="Environment variables exposed to guest"
+        description="Environment variables exposed to guest (Python-specific defaults; can be customized per runtime)"
     )
 
     timeout_seconds: float | None = Field(

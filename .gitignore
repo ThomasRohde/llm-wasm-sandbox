@@ -30,8 +30,9 @@ env/
 .uv/
 uv.lock
 
-# WASM binary (large, download separately)
+# WASM binaries (large, download separately)
 bin/python.wasm
+bin/quickjs.wasm
 
 # Vendored packages (download with manage_vendor.py)
 vendor/
