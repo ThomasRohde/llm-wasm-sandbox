@@ -11,7 +11,6 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from pydantic import ValidationError
 
 from sandbox.core import (
     ExecutionPolicy,
@@ -89,49 +88,49 @@ class TestExecutionPolicy:
     
     def test_negative_fuel_budget_fails(self):
         """Test ExecutionPolicy rejects negative fuel_budget."""
-        with pytest.raises(ValidationError) as excinfo:
+        with pytest.raises(PolicyValidationError) as excinfo:
             ExecutionPolicy(fuel_budget=-100)
         
         assert "fuel_budget" in str(excinfo.value)
     
     def test_zero_fuel_budget_fails(self):
         """Test ExecutionPolicy rejects zero fuel_budget."""
-        with pytest.raises(ValidationError) as excinfo:
+        with pytest.raises(PolicyValidationError) as excinfo:
             ExecutionPolicy(fuel_budget=0)
         
         assert "fuel_budget" in str(excinfo.value)
     
     def test_negative_memory_bytes_fails(self):
         """Test ExecutionPolicy rejects negative memory_bytes."""
-        with pytest.raises(ValidationError) as excinfo:
+        with pytest.raises(PolicyValidationError) as excinfo:
             ExecutionPolicy(memory_bytes=-1000)
         
         assert "memory_bytes" in str(excinfo.value)
     
     def test_zero_memory_bytes_fails(self):
         """Test ExecutionPolicy rejects zero memory_bytes."""
-        with pytest.raises(ValidationError) as excinfo:
+        with pytest.raises(PolicyValidationError) as excinfo:
             ExecutionPolicy(memory_bytes=0)
         
         assert "memory_bytes" in str(excinfo.value)
     
     def test_negative_stdout_max_bytes_fails(self):
         """Test ExecutionPolicy rejects negative stdout_max_bytes."""
-        with pytest.raises(ValidationError) as excinfo:
+        with pytest.raises(PolicyValidationError) as excinfo:
             ExecutionPolicy(stdout_max_bytes=-500)
         
         assert "stdout_max_bytes" in str(excinfo.value)
     
     def test_negative_stderr_max_bytes_fails(self):
         """Test ExecutionPolicy rejects negative stderr_max_bytes."""
-        with pytest.raises(ValidationError) as excinfo:
+        with pytest.raises(PolicyValidationError) as excinfo:
             ExecutionPolicy(stderr_max_bytes=-500)
         
         assert "stderr_max_bytes" in str(excinfo.value)
     
     def test_negative_timeout_fails(self):
         """Test ExecutionPolicy rejects negative timeout_seconds."""
-        with pytest.raises(ValidationError) as excinfo:
+        with pytest.raises(PolicyValidationError) as excinfo:
             ExecutionPolicy(timeout_seconds=-10.0)
         
         assert "timeout_seconds" in str(excinfo.value)
@@ -183,6 +182,13 @@ class TestExecutionPolicy:
         )
         
         assert policy.mount_data_dir == "/host/data"
+        assert policy.guest_data_path == "/data"
+
+    def test_optional_data_mount_defaults_guest_path(self):
+        """Test guest_data_path defaults to /data when mount_data_dir is provided programmatically."""
+        policy = ExecutionPolicy(mount_data_dir="datasets")
+
+        assert policy.mount_data_dir == "datasets"
         assert policy.guest_data_path == "/data"
 
 
@@ -391,7 +397,8 @@ guest_data_path = "/readonly_data"
             with pytest.raises(PolicyValidationError) as excinfo:
                 load_policy(toml_path)
             
-            assert "validation failed" in str(excinfo.value).lower()
+            assert "invalid execution policy" in str(excinfo.value).lower()
+            assert "fuel_budget" in str(excinfo.value).lower()
         finally:
             Path(toml_path).unlink()
     
@@ -405,7 +412,8 @@ guest_data_path = "/readonly_data"
             with pytest.raises(PolicyValidationError) as excinfo:
                 load_policy(toml_path)
             
-            assert "validation failed" in str(excinfo.value).lower()
+            assert "invalid execution policy" in str(excinfo.value).lower()
+            assert "memory_bytes" in str(excinfo.value).lower()
         finally:
             Path(toml_path).unlink()
     

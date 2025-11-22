@@ -185,6 +185,20 @@ raise ValueError("Intentional error from guest")
         assert result.memory_used_bytes > 0
         assert "memory_pages" in result.metadata
 
+    def test_missing_wasm_binary_raises_file_not_found(self, temp_workspace, default_policy):
+        """Missing WASM binaries should raise instead of returning a result."""
+        import uuid
+
+        sandbox = PythonSandbox(
+            wasm_binary_path="bin/missing-python.wasm",
+            policy=default_policy,
+            session_id=str(uuid.uuid4()),
+            workspace_root=temp_workspace
+        )
+
+        with pytest.raises(FileNotFoundError):
+            sandbox.execute("print('test')")
+
 
 class TestPythonSandboxFileDetection:
     """Test file delta detection (created/modified files)."""
@@ -286,6 +300,22 @@ obj = MyClass(10)
 result = obj.process()
 """
         assert python_sandbox.validate_code(code) is True
+
+    def test_validate_code_uses_sandbox_filename(self, python_sandbox, monkeypatch):
+        """Validate code should compile using the <sandbox> filename sentinel."""
+        import builtins
+
+        captured: dict[str, str] = {}
+        real_compile = builtins.compile
+
+        def fake_compile(source: str, filename: str, mode: str):
+            captured["filename"] = filename
+            return real_compile(source, filename, mode)
+
+        monkeypatch.setattr(builtins, "compile", fake_compile)
+
+        assert python_sandbox.validate_code("x = 1") is True
+        assert captured["filename"] == "<sandbox>"
 
 
 class TestPythonSandboxSecurityBoundaries:

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import logging
 import pytest
 import structlog
 
@@ -52,6 +53,16 @@ def custom_logger(log_capture: StructlogCapture) -> Any:
     return structlog.get_logger("test_sandbox")
 
 
+@pytest.fixture
+def std_logger() -> logging.Logger:
+    """Fixture providing a standard library logger for compatibility tests."""
+    logger = logging.getLogger("sandbox-test-logger")
+    logger.handlers.clear()
+    logger.setLevel(logging.INFO)
+    logger.propagate = True
+    return logger
+
+
 def test_configure_structlog_console_renderer() -> None:
     """Test structlog configuration with console renderer."""
     configure_structlog(use_json=False)
@@ -86,6 +97,21 @@ def test_sandbox_logger_creates_default_logger() -> None:
     assert sandbox_logger._logger is not None
 
 
+def test_sandbox_logger_accepts_standard_logging_logger(std_logger: logging.Logger, caplog: pytest.LogCaptureFixture) -> None:
+    """Test SandboxLogger works with a standard logging.Logger."""
+    sandbox_logger = SandboxLogger(logger=std_logger)
+    policy = ExecutionPolicy()
+
+    with caplog.at_level(logging.INFO, logger=std_logger.name):
+        sandbox_logger.log_execution_start(runtime="python", policy=policy, workspace="/tmp/test")
+
+    assert len(caplog.records) == 1
+    record = caplog.records[0]
+    assert record.event == "execution.start"
+    assert record.runtime == "python"
+    assert record.log_message == "sandbox.execution.start"
+
+
 def test_log_execution_start_structure(
     custom_logger: Any,
     log_capture: StructlogCapture
@@ -114,7 +140,8 @@ def test_log_execution_start_structure(
 
     # Verify log level and event type
     assert event["level"] == "info"
-    assert event["event_type"] == "execution.start"
+    assert event["event"] == "execution.start"
+    assert event["log_message"] == "sandbox.execution.start"
 
     # Verify structured data
     assert event["runtime"] == "python"
@@ -123,6 +150,7 @@ def test_log_execution_start_structure(
     assert event["stdout_max_bytes"] == 1_000_000
     assert event["stderr_max_bytes"] == 500_000
     assert event["guest_mount_path"] == "/app"
+    assert event["policy"]["fuel_budget"] == 500_000_000
 
     # Verify extra fields passed through
     assert event["trace_id"] == "test-trace-123"
@@ -156,7 +184,8 @@ def test_log_execution_complete_success_structure(
     event = log_capture.events[0]
 
     assert event["level"] == "info"
-    assert event["event_type"] == "execution.complete"
+    assert event["event"] == "execution.complete"
+    assert event["log_message"] == "sandbox.execution.complete"
 
     # Verify structured data
     assert event["runtime"] == "python"
@@ -167,8 +196,40 @@ def test_log_execution_complete_success_structure(
     assert event["duration_ms"] == 42.5
     assert event["stdout_bytes"] == len("Hello, world!\n")
     assert event["stderr_bytes"] == 0
-    assert event["files_created"] == 1
-    assert event["files_modified"] == 1
+    assert event["files_created_count"] == 1
+    assert event["files_modified_count"] == 1
+    assert event["files_created_paths"] == ["output.txt"]
+    assert event["files_modified_paths"] == ["data.json"]
+
+
+def test_log_execution_complete_truncates_long_paths(
+    custom_logger: Any,
+    log_capture: StructlogCapture
+) -> None:
+    """Test filesystem delta logging truncates very long paths."""
+    sandbox_logger = SandboxLogger(logger=custom_logger)
+
+    long_name = "nested/" + ("a" * 180) + ".txt"
+    result = SandboxResult(
+        success=True,
+        stdout="",
+        stderr="",
+        exit_code=0,
+        fuel_consumed=None,
+        memory_used_bytes=123,
+        duration_ms=1.0,
+        files_created=[long_name],
+        files_modified=[],
+        workspace_path="/workspace"
+    )
+
+    sandbox_logger.log_execution_complete(result, runtime="python")
+
+    event = log_capture.events[0]
+    assert event["files_created_count"] == 1
+    truncated_path = event["files_created_paths"][0]
+    assert truncated_path.endswith(SandboxLogger._PATH_TRUNCATION_SUFFIX)
+    assert len(truncated_path) <= SandboxLogger._MAX_PATH_LENGTH
 
 
 def test_log_execution_complete_failure_structure(
@@ -198,6 +259,7 @@ def test_log_execution_complete_failure_structure(
     event = log_capture.events[0]
 
     assert event["level"] == "info"
+    assert event["event"] == "execution.complete"
     assert event["success"] is False
     assert event["exit_code"] == 1
 
@@ -226,10 +288,10 @@ def test_log_security_event_structure(
 
     # Security events should be WARNING level
     assert event["level"] == "warning"
-    assert event["event_name"] == "security.violation"
+    assert event["event"] == "security.fuel_exhausted"
+    assert event["log_message"] == "sandbox.security.fuel_exhausted"
 
     # Verify structured data
-    assert event["event_type"] == "fuel_exhausted"
     assert event["fuel_budget"] == 400_000_000
     assert event["fuel_consumed"] == 400_000_000
     assert event["code_snippet"] == "while True: pass"
@@ -256,7 +318,7 @@ def test_log_security_event_fs_access_denied(
     event = log_capture.events[0]
 
     assert event["level"] == "warning"
-    assert event["event_type"] == "fs_access_denied"
+    assert event["event"] == "security.fs_access_denied"
     assert event["attempted_path"] == "/etc/passwd"
     assert event["allowed_paths"] == ["/app"]
     assert event["operation"] == "read"
@@ -280,6 +342,8 @@ def test_multiple_extra_fields_in_execution_start(
     )
 
     event = log_capture.events[0]
+    assert event["event"] == "execution.start"
+    assert event["log_message"] == "sandbox.execution.start"
 
     # Verify all extra fields are attached
     assert event["span_id"] == "span-456"
@@ -352,7 +416,8 @@ def test_log_session_created(
     event = log_capture.events[0]
 
     assert event["level"] == "info"
-    assert event["event_type"] == "session.created"
+    assert event["event"] == "session.created"
+    assert event["log_message"] == "sandbox.session.created"
     assert event["session_id"] == "session-abc-123"
     assert event["workspace_path"] == "/workspace/session-abc-123"
 
@@ -370,7 +435,7 @@ def test_log_session_retrieved(
     )
 
     event = log_capture.events[0]
-    assert event["event_type"] == "session.retrieved"
+    assert event["event"] == "session.retrieved"
     assert event["session_id"] == "session-def-456"
 
 
@@ -384,7 +449,7 @@ def test_log_session_deleted(
     sandbox_logger.log_session_deleted(session_id="session-ghi-789")
 
     event = log_capture.events[0]
-    assert event["event_type"] == "session.deleted"
+    assert event["event"] == "session.deleted"
     assert event["session_id"] == "session-ghi-789"
 
 
@@ -403,7 +468,7 @@ def test_log_file_operation_write(
     )
 
     event = log_capture.events[0]
-    assert event["event_type"] == "session.file.write"
+    assert event["event"] == "session.file.write"
     assert event["session_id"] == "session-123"
     assert event["path"] == "data/output.txt"
     assert event["file_size"] == 1024
@@ -424,7 +489,7 @@ def test_log_file_operation_list(
     )
 
     event = log_capture.events[0]
-    assert event["event_type"] == "session.file.list"
+    assert event["event"] == "session.file.list"
     assert event["file_count"] == 5
 
 
@@ -443,5 +508,5 @@ def test_log_file_operation_delete(
     )
 
     event = log_capture.events[0]
-    assert event["event_type"] == "session.file.delete"
+    assert event["event"] == "session.file.delete"
     assert event["recursive"] is True

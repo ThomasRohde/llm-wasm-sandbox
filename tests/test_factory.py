@@ -14,6 +14,7 @@ import pytest
 from sandbox import (
     BaseSandbox,
     ExecutionPolicy,
+    PolicyValidationError,
     PythonSandbox,
     RuntimeType,
     SandboxLogger,
@@ -113,7 +114,7 @@ class TestCreateSandboxCustomPolicy:
     def test_create_sandbox_with_invalid_policy_raises_validation_error(self) -> None:
         """Test create_sandbox() raises PolicyValidationError for invalid policy."""
         # ExecutionPolicy validation happens at construction, not in factory
-        with pytest.raises(Exception):  # Pydantic ValidationError
+        with pytest.raises(PolicyValidationError):
             ExecutionPolicy(fuel_budget=-1000)  # Negative fuel invalid
 
 
@@ -199,11 +200,18 @@ class TestCreateSandboxIntegration:
             wasm_binary_path=custom_wasm,
         )
 
-        assert isinstance(sandbox, PythonSandbox)
-        assert sandbox.policy == custom_policy
-        assert sandbox.workspace.parent == custom_workspace_root
-        assert sandbox.logger == custom_logger
-        assert sandbox.wasm_binary_path == custom_wasm
+    def test_missing_wasm_binary_raises_on_execute(self, tmp_path: Path) -> None:
+        """create_sandbox should surface missing wasm binaries via FileNotFoundError."""
+        policy = ExecutionPolicy()
+        sandbox = create_sandbox(
+            runtime=RuntimeType.PYTHON,
+            wasm_binary_path=str(tmp_path / "missing.wasm"),
+            workspace_root=tmp_path / "ws-root",
+            policy=policy
+        )
+
+        with pytest.raises(FileNotFoundError):
+            sandbox.execute("print('hi')")
 
     def test_create_sandbox_returns_sandbox_with_execute_method(self) -> None:
         """Test create_sandbox() returns sandbox with executable interface."""

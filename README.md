@@ -209,6 +209,10 @@ print(result.fuel_consumed)       # Fuel units used
 print(result.duration_seconds)    # Wall-clock time
 ```
 
+### Logging and Observability
+
+Every sandbox ships with a `SandboxLogger` that works with either `structlog` or the standard `logging.Logger`. Execution lifecycle events use messages `sandbox.execution.start` / `sandbox.execution.complete` with an `event` field (`execution.start` / `execution.complete`), policy snapshots, runtime identifiers, success, duration, exit_code, fuel_consumed, and memory_used_bytes. Completion logs also include filesystem deltas (created/modified counts plus truncated path lists) so telemetry backends can ingest changes without log flooding.
+
 ---
 
 ## ⚙️ Resource Limits & Configuration
@@ -233,6 +237,8 @@ policy = ExecutionPolicy(
 
 sandbox = create_sandbox(runtime=RuntimeType.PYTHON, policy=policy)
 ```
+
+Invalid policies raise `PolicyValidationError` with field-level details. When configuring an optional data mount programmatically (e.g., `ExecutionPolicy(mount_data_dir="datasets")`), the sandbox will automatically set `guest_data_path="/data"` if you don't specify one.
 
 ### Default Limits
 

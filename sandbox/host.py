@@ -19,6 +19,7 @@ from typing import Tuple
 
 from wasmtime import Config, Engine, ExitTrap, Linker, Module, Store, Trap, WasiConfig
 
+from .core.errors import SandboxExecutionError
 from .core.models import ExecutionPolicy
 
 
@@ -132,11 +133,17 @@ def run_untrusted_python(
     fuel_budget = int(policy.fuel_budget)
     store.set_fuel(fuel_budget)
 
+    if not hasattr(store, "set_limits"):
+        raise SandboxExecutionError(
+            "Memory limit enforcement is unavailable: wasmtime.Store.set_limits is missing"
+        )
+
     try:
         store.set_limits(memory_size=int(policy.memory_bytes))
-    except Exception:
-        # Graceful degradation if wasmtime-py version lacks set_limits
-        pass
+    except Exception as e:
+        raise SandboxExecutionError(
+            f"Failed to enforce memory limit of {policy.memory_bytes} bytes"
+        ) from e
 
     instance = linker.instantiate(store, module)
     start = instance.exports(store)["_start"]

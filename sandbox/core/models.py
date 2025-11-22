@@ -10,7 +10,9 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
+
+from sandbox.core.errors import PolicyValidationError
 
 
 class RuntimeType(str, Enum):
@@ -108,6 +110,34 @@ class ExecutionPolicy(BaseModel):
         ge=0,
         description="Optional OS-level timeout (None = no timeout)"
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def set_guest_data_default(cls, values: Any) -> Any:
+        """Ensure guest_data_path defaults to /data when mount_data_dir is provided."""
+        if not isinstance(values, dict):
+            return values
+
+        mount_dir = values.get("mount_data_dir")
+        guest_data = values.get("guest_data_path")
+        if mount_dir is not None and guest_data is None:
+            updated = dict(values)
+            updated["guest_data_path"] = "/data"
+            return updated
+        return values
+
+    def __init__(self, **data: Any) -> None:
+        try:
+            super().__init__(**data)
+        except ValidationError as e:
+            raise PolicyValidationError(f"Invalid execution policy: {e}") from e
+
+    @classmethod
+    def model_validate(cls, obj: Any, *, strict: bool | None = None, context: dict[str, Any] | None = None) -> "ExecutionPolicy":
+        try:
+            return super().model_validate(obj, strict=strict, context=context)  # type: ignore[arg-type]
+        except ValidationError as e:
+            raise PolicyValidationError(f"Invalid execution policy: {e}") from e
 
     @field_validator("fuel_budget", "memory_bytes", "stdout_max_bytes", "stderr_max_bytes")
     @classmethod

@@ -49,27 +49,61 @@ def configure_structlog(
 
 
 class SandboxLogger:
-    """Wrapper for structured logging of sandbox execution events using structlog.
+    """Wrapper for structured logging of sandbox execution events.
 
-    Emits structured log events with consistent schemas for execution
-    lifecycle and security monitoring. Uses structlog for native structured
-    logging with key-value pairs.
-
-    Attributes:
-        _logger: Underlying structlog BoundLogger instance
+    Accepts either structlog or standard logging.Logger instances and normalizes
+    emission so callers do not need to care which backend is in use.
     """
+
+    _PATH_TRUNCATION_SUFFIX = "...[truncated]"
+    _MAX_PATH_LENGTH = 140
 
     def __init__(self, logger: Any = None) -> None:
         """Initialize SandboxLogger with optional custom logger.
 
         Args:
-            logger: Optional structlog BoundLogger to use. If None, creates
-                    a default logger named 'sandbox'.
+            logger: Optional structlog BoundLogger or logging.Logger. If None,
+                    a default structlog logger named 'sandbox' is created.
         """
         if logger is None:
             self._logger = structlog.get_logger("sandbox")
         else:
             self._logger = logger
+
+    @property
+    def logger(self) -> Any:
+        """Expose the underlying logger instance (structlog or logging.Logger)."""
+        return self._logger
+
+    def _emit(self, level: int, message: str, **fields: Any) -> None:
+        """Emit a log record regardless of logger backend."""
+        extra = dict(fields)
+        extra.setdefault("log_message", message)
+        # Ensure event key is always present for downstream processors
+        extra.setdefault("event", message.split(".", 1)[-1] if "." in message else message)
+        extra.setdefault("event_type", extra.get("event"))
+
+        if isinstance(self._logger, logging.Logger):
+            # Standard logging expects structured data in the 'extra' mapping
+            self._logger.log(level, message, extra=extra)
+            return
+
+        method_name = logging.getLevelName(level).lower()
+        log_method = getattr(self._logger, method_name, None)
+        if not callable(log_method):
+            log_method = getattr(self._logger, "info")
+
+        log_kwargs = dict(extra)
+        event_value = log_kwargs.pop("event", None)
+        event_arg = event_value if event_value is not None else message
+        log_method(event_arg, **log_kwargs)
+
+    def _truncate_path(self, path: str) -> str:
+        """Truncate long file paths to keep logs concise."""
+        if len(path) <= self._MAX_PATH_LENGTH:
+            return path
+        keep = self._MAX_PATH_LENGTH - len(self._PATH_TRUNCATION_SUFFIX)
+        return f"{path[:keep]}{self._PATH_TRUNCATION_SUFFIX}"
 
     def log_execution_start(
         self,
@@ -89,21 +123,28 @@ class SandboxLogger:
             session_id: Optional session identifier for session-aware executions
             **extra: Additional key-value pairs to include in log event
         """
-        log_kwargs: dict[str, Any] = {
-            "event_type": "execution.start",
-            "runtime": runtime,
+        policy_snapshot = {
             "fuel_budget": policy.fuel_budget,
             "memory_bytes": policy.memory_bytes,
             "stdout_max_bytes": policy.stdout_max_bytes,
             "stderr_max_bytes": policy.stderr_max_bytes,
             "guest_mount_path": policy.guest_mount_path,
-            **extra
+            "mount_data_dir": policy.mount_data_dir,
+            "guest_data_path": policy.guest_data_path,
+        }
+
+        log_kwargs: dict[str, Any] = {
+            "event": "execution.start",
+            "runtime": runtime,
+            "policy": policy_snapshot,
+            **policy_snapshot,
+            **extra,
         }
 
         if session_id is not None:
             log_kwargs["session_id"] = session_id
 
-        self._logger.info("Sandbox execution starting", **log_kwargs)
+        self._emit(logging.INFO, "sandbox.execution.start", **log_kwargs)
 
     def log_execution_complete(self, result: SandboxResult, runtime: str, session_id: str | None = None) -> None:
         """Log the completion of a sandbox execution with result metrics.
@@ -117,8 +158,11 @@ class SandboxLogger:
             runtime: Runtime type (e.g., "python", "javascript")
             session_id: Optional session identifier for session-aware executions
         """
+        files_created_paths = [self._truncate_path(p) for p in result.files_created]
+        files_modified_paths = [self._truncate_path(p) for p in result.files_modified]
+
         log_kwargs: dict[str, Any] = {
-            "event_type": "execution.complete",
+            "event": "execution.complete",
             "runtime": runtime,
             "success": result.success,
             "exit_code": result.exit_code,
@@ -127,8 +171,10 @@ class SandboxLogger:
             "duration_ms": result.duration_ms,
             "stdout_bytes": len(result.stdout),
             "stderr_bytes": len(result.stderr),
-            "files_created": len(result.files_created),
-            "files_modified": len(result.files_modified),
+            "files_created_count": len(result.files_created),
+            "files_modified_count": len(result.files_modified),
+            "files_created_paths": files_created_paths,
+            "files_modified_paths": files_modified_paths,
         }
 
         stdout_truncated = result.metadata.get("stdout_truncated")
@@ -144,7 +190,7 @@ class SandboxLogger:
         if session_id is not None:
             log_kwargs["session_id"] = session_id
 
-        self._logger.info("Sandbox execution completed", **log_kwargs)
+        self._emit(logging.INFO, "sandbox.execution.complete", **log_kwargs)
 
     def log_security_event(
         self,
@@ -162,10 +208,11 @@ class SandboxLogger:
                        "fs_access_denied", "memory_limit_exceeded")
             details: Dict containing event-specific details
         """
-        self._logger.warning(
-            f"Security event: {event_type}",
-            event_name="security.violation",
-            event_type=event_type,
+        event = f"security.{event_type}"
+        self._emit(
+            logging.WARNING,
+            f"sandbox.{event}",
+            event=event,
             **details
         )
 
@@ -183,9 +230,10 @@ class SandboxLogger:
             session_id: UUIDv4 session identifier
             workspace_path: Absolute path to session workspace directory
         """
-        self._logger.info(
-            f"Session created: {session_id}",
-            event_type="session.created",
+        self._emit(
+            logging.INFO,
+            "sandbox.session.created",
+            event="session.created",
             session_id=session_id,
             workspace_path=workspace_path
         )
@@ -204,9 +252,10 @@ class SandboxLogger:
             session_id: UUIDv4 session identifier
             workspace_path: Absolute path to session workspace directory
         """
-        self._logger.info(
-            f"Session retrieved: {session_id}",
-            event_type="session.retrieved",
+        self._emit(
+            logging.INFO,
+            "sandbox.session.retrieved",
+            event="session.retrieved",
             session_id=session_id,
             workspace_path=workspace_path
         )
@@ -223,9 +272,10 @@ class SandboxLogger:
         Args:
             session_id: UUIDv4 session identifier
         """
-        self._logger.info(
-            f"Session deleted: {session_id}",
-            event_type="session.deleted",
+        self._emit(
+            logging.INFO,
+            "sandbox.session.deleted",
+            event="session.deleted",
             session_id=session_id
         )
 
@@ -250,9 +300,11 @@ class SandboxLogger:
                 - file_count: Number of files for list operations
                 - recursive: Boolean flag for delete operations
         """
-        self._logger.info(
-            f"File operation {operation}: {path}",
-            event_type=f"session.file.{operation}",
+        event = f"session.file.{operation}"
+        self._emit(
+            logging.INFO,
+            f"sandbox.{event}",
+            event=event,
             session_id=session_id,
             path=path,
             **kwargs
@@ -272,9 +324,10 @@ class SandboxLogger:
             session_id: UUIDv4 session identifier
             created_at: ISO 8601 UTC timestamp when session was created
         """
-        self._logger.info(
-            f"Session metadata created: {session_id}",
-            event_type="session.metadata.created",
+        self._emit(
+            logging.INFO,
+            "sandbox.session.metadata.created",
+            event="session.metadata.created",
             session_id=session_id,
             created_at=created_at
         )
@@ -293,9 +346,10 @@ class SandboxLogger:
             session_id: UUIDv4 session identifier
             timestamp: ISO 8601 UTC timestamp of the update
         """
-        self._logger.info(
-            f"Session metadata updated: {session_id}",
-            event_type="session.metadata.updated",
+        self._emit(
+            logging.INFO,
+            "sandbox.session.metadata.updated",
+            event="session.metadata.updated",
             session_id=session_id,
             timestamp=timestamp
         )
@@ -315,9 +369,10 @@ class SandboxLogger:
             workspace_root: Root directory for session workspaces
             dry_run: Whether this is a dry-run (no actual deletions)
         """
-        self._logger.info(
-            "Session pruning started",
-            event_type="session.prune.started",
+        self._emit(
+            logging.INFO,
+            "sandbox.session.prune.started",
+            event="session.prune.started",
             threshold_hours=threshold_hours,
             workspace_root=workspace_root,
             dry_run=dry_run
@@ -339,9 +394,10 @@ class SandboxLogger:
             age_hours: Age of session in hours
             threshold_hours: Age threshold for pruning
         """
-        self._logger.info(
-            f"Pruning candidate: {session_id}",
-            event_type="session.prune.candidate",
+        self._emit(
+            logging.INFO,
+            "sandbox.session.prune.candidate",
+            event="session.prune.candidate",
             session_id=session_id,
             age_hours=age_hours,
             threshold_hours=threshold_hours
@@ -363,9 +419,10 @@ class SandboxLogger:
             age_hours: Age of session in hours
             reclaimed_bytes: Disk space reclaimed in bytes
         """
-        self._logger.info(
-            f"Session pruned: {session_id}",
-            event_type="session.prune.deleted",
+        self._emit(
+            logging.INFO,
+            "sandbox.session.prune.deleted",
+            event="session.prune.deleted",
             session_id=session_id,
             age_hours=age_hours,
             reclaimed_bytes=reclaimed_bytes
@@ -385,9 +442,10 @@ class SandboxLogger:
             session_id: UUIDv4 session identifier
             reason: Reason for skipping (e.g., "missing_metadata")
         """
-        self._logger.warning(
-            f"Session skipped during pruning: {session_id}",
-            event_type="session.prune.skipped",
+        self._emit(
+            logging.WARNING,
+            "sandbox.session.prune.skipped",
+            event="session.prune.skipped",
             session_id=session_id,
             reason=reason
         )
@@ -405,9 +463,10 @@ class SandboxLogger:
             session_id: UUIDv4 session identifier
             error: Error message from deletion attempt
         """
-        self._logger.error(
-            f"Error pruning session: {session_id}",
-            event_type="session.prune.error",
+        self._emit(
+            logging.ERROR,
+            "sandbox.session.prune.error",
+            event="session.prune.error",
             session_id=session_id,
             error=error
         )
@@ -431,9 +490,10 @@ class SandboxLogger:
             reclaimed_bytes: Total disk space reclaimed in bytes
             dry_run: Whether this was a dry-run
         """
-        self._logger.info(
-            "Session pruning completed",
-            event_type="session.prune.completed",
+        self._emit(
+            logging.INFO,
+            "sandbox.session.prune.completed",
+            event="session.prune.completed",
             deleted_count=deleted_count,
             skipped_count=skipped_count,
             error_count=error_count,

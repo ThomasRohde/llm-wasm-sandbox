@@ -70,6 +70,8 @@ def load_policy(path: str = "config/policy.toml") -> ExecutionPolicy:
     if not os.path.exists(path):
         try:
             return ExecutionPolicy(**DEFAULT_POLICY)  # type: ignore[arg-type]
+        except PolicyValidationError:
+            raise
         except ValidationError as e:
             raise PolicyValidationError(f"Default policy validation failed: {e}") from e
 
@@ -89,5 +91,7 @@ def load_policy(path: str = "config/policy.toml") -> ExecutionPolicy:
 
     try:
         return ExecutionPolicy(**policy)  # type: ignore[arg-type]
+    except PolicyValidationError:
+        raise
     except ValidationError as e:
         raise PolicyValidationError(f"Policy validation failed: {e}") from e

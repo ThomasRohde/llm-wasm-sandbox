@@ -85,6 +85,10 @@ class PythonSandbox(BaseSandbox):
         Returns:
             SandboxResult with outputs, metrics, file deltas, logs path, and session_id
         """
+        wasm_path = Path(self.wasm_binary_path)
+        if not wasm_path.is_file():
+            raise FileNotFoundError(f"WASM binary not found at {wasm_path}")
+
         # Log execution start with session_id
         self.logger.log_execution_start(
             runtime="python",
@@ -102,24 +106,20 @@ class PythonSandbox(BaseSandbox):
         # Measure execution duration
         start_time = time.perf_counter()
 
-        # Delegate to low-level host execution (catch WASM traps gracefully)
+        # Delegate to low-level host execution
         try:
             raw_result = run_untrusted_python(
-                wasm_path=self.wasm_binary_path,
+                wasm_path=str(wasm_path),
                 workspace_dir=str(self.workspace),
                 policy=self.policy
             )
         except Exception as e:
-            # WASM runtime errors (OutOfFuel, ExitTrap, etc.) are captured here
-            # These are execution artifacts, not errors - guest code failures are expected
             duration_seconds = time.perf_counter() - start_time
-
             msg = f"WASM runtime error: {type(e).__name__}: {e!s}"
             trap_reason = "memory_limit" if "memory" in msg.lower() else "host_error"
             mem_len = int(self.policy.memory_bytes)
             mem_pages = max(1, mem_len // 65536)
 
-            # Create minimal result for error cases
             from sandbox.host import SandboxResult as HostSandboxResult
             raw_result = HostSandboxResult(
                 stdout="",
@@ -172,7 +172,7 @@ class PythonSandbox(BaseSandbox):
             True if syntax is valid, False if syntax errors exist
         """
         try:
-            compile(code, "<string>", "exec")
+            compile(code, "<sandbox>", "exec")
             return True
         except SyntaxError:
             return False

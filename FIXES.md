@@ -1,48 +1,58 @@
-# PRD: Improve Policy Enforcement and Execution Fidelity in the Python WASM Sandbox
+# PRD: Harden Python WASM sandbox correctness and observability
 
-## Summary
-Fix critical gaps in how the Python sandbox applies execution policy, reports execution outcomes, and emits lifecycle telemetry. The current flow ignores caller-provided `ExecutionPolicy` settings when running code, always reports `success=True`, and mislabels new sessions as “retrieved,” making resource and security controls unenforceable and observability noisy.
+## Overview
+Recent code review surfaced gaps between the implementation and the OpenSpec requirements for the Python runtime, logging, and policy handling. The fixes here focus on preserving security boundaries (memory limits, missing binary failures), making logging interoperable with standard loggers and spec-compliant event schemas, and tightening policy validation and configuration defaults.
 
-## Problems to Solve
-- **Policy bypass:** `PythonSandbox.execute` calls `host.run_untrusted_python` which reloads policy from disk, so caller-supplied limits/env/argv/mounts are ignored. Custom fuel/memory caps and env whitelists are not applied to executions.  
-- **Incorrect result status:** `_map_to_sandbox_result` sets `success=True` and `exit_code=0` even when execution traps or guest stderr contains errors. Failures (syntax errors, OutOfFuel, runtime errors) are reported as successes.  
-- **No truncation signal:** Stdout/stderr are capped, but callers are never told when truncation occurred, violating the spec requirement to indicate capped output.  
-- **Session telemetry drift:** New sessions are logged as `session.retrieved` because logging checks metadata existence after creating it, reducing the value of lifecycle logs.
+## Problems to Fix
+- Logging API assumes `structlog` and will raise `TypeError` when given a standard `logging.Logger`; emitted event names/fields diverge from spec and omit filesystem delta logging (sandbox/core/logging.py:51-180).
+- Memory limits silently disable if `wasmtime.Store.set_limits` is unavailable, leaving the sandbox without a cap (sandbox/host.py:133-139).
+- Missing or misconfigured WASM binaries are swallowed and converted into a successful return path instead of raising a clear error (sandbox/runtimes/python/sandbox.py:104-135), violating factory error expectations.
+- Invalid `ExecutionPolicy` constructions raise raw `pydantic.ValidationError` instead of `PolicyValidationError`; mount_data_dir lacks default guest path when built programmatically (sandbox/core/models.py:26-142).
+- `validate_code` uses `compile(..., "<string>", ...)` instead of the agreed `<sandbox>` marker (sandbox/runtimes/python/sandbox.py:164-179).
 
-## Goals / Success Criteria
-- Executions honor the `ExecutionPolicy` instance passed to `create_sandbox` (fuel, memory, stdout/stderr caps, argv, env, data mounts) without reloading config from disk.  
-- `SandboxResult.success` and `exit_code` reflect real execution state: failures/traps set `success=False`, and traps/out-of-fuel are surfaced in stderr/metadata.  
-- Stdout/stderr truncation is detectable by callers (explicit flags or markers) while keeping capped payloads.  
-- Session lifecycle logs correctly distinguish created vs retrieved sessions.  
-- Regression tests cover the above behaviors.
+## Goals
+- Enforce memory caps and binary presence deterministically; never degrade silently.
+- Make logging usable with `logging.Logger` and align event names/payloads with spec (execution start/complete, security events, filesystem deltas).
+- Ensure policy validation always raises `PolicyValidationError`, with correct defaults for optional data mounts.
+- Preserve existing public API surface and backward-compatible test expectations.
 
 ## Non-Goals
-- Adding new runtimes or redesigning the logging stack.  
-- Changing policy defaults or the public `ExecutionPolicy` schema.  
-- Implementing OS-level timeouts beyond existing policy fields.
+- No new runtime types or WASI capability expansions.
+- No redesign of session management or workspace layout.
+- No dependency upgrades beyond what is required to implement the fixes.
 
-## Approach
-1. **Policy plumbing:** Thread the provided `ExecutionPolicy` into `run_untrusted_python` (accept a policy arg, remove internal `load_policy` call, and default to `ExecutionPolicy()` when none is passed). Ensure all limits/env/mounts use the passed policy.  
-2. **Result correctness:** Capture trap/exit outcomes from the WASM run. Set `success` based on trap/exit code and stderr; surface trap reasons (OutOfFuel, memory, other) in stderr/metadata; map exit codes when available instead of forcing `0`.  
-3. **Truncation signaling:** When stdout/stderr exceed caps, annotate results (e.g., boolean flags in metadata or “[truncated]” markers) while preserving capped payloads.  
-4. **Session logging fix:** Track prior existence before writing metadata so new sessions emit `log_session_created` and existing ones emit `log_session_retrieved`.  
-5. **Tests:** Add/extend tests to cover custom policy enforcement (fuel/memory/env), failure status propagation, truncation signaling, and correct session logging.
+## User Stories
+- As a platform engineer, I need missing or invalid WASM binaries to fail fast so deployment misconfigurations are caught early.
+- As an observability engineer, I need execution and security events to use standard loggers and spec-compliant fields so logs ingest cleanly.
+- As a security reviewer, I need memory caps to remain enforced even when wasmtime APIs differ, to prevent memory exhaustion attacks.
+- As an API consumer, I need policy validation errors to be predictable and typed (`PolicyValidationError`) regardless of how the policy is constructed.
 
-## Work Items
-- [ ] Update host layer to accept `ExecutionPolicy` input and remove implicit `load_policy` usage.  
-- [ ] Wire `PythonSandbox` to pass its policy through to the host and ensure mounts/env/argv honor it.  
-- [ ] Derive `success`/`exit_code` from trap/exit outcomes; propagate trap reasons into stderr/metadata.  
-- [ ] Implement stdout/stderr truncation indicators and document behavior.  
-- [ ] Fix session creation logging to distinguish new vs existing sessions.  
-- [ ] Add regression tests for policy enforcement, failure signaling, truncation flags, and session logging.  
-- [ ] Update docs/README snippets if behavior changes (e.g., new truncation markers).
+## Proposed Changes
+1) **Logging compatibility and schema**
+   - Accept both `structlog` and `logging.Logger` instances without runtime errors; normalize to a common interface internally.
+   - Emit execution start/complete/security events with spec message keys (`sandbox.execution.start`, `sandbox.execution.complete`, `sandbox.security.*`) and required fields (`event`, `runtime`, policy snapshot, success, duration_ms, fuel_consumed, memory_used_bytes, exit_code).
+   - Add filesystem delta logging (counts and truncated paths) on completion.
 
-## Risks & Mitigations
-- **Wasmtime API variance:** `Store` limit APIs differ by version; guard with feature detection and add tests that accept best-effort enforcement.  
-- **Backwards compatibility:** New truncation indicators may affect downstream parsing; add release notes and keep payload format stable.  
-- **Performance:** Extra trap/exit handling should stay lightweight; measure with existing benchmarks if changes touch hot paths.
+2) **Resource enforcement**
+   - Enforce memory caps even when `Store.set_limits` is unavailable: detect support at initialization and fail fast or provide a guarded fallback; add explicit tests for cap enforcement.
+   - Surface missing `wasm_binary_path` as `FileNotFoundError` from `PythonSandbox.execute`/`create_sandbox` rather than wrapping it into a success=False result.
 
-## Validation
-- Unit/integration tests for custom policy adherence, failure reporting, truncation signaling, and session logging.  
-- Manual smoke: run code with small fuel/memory to confirm enforcement and accurate `success`/stderr; verify truncation flags with large output.  
-- Optional: rerun benchmark scripts to ensure no regressions after host plumbing changes.
+3) **Policy validation and defaults**
+   - Wrap `ExecutionPolicy` validation errors in `PolicyValidationError` for direct instantiation and keep field-level details.
+   - Auto-set `guest_data_path="/data"` when `mount_data_dir` is provided programmatically (not only via TOML).
+
+4) **Validation consistency**
+   - Update `validate_code` to compile with the `<sandbox>` filename sentinel to match spec wording.
+
+## Acceptance Criteria
+- Logging methods accept a plain `logging.Logger` without raising, and emitted records include spec-required keys; filesystem delta counts/paths appear in execution.complete logs with truncation for long paths.
+- Memory limit enforcement fails closed: if limits cannot be set, execution raises a clear exception before running guest code; out-of-memory attempts trigger a trap or error that bubbles into `SandboxResult` with `trap_reason="memory_limit"`.
+- Calling `create_sandbox(runtime=RuntimeType.PYTHON, wasm_binary_path="missing.wasm").execute("print(1)")` raises `FileNotFoundError` with the missing path in the message.
+- `ExecutionPolicy(fuel_budget=-1)` raises `PolicyValidationError`; `ExecutionPolicy(mount_data_dir="datasets")` sets `guest_data_path="/data"` by default.
+- `PythonSandbox.validate_code("x=1")` returns True and uses `<sandbox>` in compile(), while invalid code returns False without execution.
+- Test coverage updated for the above behaviors (logging acceptance via unit/contract tests, memory cap enforcement, missing binary, policy validation).
+
+## Rollout & Verification
+- Add unit tests for logging schema, policy validation errors, data mount defaults, missing WASM binary handling, and memory cap enforcement.
+- Run `uv run pytest` locally; ensure logging assertions avoid brittle ordering by asserting structured fields.
+- Document behavioral changes in README and docstrings where relevant (logging expectations, policy validation).

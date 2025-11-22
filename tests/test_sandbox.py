@@ -3,7 +3,10 @@ import os
 import tempfile
 from pathlib import Path
 
+import pytest
+
 from sandbox import ExecutionPolicy, RuntimeType, create_sandbox
+from sandbox.core.errors import SandboxExecutionError
 from sandbox.host import SandboxResult, run_untrusted_python
 from sandbox.policies import DEFAULT_POLICY, load_policy
 from sandbox.utils import (
@@ -365,6 +368,54 @@ class TestHostDirect:
         assert result.trap_message is None
         assert result.stdout_truncated is False
         assert result.stderr_truncated is True
+
+    def test_run_untrusted_python_raises_when_memory_limits_missing(self, monkeypatch, tmp_path: Path):
+        """Memory limit enforcement should fail closed when set_limits is unavailable."""
+        import sandbox.host as host_module
+
+        class DummyConfig:
+            def __init__(self):
+                pass
+
+        class DummyEngine:
+            def __init__(self, cfg):
+                pass
+
+        class DummyLinker:
+            def __init__(self, engine):
+                pass
+
+            def define_wasi(self):
+                pass
+
+        class DummyModule:
+            @staticmethod
+            def from_file(engine, path):
+                return DummyModule()
+
+        class DummyWasiConfig:
+            def preopen_dir(self, host_dir, guest_path):
+                pass
+
+        class DummyStore:
+            def __init__(self, engine):
+                pass
+
+            def set_wasi(self, wasi):
+                pass
+
+            def set_fuel(self, fuel):
+                pass
+
+        monkeypatch.setattr(host_module, "Config", DummyConfig)
+        monkeypatch.setattr(host_module, "Engine", DummyEngine)
+        monkeypatch.setattr(host_module, "Linker", DummyLinker)
+        monkeypatch.setattr(host_module, "Module", DummyModule)
+        monkeypatch.setattr(host_module, "WasiConfig", DummyWasiConfig)
+        monkeypatch.setattr(host_module, "Store", DummyStore)
+
+        with pytest.raises(SandboxExecutionError):
+            run_untrusted_python(wasm_path=str(tmp_path / "python.wasm"))
 
 
 class TestEdgeCases:
