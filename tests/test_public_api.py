@@ -66,6 +66,7 @@ class TestPublicAPIImports:
 
         # Verify it extends BaseSandbox
         from sandbox import BaseSandbox
+
         assert issubclass(PythonSandbox, BaseSandbox)
 
     def test_import_create_sandbox(self) -> None:
@@ -221,6 +222,7 @@ class TestPruningAPIImports:
 
         # Verify it has expected fields
         from dataclasses import fields
+
         field_names = {f.name for f in fields(PruneResult)}
         assert "deleted_sessions" in field_names
         assert "skipped_sessions" in field_names
@@ -237,6 +239,7 @@ class TestPruningAPIImports:
 
         # Verify it has expected fields
         from dataclasses import fields
+
         field_names = {f.name for f in fields(SessionMetadata)}
         assert "session_id" in field_names
         assert "created_at" in field_names

@@ -23,10 +23,7 @@ def setup_logging(level: int = logging.INFO) -> logging.Logger:
     Returns:
         logging.Logger: Configured logger instance for the sandbox subsystem.
     """
-    logging.basicConfig(
-        level=level,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
+    logging.basicConfig(level=level, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     return logging.getLogger("llm-wasm-sandbox")
 
 
@@ -57,6 +54,7 @@ class SandboxError(Exception):
     memory limits, WASI violations). Subclasses provide granular error types
     for specific failure modes.
     """
+
     pass
 
 
@@ -67,6 +65,7 @@ class FuelExhaustionError(SandboxError):
     configured in the policy. Typically caused by infinite loops or excessive
     computation. Maps to Wasmtime's OutOfFuel trap.
     """
+
     pass
 
 
@@ -77,4 +76,5 @@ class MemoryLimitError(SandboxError):
     configured in the policy. Typically caused by unbounded allocations
     or memory bombs. Maps to Wasmtime's memory limit violation.
     """
+
     pass

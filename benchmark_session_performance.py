@@ -79,9 +79,7 @@ def test_file_operation_performance():
         @benchmark("Write 100 Small Files (1KB each)", iterations=1)
         def write_files():
             for i in range(100):
-                write_session_file(
-                    session_id, f"file_{i:03d}.txt", b"x" * 1024, overwrite=True
-                )
+                write_session_file(session_id, f"file_{i:03d}.txt", b"x" * 1024, overwrite=True)
 
         write_files()
         print("✓ Wrote 100 files")

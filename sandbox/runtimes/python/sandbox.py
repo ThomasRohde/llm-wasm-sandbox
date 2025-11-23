@@ -52,7 +52,7 @@ class PythonSandbox(BaseSandbox):
         policy: ExecutionPolicy,
         session_id: str,
         storage_adapter: StorageAdapter,
-        logger: Any = None
+        logger: Any = None,
     ) -> None:
         """Initialize PythonSandbox with WASM binary path and session config.
 
@@ -96,7 +96,7 @@ class PythonSandbox(BaseSandbox):
             runtime="python",
             policy=self.policy,
             session_id=self.session_id,
-            inject_setup=inject_setup
+            inject_setup=inject_setup,
         )
 
         # Write code to workspace
@@ -111,9 +111,7 @@ class PythonSandbox(BaseSandbox):
         # Delegate to low-level host execution
         try:
             raw_result = run_untrusted_python(
-                wasm_path=str(wasm_path),
-                workspace_dir=str(self.workspace),
-                policy=self.policy
+                wasm_path=str(wasm_path), workspace_dir=str(self.workspace), policy=self.policy
             )
         except Exception as e:
             duration_seconds = time.perf_counter() - start_time
@@ -123,6 +121,7 @@ class PythonSandbox(BaseSandbox):
             mem_pages = max(1, mem_len // 65536)
 
             from sandbox.host import SandboxResult as HostSandboxResult
+
             raw_result = HostSandboxResult(
                 stdout="",
                 stderr=msg,
@@ -132,24 +131,19 @@ class PythonSandbox(BaseSandbox):
                 logs_dir=None,
                 exit_code=1,
                 trapped=True,
-                trap_reason=trap_reason
+                trap_reason=trap_reason,
             )
 
         duration_seconds = time.perf_counter() - start_time
 
         # Detect file changes
         files_created, files_modified = self._detect_file_delta(
-            before_files,
-            exclude=user_code_path
+            before_files, exclude=user_code_path
         )
 
         # Map to typed SandboxResult (always include session_id)
         result = self._map_to_sandbox_result(
-            raw_result,
-            duration_seconds,
-            files_created,
-            files_modified,
-            session_id=self.session_id
+            raw_result, duration_seconds, files_created, files_modified, session_id=self.session_id
         )
 
         # Update session timestamp after successful execution
@@ -192,11 +186,7 @@ class PythonSandbox(BaseSandbox):
         final_code = INJECTED_SETUP + code if inject_setup else code
 
         filename = self.storage_adapter.PYTHON_CODE_FILENAME
-        self.storage_adapter.write_file(
-            self.session_id,
-            filename,
-            final_code.encode("utf-8")
-        )
+        self.storage_adapter.write_file(self.session_id, filename, final_code.encode("utf-8"))
         return filename
 
     def _snapshot_workspace(self, exclude: str) -> dict[str, float]:
@@ -217,9 +207,7 @@ class PythonSandbox(BaseSandbox):
         return snapshot
 
     def _detect_file_delta(
-        self,
-        before_files: dict[str, float],
-        exclude: str
+        self, before_files: dict[str, float], exclude: str
     ) -> tuple[list[str], list[str]]:
         """Detect files created or modified during execution.
 
@@ -236,18 +224,16 @@ class PythonSandbox(BaseSandbox):
         """
         # Get current snapshot
         after_files = self.storage_adapter.get_workspace_snapshot(self.session_id)
-        
+
         # Detect changes via adapter
         files_created, files_modified = self.storage_adapter.detect_file_changes(
-            self.session_id,
-            before_files,
-            after_files
+            self.session_id, before_files, after_files
         )
-        
+
         # Filter out excluded file
         files_created = [f for f in files_created if f != exclude]
         files_modified = [f for f in files_modified if f != exclude]
-        
+
         return (files_created, files_modified)
 
     def _map_to_sandbox_result(
@@ -256,7 +242,7 @@ class PythonSandbox(BaseSandbox):
         duration_seconds: float,
         files_created: list[str],
         files_modified: list[str],
-        session_id: str | None = None
+        session_id: str | None = None,
     ) -> SandboxResult:
         """Map host.SandboxResult to core.SandboxResult Pydantic model.
 
@@ -307,9 +293,7 @@ class PythonSandbox(BaseSandbox):
 
         # Determine success based on exit code, traps, and stderr contents
         success = self._determine_success(
-            exit_code=exit_code,
-            trapped=trapped,
-            stderr=raw_result.stderr
+            exit_code=exit_code, trapped=trapped, stderr=raw_result.stderr
         )
 
         return SandboxResult(
@@ -323,7 +307,7 @@ class PythonSandbox(BaseSandbox):
             files_created=files_created,
             files_modified=files_modified,
             workspace_path=str(self.workspace),
-            metadata=metadata
+            metadata=metadata,
         )
 
     @staticmethod
@@ -348,17 +332,17 @@ class PythonSandbox(BaseSandbox):
         """
         try:
             self.storage_adapter.update_session_timestamp(self.session_id)
-            
+
             # Log structured event
             metadata = self.storage_adapter.read_metadata(self.session_id)
             self.logger.log_session_metadata_updated(
-                session_id=self.session_id,
-                timestamp=metadata.updated_at
+                session_id=self.session_id, timestamp=metadata.updated_at
             )
         except Exception as e:
             # Log warning but don't fail execution
             import sys
+
             print(
                 f"Warning: Failed to update session timestamp for {self.session_id}: {e}",
-                file=sys.stderr
+                file=sys.stderr,
             )

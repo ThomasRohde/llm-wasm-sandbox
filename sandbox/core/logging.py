@@ -16,10 +16,7 @@ if TYPE_CHECKING:
     from sandbox.core.models import ExecutionPolicy, SandboxResult
 
 
-def configure_structlog(
-    level: int = logging.INFO,
-    use_json: bool = False
-) -> None:
+def configure_structlog(level: int = logging.INFO, use_json: bool = False) -> None:
     """Configure structlog with sensible defaults for sandbox logging.
 
     Args:
@@ -106,11 +103,7 @@ class SandboxLogger:
         return f"{path[:keep]}{self._PATH_TRUNCATION_SUFFIX}"
 
     def log_execution_start(
-        self,
-        runtime: str,
-        policy: ExecutionPolicy,
-        session_id: str | None = None,
-        **extra: Any
+        self, runtime: str, policy: ExecutionPolicy, session_id: str | None = None, **extra: Any
     ) -> None:
         """Log the start of a sandbox execution with policy details.
 
@@ -147,7 +140,9 @@ class SandboxLogger:
 
         self._emit(logging.INFO, "sandbox.execution.start", **log_kwargs)
 
-    def log_execution_complete(self, result: SandboxResult, runtime: str, session_id: str | None = None) -> None:
+    def log_execution_complete(
+        self, result: SandboxResult, runtime: str, session_id: str | None = None
+    ) -> None:
         """Log the completion of a sandbox execution with result metrics.
 
         Emits an INFO-level structured log event at execution.complete with
@@ -193,11 +188,7 @@ class SandboxLogger:
 
         self._emit(logging.INFO, "sandbox.execution.complete", **log_kwargs)
 
-    def log_security_event(
-        self,
-        event_type: str,
-        details: dict[str, Any]
-    ) -> None:
+    def log_security_event(self, event_type: str, details: dict[str, Any]) -> None:
         """Log a security-relevant event at WARNING level.
 
         Emits a WARNING-level structured log for security monitoring,
@@ -210,18 +201,9 @@ class SandboxLogger:
             details: Dict containing event-specific details
         """
         event = f"security.{event_type}"
-        self._emit(
-            logging.WARNING,
-            f"sandbox.{event}",
-            event=event,
-            **details
-        )
+        self._emit(logging.WARNING, f"sandbox.{event}", event=event, **details)
 
-    def log_session_created(
-        self,
-        session_id: str,
-        workspace_path: str
-    ) -> None:
+    def log_session_created(self, session_id: str, workspace_path: str) -> None:
         """Log the creation of a new session workspace.
 
         Emits an INFO-level structured log event at session.created with
@@ -236,14 +218,10 @@ class SandboxLogger:
             "sandbox.session.created",
             event="session.created",
             session_id=session_id,
-            workspace_path=workspace_path
+            workspace_path=workspace_path,
         )
 
-    def log_session_retrieved(
-        self,
-        session_id: str,
-        workspace_path: str
-    ) -> None:
+    def log_session_retrieved(self, session_id: str, workspace_path: str) -> None:
         """Log retrieval of an existing session workspace.
 
         Emits an INFO-level structured log event at session.retrieved with
@@ -258,13 +236,10 @@ class SandboxLogger:
             "sandbox.session.retrieved",
             event="session.retrieved",
             session_id=session_id,
-            workspace_path=workspace_path
+            workspace_path=workspace_path,
         )
 
-    def log_session_deleted(
-        self,
-        session_id: str
-    ) -> None:
+    def log_session_deleted(self, session_id: str) -> None:
         """Log deletion of a session workspace.
 
         Emits an INFO-level structured log event at session.deleted with
@@ -274,19 +249,10 @@ class SandboxLogger:
             session_id: UUIDv4 session identifier
         """
         self._emit(
-            logging.INFO,
-            "sandbox.session.deleted",
-            event="session.deleted",
-            session_id=session_id
+            logging.INFO, "sandbox.session.deleted", event="session.deleted", session_id=session_id
         )
 
-    def log_file_operation(
-        self,
-        operation: str,
-        session_id: str,
-        path: str,
-        **kwargs: Any
-    ) -> None:
+    def log_file_operation(self, operation: str, session_id: str, path: str, **kwargs: Any) -> None:
         """Log a session file operation.
 
         Emits an INFO-level structured log event for file operations
@@ -308,14 +274,10 @@ class SandboxLogger:
             event=event,
             session_id=session_id,
             path=path,
-            **kwargs
+            **kwargs,
         )
 
-    def log_session_metadata_created(
-        self,
-        session_id: str,
-        created_at: str
-    ) -> None:
+    def log_session_metadata_created(self, session_id: str, created_at: str) -> None:
         """Log creation of session metadata.
 
         Emits an INFO-level structured log event when .metadata.json is
@@ -330,14 +292,10 @@ class SandboxLogger:
             "sandbox.session.metadata.created",
             event="session.metadata.created",
             session_id=session_id,
-            created_at=created_at
+            created_at=created_at,
         )
 
-    def log_session_metadata_updated(
-        self,
-        session_id: str,
-        timestamp: str
-    ) -> None:
+    def log_session_metadata_updated(self, session_id: str, timestamp: str) -> None:
         """Log update of session metadata timestamp.
 
         Emits an INFO-level structured log event when session metadata
@@ -352,15 +310,10 @@ class SandboxLogger:
             "sandbox.session.metadata.updated",
             event="session.metadata.updated",
             session_id=session_id,
-            timestamp=timestamp
+            timestamp=timestamp,
         )
 
-    def log_prune_started(
-        self,
-        threshold_hours: float,
-        workspace_root: str,
-        dry_run: bool
-    ) -> None:
+    def log_prune_started(self, threshold_hours: float, workspace_root: str, dry_run: bool) -> None:
         """Log the start of a pruning operation.
 
         Emits an INFO-level structured log event when pruning begins.
@@ -376,14 +329,11 @@ class SandboxLogger:
             event="session.prune.started",
             threshold_hours=threshold_hours,
             workspace_root=workspace_root,
-            dry_run=dry_run
+            dry_run=dry_run,
         )
 
     def log_prune_candidate(
-        self,
-        session_id: str,
-        age_hours: float,
-        threshold_hours: float
+        self, session_id: str, age_hours: float, threshold_hours: float
     ) -> None:
         """Log a session identified as a pruning candidate.
 
@@ -401,15 +351,10 @@ class SandboxLogger:
             event="session.prune.candidate",
             session_id=session_id,
             age_hours=age_hours,
-            threshold_hours=threshold_hours
+            threshold_hours=threshold_hours,
         )
 
-    def log_prune_deleted(
-        self,
-        session_id: str,
-        age_hours: float,
-        reclaimed_bytes: int
-    ) -> None:
+    def log_prune_deleted(self, session_id: str, age_hours: float, reclaimed_bytes: int) -> None:
         """Log successful deletion of a session workspace.
 
         Emits an INFO-level structured log event after a session is deleted
@@ -426,14 +371,10 @@ class SandboxLogger:
             event="session.prune.deleted",
             session_id=session_id,
             age_hours=age_hours,
-            reclaimed_bytes=reclaimed_bytes
+            reclaimed_bytes=reclaimed_bytes,
         )
 
-    def log_prune_skipped(
-        self,
-        session_id: str,
-        reason: str
-    ) -> None:
+    def log_prune_skipped(self, session_id: str, reason: str) -> None:
         """Log a session that was skipped during pruning.
 
         Emits a WARNING-level structured log event for sessions that could
@@ -448,14 +389,10 @@ class SandboxLogger:
             "sandbox.session.prune.skipped",
             event="session.prune.skipped",
             session_id=session_id,
-            reason=reason
+            reason=reason,
         )
 
-    def log_prune_error(
-        self,
-        session_id: str,
-        error: str
-    ) -> None:
+    def log_prune_error(self, session_id: str, error: str) -> None:
         """Log an error that occurred during session deletion.
 
         Emits an ERROR-level structured log event when deletion fails.
@@ -469,7 +406,7 @@ class SandboxLogger:
             "sandbox.session.prune.error",
             event="session.prune.error",
             session_id=session_id,
-            error=error
+            error=error,
         )
 
     def log_prune_completed(
@@ -478,7 +415,7 @@ class SandboxLogger:
         skipped_count: int,
         error_count: int,
         reclaimed_bytes: int,
-        dry_run: bool
+        dry_run: bool,
     ) -> None:
         """Log completion of pruning operation with summary statistics.
 
@@ -499,5 +436,5 @@ class SandboxLogger:
             skipped_count=skipped_count,
             error_count=error_count,
             reclaimed_bytes=reclaimed_bytes,
-            dry_run=dry_run
+            dry_run=dry_run,
         )

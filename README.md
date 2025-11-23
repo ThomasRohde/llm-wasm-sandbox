@@ -61,9 +61,31 @@ Execute untrusted code safely using WebAssembly sandboxing with multi-layered se
 
 ### Installation
 
+#### From PyPI (Recommended)
+
+```bash
+# Install the package
+pip install llm-wasm-sandbox
+
+# Download WASM runtimes (required for execution)
+# On Windows (PowerShell)
+Invoke-WebRequest -Uri "https://github.com/ThomasRohde/llm-wasm-sandbox/raw/main/scripts/fetch_wlr_python.ps1" -OutFile "fetch_wlr_python.ps1"
+.\fetch_wlr_python.ps1
+
+Invoke-WebRequest -Uri "https://github.com/ThomasRohde/llm-wasm-sandbox/raw/main/scripts/fetch_quickjs.ps1" -OutFile "fetch_quickjs.ps1"
+.\fetch_quickjs.ps1
+
+# On Linux/macOS
+curl -O https://github.com/ThomasRohde/llm-wasm-sandbox/raw/main/scripts/fetch_wlr_python.sh
+chmod +x fetch_wlr_python.sh
+./fetch_wlr_python.sh
+```
+
+#### From Source
+
 ```powershell
 # Clone the repository
-git clone https://github.com/yourusername/llm-wasm-sandbox.git
+git clone https://github.com/ThomasRohde/llm-wasm-sandbox.git
 cd llm-wasm-sandbox
 
 # Install dependencies (uv recommended)
@@ -500,7 +522,7 @@ import <package-name>
 
 ### Getting Help
 
-- 🐞 **Report bugs**: [GitHub Issues](https://github.com/yourusername/llm-wasm-sandbox/issues)
+- 🐞 **Report bugs**: [GitHub Issues](https://github.com/ThomasRohde/llm-wasm-sandbox/issues)
 - 📖 **Documentation**: See inline code comments and docstrings
 - 💡 **Examples**: Check `demo*.py` files and `tests/` directory
 
@@ -603,18 +625,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## ⭐ Star History
-
-If you find this project useful, please consider giving it a star on GitHub!
-
----
-
 <div align="center">
 
 **Built with ❤️ for secure LLM code execution**
 
-[Report Bug](https://github.com/yourusername/llm-wasm-sandbox/issues) •
-[Request Feature](https://github.com/yourusername/llm-wasm-sandbox/issues) •
-[Documentation](https://github.com/yourusername/llm-wasm-sandbox)
+[Report Bug](https://github.com/ThomasRohde/llm-wasm-sandbox/issues) •
+[Request Feature](https://github.com/ThomasRohde/llm-wasm-sandbox/issues) •
+[Documentation](https://github.com/ThomasRohde/llm-wasm-sandbox)
 
 </div>

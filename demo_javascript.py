@@ -34,8 +34,7 @@ console = Console()
 
 # Enable console logging with structured events
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = SandboxLogger()
 
@@ -43,12 +42,12 @@ logger = SandboxLogger()
 def execute_in_session(code: str, session_id: str, reuse: bool = False) -> tuple[str, dict]:
     """
     Execute JavaScript code in isolated session workspace with logging enabled.
-    
+
     Args:
         code: JavaScript code to execute
         session_id: Session identifier for workspace isolation
         reuse: If True, reuse existing session; if False, create new session
-        
+
     Returns:
         Tuple of (session_id, result_dict)
     """
@@ -60,14 +59,12 @@ def execute_in_session(code: str, session_id: str, reuse: bool = False) -> tuple
             session_id=session_id,
             runtime=RuntimeType.JAVASCRIPT,
             workspace_root=workspace_base,
-            logger=logger
+            logger=logger,
         )
     else:
         # Create new session with isolated workspace
         sandbox = create_sandbox(
-            runtime=RuntimeType.JAVASCRIPT,
-            workspace_root=workspace_base,
-            logger=logger
+            runtime=RuntimeType.JAVASCRIPT, workspace_root=workspace_base, logger=logger
         )
         session_id = sandbox.session_id
 
@@ -76,16 +73,16 @@ def execute_in_session(code: str, session_id: str, reuse: bool = False) -> tuple
 
     # Return session_id and result dict
     return session_id, {
-        'stdout': result.stdout,
-        'stderr': result.stderr,
-        'fuel_consumed': result.fuel_consumed,
-        'mem_len': result.memory_used_bytes,
-        'mem_pages': result.memory_used_bytes // 65536,
-        'workspace': str(workspace_base / session_id),
-        'files_created': result.files_created,
-        'files_modified': result.files_modified,
-        'success': result.success,
-        'session_id': result.metadata.get('session_id', session_id),
+        "stdout": result.stdout,
+        "stderr": result.stderr,
+        "fuel_consumed": result.fuel_consumed,
+        "mem_len": result.memory_used_bytes,
+        "mem_pages": result.memory_used_bytes // 65536,
+        "workspace": str(workspace_base / session_id),
+        "files_created": result.files_created,
+        "files_modified": result.files_modified,
+        "success": result.success,
+        "session_id": result.metadata.get("session_id", session_id),
     }
 
 
@@ -94,7 +91,7 @@ def cleanup_workspace():
     workspace = Path("workspace")
     if workspace.exists():
         for item in workspace.iterdir():
-            if item.name not in ['.gitkeep', 'site-packages']:
+            if item.name not in [".gitkeep", "site-packages"]:
                 if item.is_dir():
                     shutil.rmtree(item)
                 else:
@@ -105,24 +102,26 @@ def show_header():
     """Display welcome header."""
     cleanup_workspace()
     console.print()
-    console.print(Panel.fit(
-        "[bold cyan]LLM WASM Sandbox - JavaScript Runtime[/bold cyan]\n"
-        "[dim]Production-grade security sandbox for untrusted JavaScript code[/dim]\n"
-        "[yellow]Using QuickJS-NG WASM with isolated session workspaces[/yellow]\n"
-        "[green]✓ Console logging enabled (detail level: full)[/green]",
-        border_style="cyan",
-        box=box.DOUBLE
-    ))
+    console.print(
+        Panel.fit(
+            "[bold cyan]LLM WASM Sandbox - JavaScript Runtime[/bold cyan]\n"
+            "[dim]Production-grade security sandbox for untrusted JavaScript code[/dim]\n"
+            "[yellow]Using QuickJS-NG WASM with isolated session workspaces[/yellow]\n"
+            "[green]✓ Console logging enabled (detail level: full)[/green]",
+            border_style="cyan",
+            box=box.DOUBLE,
+        )
+    )
     console.print()
 
 
 def demo_basic_execution():
     """Demo 1: Basic JavaScript execution with session management."""
-    console.print(Panel(
-        "[bold]Demo 1:[/bold] Session-Based JavaScript Execution",
-        style="green",
-        expand=False
-    ))
+    console.print(
+        Panel(
+            "[bold]Demo 1:[/bold] Session-Based JavaScript Execution", style="green", expand=False
+        )
+    )
 
     code = """
 console.log("Hello from WASM JavaScript!");
@@ -140,7 +139,7 @@ console.log(`Sum of squares (1-5): ${sum}`);
     session_id, result = execute_in_session(code, session_id="demo-js-1-basic")
 
     console.print("\n[bold]Output:[/bold]")
-    console.print(result['stdout'].strip())
+    console.print(result["stdout"].strip())
     console.print(f"\n[dim]Session ID: {session_id}[/dim]")
     console.print(f"[dim]Workspace: {result['workspace']}[/dim]")
 
@@ -149,7 +148,7 @@ console.log(`Sum of squares (1-5): ${sum}`);
     table.add_row("[cyan]Session ID[/cyan]", session_id[:16] + "...")
     table.add_row("[cyan]Fuel consumed[/cyan]", f"{result['fuel_consumed']:,} instructions")
     table.add_row("[cyan]Memory used[/cyan]", f"{result['mem_len']:,} bytes")
-    table.add_row("[cyan]Memory pages[/cyan]", str(result['mem_pages']))
+    table.add_row("[cyan]Memory pages[/cyan]", str(result["mem_pages"]))
     console.print("\n[bold]Execution Metrics:[/bold]")
     console.print(table)
     console.print()
@@ -157,11 +156,9 @@ console.log(`Sum of squares (1-5): ${sum}`);
 
 def demo_security_fuel():
     """Demo 2: Fuel exhaustion (infinite loop protection)."""
-    console.print(Panel(
-        "[bold]Demo 2:[/bold] Security - Fuel Limits",
-        style="yellow",
-        expand=False
-    ))
+    console.print(
+        Panel("[bold]Demo 2:[/bold] Security - Fuel Limits", style="yellow", expand=False)
+    )
 
     console.print("\n[dim]Demonstrating fuel consumption tracking...[/dim]\n")
 
@@ -183,13 +180,15 @@ console.log("An infinite loop would hit the 2 billion instruction limit");
     _, result = execute_in_session(code, session_id="demo-js-2-fuel")
 
     console.print("[bold]Output:[/bold]")
-    console.print(result['stdout'].strip())
+    console.print(result["stdout"].strip())
 
     # Create metrics table
     table = Table(show_header=False, box=box.SIMPLE)
     table.add_row("[cyan]Fuel consumed[/cyan]", f"{result['fuel_consumed']:,} instructions")
     table.add_row("[cyan]Fuel budget[/cyan]", "2,000,000,000 instructions")
-    table.add_row("[cyan]Usage[/cyan]", f"{(result['fuel_consumed']/2_000_000_000)*100:.2f}% of budget")
+    table.add_row(
+        "[cyan]Usage[/cyan]", f"{(result['fuel_consumed'] / 2_000_000_000) * 100:.2f}% of budget"
+    )
 
     console.print("\n[bold]Fuel Metrics:[/bold]")
     console.print(table)
@@ -200,11 +199,9 @@ console.log("An infinite loop would hit the 2 billion instruction limit");
 
 def demo_security_filesystem():
     """Demo 3: Filesystem isolation."""
-    console.print(Panel(
-        "[bold]Demo 3:[/bold] Security - Filesystem Isolation",
-        style="yellow",
-        expand=False
-    ))
+    console.print(
+        Panel("[bold]Demo 3:[/bold] Security - Filesystem Isolation", style="yellow", expand=False)
+    )
 
     code = """
 console.log("Attempting to access restricted paths...");
@@ -226,17 +223,13 @@ console.log("\\n✓ All escape attempts blocked by WASI capabilities");
     _, result = execute_in_session(code, session_id="demo-js-3-filesystem")
 
     console.print("\n[bold]Security Test Results:[/bold]")
-    console.print(result['stdout'].strip())
+    console.print(result["stdout"].strip())
     console.print()
 
 
 def demo_es6_features():
     """Demo 4: ES6+ syntax and features."""
-    console.print(Panel(
-        "[bold]Demo 4:[/bold] ES6+ Features",
-        style="blue",
-        expand=False
-    ))
+    console.print(Panel("[bold]Demo 4:[/bold] ES6+ Features", style="blue", expand=False))
 
     code = """
 // Arrow functions
@@ -278,18 +271,14 @@ console.log(`Point: (${point.x}, ${point.y})`);
     _, result = execute_in_session(code, session_id="demo-js-4-es6")
 
     console.print("\n[bold]Output:[/bold]")
-    console.print(result['stdout'].strip())
+    console.print(result["stdout"].strip())
     console.print(f"\n[dim]Fuel: {result['fuel_consumed']:,} instructions[/dim]")
     console.print()
 
 
 def demo_json_processing():
     """Demo 5: JSON data processing."""
-    console.print(Panel(
-        "[bold]Demo 5:[/bold] JSON Processing",
-        style="blue",
-        expand=False
-    ))
+    console.print(Panel("[bold]Demo 5:[/bold] JSON Processing", style="blue", expand=False))
 
     code = """
 // Data analysis with JSON
@@ -335,17 +324,15 @@ console.log(JSON.stringify(summary, null, 2));
     _, result = execute_in_session(code, session_id="demo-js-5-json")
 
     console.print("\n[bold]Output:[/bold]")
-    console.print(result['stdout'].strip())
+    console.print(result["stdout"].strip())
     console.print()
 
 
 def demo_algorithms():
     """Demo 6: Algorithms and computation."""
-    console.print(Panel(
-        "[bold]Demo 6:[/bold] Algorithms & Computation",
-        style="blue",
-        expand=False
-    ))
+    console.print(
+        Panel("[bold]Demo 6:[/bold] Algorithms & Computation", style="blue", expand=False)
+    )
 
     code = """
 // Fibonacci sequence
@@ -400,17 +387,15 @@ Object.entries(wordFreq).forEach(([word, count]) => {
     _, result = execute_in_session(code, session_id="demo-js-6-algorithms")
 
     console.print("\n[bold]Output:[/bold]")
-    console.print(result['stdout'].strip())
+    console.print(result["stdout"].strip())
     console.print()
 
 
 def demo_unicode():
     """Demo 7: Unicode and international text."""
-    console.print(Panel(
-        "[bold]Demo 7:[/bold] Unicode & International Text",
-        style="cyan",
-        expand=False
-    ))
+    console.print(
+        Panel("[bold]Demo 7:[/bold] Unicode & International Text", style="cyan", expand=False)
+    )
 
     code = """
 // Multi-language support
@@ -448,17 +433,15 @@ console.log("\\n✓ All Unicode encodings handled correctly");
     _, result = execute_in_session(code, session_id="demo-js-7-unicode")
 
     console.print("\n[bold]Output:[/bold]")
-    console.print(result['stdout'].strip())
+    console.print(result["stdout"].strip())
     console.print()
 
 
 def demo_llm_integration():
     """Demo 8: LLM integration pattern."""
-    console.print(Panel(
-        "[bold]Demo 8:[/bold] LLM Integration Pattern",
-        style="green",
-        expand=False
-    ))
+    console.print(
+        Panel("[bold]Demo 8:[/bold] LLM Integration Pattern", style="green", expand=False)
+    )
 
     # Simulated LLM-generated JavaScript code
     llm_code = """
@@ -511,11 +494,11 @@ console.log("\\n✓ Analysis complete");
 
     console.print("\n[bold cyan]Step 3: Capture Output[/bold cyan]")
     console.print("[bold]Console Output (stdout):[/bold]")
-    console.print(result['stdout'].strip())
+    console.print(result["stdout"].strip())
 
-    if result['stderr']:
+    if result["stderr"]:
         console.print("\n[bold red]Errors (stderr):[/bold red]")
-        console.print(result['stderr'].strip())
+        console.print(result["stderr"].strip())
 
     console.print("\n[bold cyan]Step 4: Collect Metrics[/bold cyan]")
 
@@ -525,14 +508,14 @@ console.log("\\n✓ Analysis complete");
     table.add_column("Value", style="green")
     table.add_column("Assessment", style="yellow")
 
-    success = bool(result['stdout']) and not result['stderr']
-    fuel_pct = (result['fuel_consumed'] / 2_000_000_000) * 100
+    success = bool(result["stdout"]) and not result["stderr"]
+    fuel_pct = (result["fuel_consumed"] / 2_000_000_000) * 100
 
     table.add_row("Success", "✓" if success else "✗", "Code executed without errors")
     table.add_row("Fuel Used", f"{result['fuel_consumed']:,}", f"{fuel_pct:.2f}% of budget")
     table.add_row("Memory", f"{result['mem_len']:,} bytes", "Well within limits")
 
-    if result['stderr']:
+    if result["stderr"]:
         table.add_row("Errors", "Yes", "Check stderr for details")
 
     console.print()
@@ -556,10 +539,12 @@ console.log("\\n✓ Analysis complete");
 def show_summary():
     """Display summary of JavaScript runtime capabilities."""
     console.print()
-    console.print(Panel.fit(
-        "[bold green]✓ All JavaScript Demos Completed Successfully[/bold green]",
-        border_style="green"
-    ))
+    console.print(
+        Panel.fit(
+            "[bold green]✓ All JavaScript Demos Completed Successfully[/bold green]",
+            border_style="green",
+        )
+    )
 
     tree = Tree("🔒 [bold]JavaScript Sandbox Capabilities[/bold]")
 
@@ -612,7 +597,7 @@ def main():
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
         console=console,
-        transient=True
+        transient=True,
     ) as progress:
         for name, demo_func in demos:
             task = progress.add_task(f"Running {name}...", total=None)

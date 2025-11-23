@@ -20,10 +20,7 @@ from sandbox import (
 
 def test_create_session_sandbox_generates_uuid(tmp_path: Path) -> None:
     """Test that create_session_sandbox generates valid UUIDv4."""
-    sandbox = create_sandbox(
-        runtime=RuntimeType.PYTHON,
-        workspace_root=tmp_path
-    )
+    sandbox = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=tmp_path)
     session_id = sandbox.session_id
 
     # Verify session_id is valid UUID format
@@ -36,10 +33,7 @@ def test_create_session_sandbox_generates_uuid(tmp_path: Path) -> None:
 
 def test_create_session_sandbox_creates_workspace(tmp_path: Path) -> None:
     """Test that create_session_sandbox creates workspace directory."""
-    sandbox = create_sandbox(
-        runtime=RuntimeType.PYTHON,
-        workspace_root=tmp_path
-    )
+    sandbox = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=tmp_path)
     session_id = sandbox.session_id
 
     workspace = tmp_path / session_id
@@ -49,10 +43,7 @@ def test_create_session_sandbox_creates_workspace(tmp_path: Path) -> None:
 
 def test_create_session_sandbox_returns_sandbox_instance(tmp_path: Path) -> None:
     """Test that create_session_sandbox returns working sandbox."""
-    sandbox = create_sandbox(
-        runtime=RuntimeType.PYTHON,
-        workspace_root=tmp_path
-    )
+    sandbox = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=tmp_path)
     session_id = sandbox.session_id
 
     # Verify sandbox can execute code
@@ -63,10 +54,7 @@ def test_create_session_sandbox_returns_sandbox_instance(tmp_path: Path) -> None
 
 def test_create_session_sandbox_isolates_workspace(tmp_path: Path) -> None:
     """Test that session workspace is isolated to WASI guest."""
-    sandbox = create_sandbox(
-        runtime=RuntimeType.PYTHON,
-        workspace_root=tmp_path
-    )
+    sandbox = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=tmp_path)
     session_id = sandbox.session_id
 
     # Execute code that writes file
@@ -87,10 +75,7 @@ print('written')
 def test_get_session_sandbox_reuses_workspace(tmp_path: Path) -> None:
     """Test that create_sandbox with existing session_id accesses existing workspace."""
     # Create session and write file
-    sandbox1 = create_sandbox(
-        runtime=RuntimeType.PYTHON,
-        workspace_root=tmp_path
-    )
+    sandbox1 = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=tmp_path)
     session_id = sandbox1.session_id
     result1 = sandbox1.execute("""
 with open('/app/state.json', 'w') as f:
@@ -99,9 +84,8 @@ with open('/app/state.json', 'w') as f:
     assert result1.success
 
     # Retrieve session and read file
-    sandbox2 = create_sandbox(session_id=session_id,
-        runtime=RuntimeType.PYTHON,
-        workspace_root=tmp_path
+    sandbox2 = create_sandbox(
+        session_id=session_id, runtime=RuntimeType.PYTHON, workspace_root=tmp_path
     )
     result2 = sandbox2.execute("""
 with open('/app/state.json', 'r') as f:
@@ -119,9 +103,8 @@ def test_get_session_sandbox_creates_workspace_if_missing(tmp_path: Path) -> Non
     assert not workspace.exists()
 
     # Retrieve sandbox (should create workspace)
-    sandbox = create_sandbox(session_id=session_id,
-        runtime=RuntimeType.PYTHON,
-        workspace_root=tmp_path
+    sandbox = create_sandbox(
+        session_id=session_id, runtime=RuntimeType.PYTHON, workspace_root=tmp_path
     )
 
     # Verify workspace was created
@@ -136,10 +119,7 @@ def test_get_session_sandbox_creates_workspace_if_missing(tmp_path: Path) -> Non
 def test_delete_session_workspace_removes_directory(tmp_path: Path) -> None:
     """Test that delete_session_workspace removes workspace."""
     # Create session
-    sandbox = create_sandbox(
-        runtime=RuntimeType.PYTHON,
-        workspace_root=tmp_path
-    )
+    sandbox = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=tmp_path)
     session_id = sandbox.session_id
     workspace = tmp_path / session_id
     assert workspace.exists()
@@ -154,10 +134,7 @@ def test_delete_session_workspace_removes_directory(tmp_path: Path) -> None:
 def test_delete_session_workspace_removes_all_files(tmp_path: Path) -> None:
     """Test that delete_session_workspace removes workspace contents."""
     # Create session and write files
-    sandbox = create_sandbox(
-        runtime=RuntimeType.PYTHON,
-        workspace_root=tmp_path
-    )
+    sandbox = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=tmp_path)
     session_id = sandbox.session_id
     result = sandbox.execute("""
 import os
@@ -188,10 +165,7 @@ def test_delete_session_workspace_idempotent(tmp_path: Path) -> None:
     delete_session_workspace(session_id, workspace_root=tmp_path)
 
     # Create and delete workspace
-    sandbox = create_sandbox(
-        runtime=RuntimeType.PYTHON,
-        workspace_root=tmp_path
-    )
+    sandbox = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=tmp_path)
     session_id = sandbox.session_id
     delete_session_workspace(session_id, workspace_root=tmp_path)
 
@@ -215,16 +189,10 @@ def test_delete_session_workspace_rejects_path_traversal(tmp_path: Path) -> None
 def test_session_isolation_between_sessions(tmp_path: Path) -> None:
     """Test that different sessions have isolated workspaces."""
     # Create two sessions
-    sandbox_a = create_sandbox(
-        runtime=RuntimeType.PYTHON,
-        workspace_root=tmp_path
-    )
+    sandbox_a = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=tmp_path)
     session_id_a = sandbox_a.session_id
 
-    sandbox_b = create_sandbox(
-        runtime=RuntimeType.PYTHON,
-        workspace_root=tmp_path
-    )
+    sandbox_b = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=tmp_path)
     session_id_b = sandbox_b.session_id
 
     # Write different files in each session
@@ -252,10 +220,7 @@ with open('/app/data.txt', 'w') as f:
 
 def test_session_persistence_across_executions(tmp_path: Path) -> None:
     """Test that session state persists across multiple executions."""
-    sandbox = create_sandbox(
-        runtime=RuntimeType.PYTHON,
-        workspace_root=tmp_path
-    )
+    sandbox = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=tmp_path)
     session_id = sandbox.session_id
 
     # First execution: write counter

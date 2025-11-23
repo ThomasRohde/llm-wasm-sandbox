@@ -20,7 +20,18 @@ import stat
 import tempfile
 from pathlib import Path
 
-from wasmtime import Config, DirPerms, Engine, ExitTrap, FilePerms, Linker, Module, Store, Trap, WasiConfig
+from wasmtime import (
+    Config,
+    DirPerms,
+    Engine,
+    ExitTrap,
+    FilePerms,
+    Linker,
+    Module,
+    Store,
+    Trap,
+    WasiConfig,
+)
 
 from .core.errors import SandboxExecutionError
 from .core.models import ExecutionPolicy
@@ -38,11 +49,21 @@ class SandboxResult:
         logs_dir: Temporary directory containing full stdout/stderr logs (None if cleaned up)
     """
 
-    def __init__(self, stdout: str, stderr: str, fuel_consumed: int | None,
-                 mem_pages: int, mem_len: int, logs_dir: str | None,
-                 exit_code: int | None = None, trapped: bool = False,
-                 trap_reason: str | None = None, trap_message: str | None = None,
-                 stdout_truncated: bool = False, stderr_truncated: bool = False):
+    def __init__(
+        self,
+        stdout: str,
+        stderr: str,
+        fuel_consumed: int | None,
+        mem_pages: int,
+        mem_len: int,
+        logs_dir: str | None,
+        exit_code: int | None = None,
+        trapped: bool = False,
+        trap_reason: str | None = None,
+        trap_message: str | None = None,
+        stdout_truncated: bool = False,
+        stderr_truncated: bool = False,
+    ):
         self.stdout = stdout
         self.stderr = stderr
         self.fuel_consumed = fuel_consumed
@@ -60,7 +81,7 @@ class SandboxResult:
 def run_untrusted_python(
     wasm_path: str = "bin/python.wasm",
     workspace_dir: str | None = None,
-    policy: ExecutionPolicy | None = None
+    policy: ExecutionPolicy | None = None,
 ) -> SandboxResult:
     """Execute untrusted Python code in a WASM sandbox with security constraints.
 
@@ -129,7 +150,7 @@ def run_untrusted_python(
                     readonly_data_dir,
                     policy.guest_data_path,
                     DirPerms.READ_ONLY,
-                    FilePerms.READ_ONLY
+                    FilePerms.READ_ONLY,
                 )
 
         wasi.argv = tuple(policy.argv)
@@ -210,8 +231,12 @@ def run_untrusted_python(
                 stderr = f"{stderr.rstrip()}\n{trap_notice}".strip()
 
         # Re-apply caps if we appended trap notices
-        stdout, stdout_truncated = _enforce_cap(stdout, int(policy.stdout_max_bytes), stdout_truncated)
-        stderr, stderr_truncated = _enforce_cap(stderr, int(policy.stderr_max_bytes), stderr_truncated)
+        stdout, stdout_truncated = _enforce_cap(
+            stdout, int(policy.stdout_max_bytes), stdout_truncated
+        )
+        stderr, stderr_truncated = _enforce_cap(
+            stderr, int(policy.stderr_max_bytes), stderr_truncated
+        )
 
     finally:
         for path in cleanup_paths:
@@ -262,7 +287,9 @@ def _prepare_readonly_data_dir(source_dir: str) -> tuple[str, str]:
     """Copy data directory to a temporary, read-only location for mounting."""
     source_path = Path(source_dir).resolve()
     if not source_path.exists() or not source_path.is_dir():
-        raise FileNotFoundError(f"mount_data_dir '{source_dir}' does not exist or is not a directory")
+        raise FileNotFoundError(
+            f"mount_data_dir '{source_dir}' does not exist or is not a directory"
+        )
 
     temp_root = Path(tempfile.mkdtemp(prefix="sandbox-data-"))
     readonly_root = temp_root / "data"
@@ -279,6 +306,7 @@ def _prepare_readonly_data_dir(source_dir: str) -> tuple[str, str]:
 
 def _make_tree_readonly(path: Path) -> None:
     """Recursively strip write permissions from a directory tree."""
+
     def _read_only_mode(mode: int) -> int:
         return mode & ~stat.S_IWUSR & ~stat.S_IWGRP & ~stat.S_IWOTH
 
@@ -296,7 +324,7 @@ def _make_tree_readonly(path: Path) -> None:
 def run_untrusted_javascript(
     wasm_path: str = "bin/quickjs.wasm",
     workspace_dir: str | None = None,
-    policy: ExecutionPolicy | None = None
+    policy: ExecutionPolicy | None = None,
 ) -> SandboxResult:
     """Execute untrusted JavaScript code in a WASM sandbox with security constraints.
 
@@ -365,7 +393,7 @@ def run_untrusted_javascript(
                     readonly_data_dir,
                     policy.guest_data_path,
                     DirPerms.READ_ONLY,
-                    FilePerms.READ_ONLY
+                    FilePerms.READ_ONLY,
                 )
 
         # JavaScript-specific argv: ["quickjs", "/app/user_code.js"]
@@ -450,8 +478,12 @@ def run_untrusted_javascript(
                 stderr = f"{stderr.rstrip()}\n{trap_notice}".strip()
 
         # Re-apply caps if we appended trap notices
-        stdout, stdout_truncated = _enforce_cap(stdout, int(policy.stdout_max_bytes), stdout_truncated)
-        stderr, stderr_truncated = _enforce_cap(stderr, int(policy.stderr_max_bytes), stderr_truncated)
+        stdout, stdout_truncated = _enforce_cap(
+            stdout, int(policy.stdout_max_bytes), stdout_truncated
+        )
+        stderr, stderr_truncated = _enforce_cap(
+            stderr, int(policy.stderr_max_bytes), stderr_truncated
+        )
 
     finally:
         for path in cleanup_paths:

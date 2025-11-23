@@ -33,23 +33,23 @@ def main():
     if len(sys.argv) < 2:
         print(__doc__)
         sys.exit(1)
-    
+
     command = sys.argv[1].lower()
-    
+
     if command == "install":
         if len(sys.argv) < 3:
             print("Error: Package name required")
             print("Usage: python scripts/manage_vendor.py install <package>")
             sys.exit(1)
-        
+
         package = sys.argv[2]
         setup_vendor_dir()
         success = install_pure_python_package(package)
         sys.exit(0 if success else 1)
-    
+
     elif command == "bootstrap":
         bootstrap_common_packages()
-    
+
     elif command == "list":
         packages = list_vendored_packages()
         if packages:
@@ -58,13 +58,13 @@ def main():
                 print(f"  - {pkg}")
         else:
             print("No vendored packages found.")
-    
+
     elif command == "clean":
         clean_vendor_dir()
-    
+
     elif command == "copy":
         copy_vendor_to_workspace()
-    
+
     else:
         print(f"Unknown command: {command}")
         print(__doc__)

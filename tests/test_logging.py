@@ -97,7 +97,9 @@ def test_sandbox_logger_creates_default_logger() -> None:
     assert sandbox_logger._logger is not None
 
 
-def test_sandbox_logger_accepts_standard_logging_logger(std_logger: logging.Logger, caplog: pytest.LogCaptureFixture) -> None:
+def test_sandbox_logger_accepts_standard_logging_logger(
+    std_logger: logging.Logger, caplog: pytest.LogCaptureFixture
+) -> None:
     """Test SandboxLogger works with a standard logging.Logger."""
     sandbox_logger = SandboxLogger(logger=std_logger)
     policy = ExecutionPolicy()
@@ -112,10 +114,7 @@ def test_sandbox_logger_accepts_standard_logging_logger(std_logger: logging.Logg
     assert record.log_message == "sandbox.execution.start"
 
 
-def test_log_execution_start_structure(
-    custom_logger: Any,
-    log_capture: StructlogCapture
-) -> None:
+def test_log_execution_start_structure(custom_logger: Any, log_capture: StructlogCapture) -> None:
     """Test execution.start log event structure and content."""
     sandbox_logger = SandboxLogger(logger=custom_logger)
     policy = ExecutionPolicy(
@@ -123,15 +122,12 @@ def test_log_execution_start_structure(
         memory_bytes=64_000_000,
         stdout_max_bytes=1_000_000,
         stderr_max_bytes=500_000,
-        guest_mount_path="/app"
+        guest_mount_path="/app",
     )
 
     # Log execution start with extra fields
     sandbox_logger.log_execution_start(
-        runtime="python",
-        policy=policy,
-        trace_id="test-trace-123",
-        user_id="test-user"
+        runtime="python", policy=policy, trace_id="test-trace-123", user_id="test-user"
     )
 
     # Verify event was captured
@@ -158,8 +154,7 @@ def test_log_execution_start_structure(
 
 
 def test_log_execution_complete_success_structure(
-    custom_logger: Any,
-    log_capture: StructlogCapture
+    custom_logger: Any, log_capture: StructlogCapture
 ) -> None:
     """Test execution.complete log event for successful execution."""
     sandbox_logger = SandboxLogger(logger=custom_logger)
@@ -174,7 +169,7 @@ def test_log_execution_complete_success_structure(
         duration_ms=42.5,
         files_created=["output.txt"],
         files_modified=["data.json"],
-        workspace_path="/workspace"
+        workspace_path="/workspace",
     )
 
     sandbox_logger.log_execution_complete(result, runtime="python")
@@ -203,8 +198,7 @@ def test_log_execution_complete_success_structure(
 
 
 def test_log_execution_complete_truncates_long_paths(
-    custom_logger: Any,
-    log_capture: StructlogCapture
+    custom_logger: Any, log_capture: StructlogCapture
 ) -> None:
     """Test filesystem delta logging truncates very long paths."""
     sandbox_logger = SandboxLogger(logger=custom_logger)
@@ -220,7 +214,7 @@ def test_log_execution_complete_truncates_long_paths(
         duration_ms=1.0,
         files_created=[long_name],
         files_modified=[],
-        workspace_path="/workspace"
+        workspace_path="/workspace",
     )
 
     sandbox_logger.log_execution_complete(result, runtime="python")
@@ -233,8 +227,7 @@ def test_log_execution_complete_truncates_long_paths(
 
 
 def test_log_execution_complete_failure_structure(
-    custom_logger: Any,
-    log_capture: StructlogCapture
+    custom_logger: Any, log_capture: StructlogCapture
 ) -> None:
     """Test execution.complete log event for failed execution."""
     sandbox_logger = SandboxLogger(logger=custom_logger)
@@ -249,7 +242,7 @@ def test_log_execution_complete_failure_structure(
         duration_ms=15.0,
         files_created=[],
         files_modified=[],
-        workspace_path="/workspace"
+        workspace_path="/workspace",
     )
 
     sandbox_logger.log_execution_complete(result, runtime="python")
@@ -264,23 +257,17 @@ def test_log_execution_complete_failure_structure(
     assert event["exit_code"] == 1
 
 
-def test_log_security_event_structure(
-    custom_logger: Any,
-    log_capture: StructlogCapture
-) -> None:
+def test_log_security_event_structure(custom_logger: Any, log_capture: StructlogCapture) -> None:
     """Test security event logging at WARNING level."""
     sandbox_logger = SandboxLogger(logger=custom_logger)
 
     details = {
         "fuel_budget": 400_000_000,
         "fuel_consumed": 400_000_000,
-        "code_snippet": "while True: pass"
+        "code_snippet": "while True: pass",
     }
 
-    sandbox_logger.log_security_event(
-        event_type="fuel_exhausted",
-        details=details
-    )
+    sandbox_logger.log_security_event(event_type="fuel_exhausted", details=details)
 
     # Verify event
     assert len(log_capture.events) == 1
@@ -298,22 +285,14 @@ def test_log_security_event_structure(
 
 
 def test_log_security_event_fs_access_denied(
-    custom_logger: Any,
-    log_capture: StructlogCapture
+    custom_logger: Any, log_capture: StructlogCapture
 ) -> None:
     """Test security event for filesystem access denial."""
     sandbox_logger = SandboxLogger(logger=custom_logger)
 
-    details = {
-        "attempted_path": "/etc/passwd",
-        "allowed_paths": ["/app"],
-        "operation": "read"
-    }
+    details = {"attempted_path": "/etc/passwd", "allowed_paths": ["/app"], "operation": "read"}
 
-    sandbox_logger.log_security_event(
-        event_type="fs_access_denied",
-        details=details
-    )
+    sandbox_logger.log_security_event(event_type="fs_access_denied", details=details)
 
     event = log_capture.events[0]
 
@@ -325,8 +304,7 @@ def test_log_security_event_fs_access_denied(
 
 
 def test_multiple_extra_fields_in_execution_start(
-    custom_logger: Any,
-    log_capture: StructlogCapture
+    custom_logger: Any, log_capture: StructlogCapture
 ) -> None:
     """Test multiple custom extra fields in execution.start."""
     sandbox_logger = SandboxLogger(logger=custom_logger)
@@ -338,7 +316,7 @@ def test_multiple_extra_fields_in_execution_start(
         span_id="span-456",
         parent_span_id="span-123",
         correlation_id="corr-789",
-        request_id="req-abc"
+        request_id="req-abc",
     )
 
     event = log_capture.events[0]
@@ -353,17 +331,14 @@ def test_multiple_extra_fields_in_execution_start(
 
 
 def test_log_execution_start_with_session_id(
-    custom_logger: Any,
-    log_capture: StructlogCapture
+    custom_logger: Any, log_capture: StructlogCapture
 ) -> None:
     """Test execution.start includes session_id when provided."""
     sandbox_logger = SandboxLogger(logger=custom_logger)
     policy = ExecutionPolicy()
 
     sandbox_logger.log_execution_start(
-        runtime="python",
-        policy=policy,
-        session_id="test-session-123"
+        runtime="python", policy=policy, session_id="test-session-123"
     )
 
     event = log_capture.events[0]
@@ -371,8 +346,7 @@ def test_log_execution_start_with_session_id(
 
 
 def test_log_execution_complete_with_session_id(
-    custom_logger: Any,
-    log_capture: StructlogCapture
+    custom_logger: Any, log_capture: StructlogCapture
 ) -> None:
     """Test execution.complete includes session_id when provided."""
     sandbox_logger = SandboxLogger(logger=custom_logger)
@@ -387,29 +361,21 @@ def test_log_execution_complete_with_session_id(
         duration_ms=10.0,
         files_created=[],
         files_modified=[],
-        workspace_path="/workspace"
+        workspace_path="/workspace",
     )
 
-    sandbox_logger.log_execution_complete(
-        result,
-        runtime="python",
-        session_id="test-session-456"
-    )
+    sandbox_logger.log_execution_complete(result, runtime="python", session_id="test-session-456")
 
     event = log_capture.events[0]
     assert event["session_id"] == "test-session-456"
 
 
-def test_log_session_created(
-    custom_logger: Any,
-    log_capture: StructlogCapture
-) -> None:
+def test_log_session_created(custom_logger: Any, log_capture: StructlogCapture) -> None:
     """Test session.created log event."""
     sandbox_logger = SandboxLogger(logger=custom_logger)
 
     sandbox_logger.log_session_created(
-        session_id="session-abc-123",
-        workspace_path="/workspace/session-abc-123"
+        session_id="session-abc-123", workspace_path="/workspace/session-abc-123"
     )
 
     assert len(log_capture.events) == 1
@@ -422,16 +388,12 @@ def test_log_session_created(
     assert event["workspace_path"] == "/workspace/session-abc-123"
 
 
-def test_log_session_retrieved(
-    custom_logger: Any,
-    log_capture: StructlogCapture
-) -> None:
+def test_log_session_retrieved(custom_logger: Any, log_capture: StructlogCapture) -> None:
     """Test session.retrieved log event."""
     sandbox_logger = SandboxLogger(logger=custom_logger)
 
     sandbox_logger.log_session_retrieved(
-        session_id="session-def-456",
-        workspace_path="/workspace/session-def-456"
+        session_id="session-def-456", workspace_path="/workspace/session-def-456"
     )
 
     event = log_capture.events[0]
@@ -439,10 +401,7 @@ def test_log_session_retrieved(
     assert event["session_id"] == "session-def-456"
 
 
-def test_log_session_deleted(
-    custom_logger: Any,
-    log_capture: StructlogCapture
-) -> None:
+def test_log_session_deleted(custom_logger: Any, log_capture: StructlogCapture) -> None:
     """Test session.deleted log event."""
     sandbox_logger = SandboxLogger(logger=custom_logger)
 
@@ -453,18 +412,12 @@ def test_log_session_deleted(
     assert event["session_id"] == "session-ghi-789"
 
 
-def test_log_file_operation_write(
-    custom_logger: Any,
-    log_capture: StructlogCapture
-) -> None:
+def test_log_file_operation_write(custom_logger: Any, log_capture: StructlogCapture) -> None:
     """Test session.file.write log event."""
     sandbox_logger = SandboxLogger(logger=custom_logger)
 
     sandbox_logger.log_file_operation(
-        operation="write",
-        session_id="session-123",
-        path="data/output.txt",
-        file_size=1024
+        operation="write", session_id="session-123", path="data/output.txt", file_size=1024
     )
 
     event = log_capture.events[0]
@@ -474,18 +427,12 @@ def test_log_file_operation_write(
     assert event["file_size"] == 1024
 
 
-def test_log_file_operation_list(
-    custom_logger: Any,
-    log_capture: StructlogCapture
-) -> None:
+def test_log_file_operation_list(custom_logger: Any, log_capture: StructlogCapture) -> None:
     """Test session.file.list log event."""
     sandbox_logger = SandboxLogger(logger=custom_logger)
 
     sandbox_logger.log_file_operation(
-        operation="list",
-        session_id="session-456",
-        path="data/",
-        file_count=5
+        operation="list", session_id="session-456", path="data/", file_count=5
     )
 
     event = log_capture.events[0]
@@ -493,18 +440,12 @@ def test_log_file_operation_list(
     assert event["file_count"] == 5
 
 
-def test_log_file_operation_delete(
-    custom_logger: Any,
-    log_capture: StructlogCapture
-) -> None:
+def test_log_file_operation_delete(custom_logger: Any, log_capture: StructlogCapture) -> None:
     """Test session.file.delete log event."""
     sandbox_logger = SandboxLogger(logger=custom_logger)
 
     sandbox_logger.log_file_operation(
-        operation="delete",
-        session_id="session-789",
-        path="temp/",
-        recursive=True
+        operation="delete", session_id="session-789", path="temp/", recursive=True
     )
 
     event = log_capture.events[0]

@@ -27,6 +27,7 @@ class StorageBackend(str, Enum):
     S3: AWS S3 cloud storage (future implementation)
     REDIS: Redis key-value store (future implementation)
     """
+
     DISK = "disk"
     MEMORY = "memory"
     S3 = "s3"
@@ -228,11 +229,7 @@ class StorageAdapter(ABC):
         pass
 
     @abstractmethod
-    def copy_vendor_packages(
-        self,
-        session_id: str,
-        vendor_path: Path
-    ) -> None:
+    def copy_vendor_packages(self, session_id: str, vendor_path: Path) -> None:
         """Copy vendored packages to session workspace.
 
         Adapters can optimize this operation (e.g., memory backend uses
@@ -284,10 +281,7 @@ class StorageAdapter(ABC):
         pass
 
     def detect_file_changes(
-        self,
-        session_id: str,
-        before: dict[str, float],
-        after: dict[str, float]
+        self, session_id: str, before: dict[str, float], after: dict[str, float]
     ) -> tuple[list[str], list[str]]:
         """Detect files created and modified by comparing snapshots.
 
@@ -338,9 +332,7 @@ class DiskStorageAdapter(StorageAdapter):
         self.workspace_root.mkdir(parents=True, exist_ok=True)
 
     def _validate_session_path(
-        self,
-        session_id: str,
-        relative_path: str | None = None
+        self, session_id: str, relative_path: str | None = None
     ) -> tuple[Path, Path]:
         """Validate session path and prevent traversal attacks.
 
@@ -356,9 +348,7 @@ class DiskStorageAdapter(StorageAdapter):
         """
         # Validate session_id doesn't contain path separators
         if "/" in session_id or "\\" in session_id or session_id in (".", ".."):
-            raise ValueError(
-                f"Invalid session_id '{session_id}': must not contain path separators"
-            )
+            raise ValueError(f"Invalid session_id '{session_id}': must not contain path separators")
 
         workspace = self.workspace_root / session_id
 
@@ -377,9 +367,7 @@ class DiskStorageAdapter(StorageAdapter):
         workspace_resolved = workspace.resolve()
 
         if not full_path.is_relative_to(workspace_resolved):
-            raise ValueError(
-                f"Path '{relative_path}' escapes session workspace"
-            )
+            raise ValueError(f"Path '{relative_path}' escapes session workspace")
 
         return (workspace, full_path)
 
@@ -401,20 +389,18 @@ class DiskStorageAdapter(StorageAdapter):
         # Create metadata (failures don't prevent session creation)
         try:
             from sandbox.sessions import SessionMetadata
+
             now = datetime.now(UTC).isoformat()
             metadata = SessionMetadata(
-                session_id=session_id,
-                created_at=now,
-                updated_at=now,
-                version=1
+                session_id=session_id, created_at=now, updated_at=now, version=1
             )
             self.write_metadata(session_id, metadata)
         except OSError as e:
             # Log warning but don't fail session creation
             import sys
+
             print(
-                f"Warning: Failed to write metadata for session {session_id}: {e}",
-                file=sys.stderr
+                f"Warning: Failed to write metadata for session {session_id}: {e}", file=sys.stderr
             )
 
     def session_exists(self, session_id: str) -> bool:
@@ -506,7 +492,9 @@ class DiskStorageAdapter(StorageAdapter):
             full_path.unlink()
         elif full_path.is_dir():
             if not recursive:
-                raise ValueError(f"Cannot delete directory '{relative_path}' without recursive=True")
+                raise ValueError(
+                    f"Cannot delete directory '{relative_path}' without recursive=True"
+                )
             shutil.rmtree(full_path)
 
     def delete_session(self, session_id: str) -> None:
@@ -556,15 +544,10 @@ class DiskStorageAdapter(StorageAdapter):
         """
         from sandbox.sessions import SessionMetadata
 
-        _, metadata_path = self._validate_session_path(
-            session_id,
-            self.METADATA_FILENAME
-        )
+        _, metadata_path = self._validate_session_path(session_id, self.METADATA_FILENAME)
 
         if not metadata_path.exists():
-            raise FileNotFoundError(
-                f"Metadata not found for session '{session_id}'"
-            )
+            raise FileNotFoundError(f"Metadata not found for session '{session_id}'")
 
         data = json.loads(metadata_path.read_text())
         return SessionMetadata.from_dict(data)
@@ -576,10 +559,7 @@ class DiskStorageAdapter(StorageAdapter):
             session_id: UUIDv4 session identifier
             metadata: SessionMetadata to persist
         """
-        _, metadata_path = self._validate_session_path(
-            session_id,
-            self.METADATA_FILENAME
-        )
+        _, metadata_path = self._validate_session_path(session_id, self.METADATA_FILENAME)
 
         metadata_path.write_text(json.dumps(metadata.to_dict(), indent=2))
 
@@ -589,10 +569,7 @@ class DiskStorageAdapter(StorageAdapter):
         Args:
             session_id: UUIDv4 session identifier
         """
-        _, metadata_path = self._validate_session_path(
-            session_id,
-            self.METADATA_FILENAME
-        )
+        _, metadata_path = self._validate_session_path(session_id, self.METADATA_FILENAME)
 
         if not metadata_path.exists():
             return
@@ -601,11 +578,7 @@ class DiskStorageAdapter(StorageAdapter):
         data["updated_at"] = datetime.now(UTC).isoformat()
         metadata_path.write_text(json.dumps(data, indent=2))
 
-    def copy_vendor_packages(
-        self,
-        session_id: str,
-        vendor_path: Path
-    ) -> None:
+    def copy_vendor_packages(self, session_id: str, vendor_path: Path) -> None:
         """Copy vendored site-packages to session workspace.
 
         Args:
@@ -620,9 +593,7 @@ class DiskStorageAdapter(StorageAdapter):
         dst = workspace / self.SITE_PACKAGES_DIR
 
         if not src.exists():
-            raise FileNotFoundError(
-                f"Vendor directory not found: {src}"
-            )
+            raise FileNotFoundError(f"Vendor directory not found: {src}")
 
         # Remove existing and copy fresh
         if dst.exists():

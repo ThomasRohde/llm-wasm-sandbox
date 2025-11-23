@@ -22,7 +22,9 @@ from sandbox.runtimes.javascript import JavaScriptSandbox
 @pytest.fixture
 def temp_workspace():
     """Create temporary workspace directory for test isolation."""
-    with tempfile.TemporaryDirectory(prefix="test-workspace-", ignore_cleanup_errors=True) as tmpdir:
+    with tempfile.TemporaryDirectory(
+        prefix="test-workspace-", ignore_cleanup_errors=True
+    ) as tmpdir:
         yield Path(tmpdir)
 
 
@@ -36,18 +38,19 @@ def default_policy():
 def javascript_sandbox(temp_workspace, default_policy):
     """Create JavaScriptSandbox instance with test configuration."""
     import uuid
+
     session_id = str(uuid.uuid4())
     storage_adapter = DiskStorageAdapter(temp_workspace)
-    
+
     # Create session workspace and metadata
     if not storage_adapter.session_exists(session_id):
         storage_adapter.create_session(session_id)
-    
+
     return JavaScriptSandbox(
         wasm_binary_path="bin/quickjs.wasm",
         policy=default_policy,
         session_id=session_id,
-        storage_adapter=storage_adapter
+        storage_adapter=storage_adapter,
     )
 
 
@@ -77,6 +80,7 @@ class TestJavaScriptSandboxBasics:
     def test_init_sets_attributes(self, temp_workspace, default_policy):
         """Test that __init__ sets wasm_binary_path, policy, session_id, storage_adapter, logger."""
         import uuid
+
         session_id = str(uuid.uuid4())
         storage_adapter = DiskStorageAdapter(temp_workspace)
 
@@ -84,7 +88,7 @@ class TestJavaScriptSandboxBasics:
             wasm_binary_path="bin/quickjs.wasm",
             policy=default_policy,
             session_id=session_id,
-            storage_adapter=storage_adapter
+            storage_adapter=storage_adapter,
         )
 
         assert sandbox.wasm_binary_path == "bin/quickjs.wasm"
@@ -97,6 +101,7 @@ class TestJavaScriptSandboxBasics:
     def test_init_with_custom_logger(self, temp_workspace, default_policy, capture_logger):
         """Test that __init__ accepts custom logger."""
         import uuid
+
         session_id = str(uuid.uuid4())
         storage_adapter = DiskStorageAdapter(temp_workspace)
 
@@ -105,7 +110,7 @@ class TestJavaScriptSandboxBasics:
             policy=default_policy,
             session_id=session_id,
             storage_adapter=storage_adapter,
-            logger=capture_logger
+            logger=capture_logger,
         )
 
         assert sandbox.logger == capture_logger
@@ -235,27 +240,30 @@ console.log(doubled.join(", "));
     def test_missing_wasm_binary_raises_file_not_found(self, temp_workspace, default_policy):
         """Missing WASM binaries should raise instead of returning a result."""
         import uuid
+
         storage_adapter = DiskStorageAdapter(temp_workspace)
 
         sandbox = JavaScriptSandbox(
             wasm_binary_path="bin/missing-quickjs.wasm",
             policy=default_policy,
             session_id=str(uuid.uuid4()),
-            storage_adapter=storage_adapter
+            storage_adapter=storage_adapter,
         )
 
         with pytest.raises(FileNotFoundError):
             sandbox.execute("console.log('test');")
 
 
-@pytest.mark.skip(reason="QuickJS WASI build does not support require('std') - file I/O APIs not available")
+@pytest.mark.skip(
+    reason="QuickJS WASI build does not support require('std') - file I/O APIs not available"
+)
 class TestJavaScriptSandboxFileOperations:
     """Test file I/O operations in JavaScriptSandbox.
-    
+
     NOTE: These tests are skipped because the QuickJS WASI build used in this
     project does not include the std module or file I/O APIs. QuickJS running
     in WASI mode has limited APIs compared to the standalone version.
-    
+
     Future enhancement: Consider using a QuickJS build with std/os modules,
     or implement file I/O via WASI host functions exposed to JavaScript.
     """
@@ -294,10 +302,12 @@ console.log('Read: ' + content);
         assert "Read: Test input data" in result.stdout
 
 
-@pytest.mark.skip(reason="QuickJS WASI build does not support require('std') - file I/O APIs not available")
+@pytest.mark.skip(
+    reason="QuickJS WASI build does not support require('std') - file I/O APIs not available"
+)
 class TestJavaScriptSandboxFileDetection:
     """Test file delta detection (created/modified files).
-    
+
     NOTE: These tests are skipped because file creation from JavaScript requires
     APIs not available in the QuickJS WASI build. File delta detection logic
     is tested indirectly through Python runtime tests.
@@ -378,13 +388,13 @@ class TestJavaScriptSandboxValidation:
         """Test that validate_code does not execute code or have side effects."""
         # Use code that would have observable side effects if executed
         code = "console.log('Side effect');"
-        
+
         # Validation should not execute the code
         result = javascript_sandbox.validate_code(code)
-        
+
         # Validation returns True (defers to runtime)
         assert result is True
-        
+
         # Verify no user_code.js file was created by validation
         user_code = javascript_sandbox.workspace / "user_code.js"
         # Note: workspace may not exist yet if this is first operation
@@ -416,6 +426,7 @@ class TestJavaScriptSandboxLogging:
     def test_logging_execution_start_emitted(self, temp_workspace, default_policy, capture_logger):
         """Test that log_execution_start is called during execute()."""
         import uuid
+
         session_id = str(uuid.uuid4())
         storage_adapter = DiskStorageAdapter(temp_workspace)
 
@@ -424,7 +435,7 @@ class TestJavaScriptSandboxLogging:
             policy=default_policy,
             session_id=session_id,
             storage_adapter=storage_adapter,
-            logger=capture_logger
+            logger=capture_logger,
         )
 
         code = "console.log('Test');"
@@ -435,9 +446,12 @@ class TestJavaScriptSandboxLogging:
         # If no errors, logging integration works
         assert isinstance(result, SandboxResult)
 
-    def test_logging_execution_complete_emitted(self, temp_workspace, default_policy, capture_logger):
+    def test_logging_execution_complete_emitted(
+        self, temp_workspace, default_policy, capture_logger
+    ):
         """Test that log_execution_complete is called after execute()."""
         import uuid
+
         session_id = str(uuid.uuid4())
         storage_adapter = DiskStorageAdapter(temp_workspace)
 
@@ -446,7 +460,7 @@ class TestJavaScriptSandboxLogging:
             policy=default_policy,
             session_id=session_id,
             storage_adapter=storage_adapter,
-            logger=capture_logger
+            logger=capture_logger,
         )
 
         code = "console.log('Test');"
@@ -515,7 +529,7 @@ class TestJavaScriptSandboxTruncation:
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            storage_adapter=storage_adapter
+            storage_adapter=storage_adapter,
         )
 
         code = """

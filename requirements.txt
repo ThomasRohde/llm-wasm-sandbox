@@ -1,5 +1,18 @@
-# wasmtime Python bindings
-wasmtime==38.*
+# Core dependencies for llm-wasm-sandbox
+# Install with: pip install -r requirements.txt
+# Or use uv: uv sync (recommended)
 
-# (Optional) TOML parser for Python < 3.11
+# Type-safe models
+pydantic>=2.0.0,<3.0.0
+
+# Console output formatting
+rich>=14.2.0
+
+# Structured logging
+structlog>=25.5.0
+
+# WASM runtime (Wasmtime Python bindings)
+wasmtime>=38.0.0,<39.0.0
+
+# TOML parser for Python < 3.11 (optional)
 tomli; python_version < "3.11"

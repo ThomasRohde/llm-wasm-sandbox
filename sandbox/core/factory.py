@@ -31,7 +31,7 @@ def create_sandbox(
     storage_adapter: StorageAdapter | None = None,
     logger: SandboxLogger | None = None,
     allow_non_uuid: bool = True,
-    **kwargs: Any
+    **kwargs: Any,
 ) -> Any:  # Returns BaseSandbox but avoid circular import in type hint
     """Create a session-aware sandbox instance for the specified runtime type.
 
@@ -111,7 +111,7 @@ def create_sandbox(
     else:
         # If storage_adapter provided, use its workspace_root
         # (only for DiskStorageAdapter backward compatibility)
-        if hasattr(storage_adapter, 'workspace_root') and isinstance(
+        if hasattr(storage_adapter, "workspace_root") and isinstance(
             storage_adapter.workspace_root, Path
         ):
             workspace_root = storage_adapter.workspace_root
@@ -129,7 +129,7 @@ def create_sandbox(
         session_workspace = _validate_session_workspace(
             session_id=session_id,
             workspace_root=storage_adapter.workspace_root,
-            allow_non_uuid=allow_non_uuid
+            allow_non_uuid=allow_non_uuid,
         )
         session_id = session_workspace.name
 
@@ -162,8 +162,7 @@ def create_sandbox(
         if logger is not None:
             metadata = storage_adapter.read_metadata(session_id)
             logger.log_session_metadata_created(
-                session_id=session_id,
-                created_at=metadata.created_at
+                session_id=session_id, created_at=metadata.created_at
             )
             logger.log_session_created(session_id, str(session_id))
     else:
@@ -174,20 +173,15 @@ def create_sandbox(
             # Legacy session without metadata - create it now
             from sandbox.sessions import SessionMetadata
             from datetime import UTC, datetime
+
             now = datetime.now(UTC).isoformat()
             metadata = SessionMetadata(
-                session_id=session_id,
-                created_at=now,
-                updated_at=now,
-                version=1
+                session_id=session_id, created_at=now, updated_at=now, version=1
             )
             try:
                 storage_adapter.write_metadata(session_id, metadata)
                 if logger is not None:
-                    logger.log_session_metadata_created(
-                        session_id=session_id,
-                        created_at=now
-                    )
+                    logger.log_session_metadata_created(session_id=session_id, created_at=now)
             except OSError:
                 # If we can't write metadata, continue anyway
                 pass
@@ -210,7 +204,7 @@ def create_sandbox(
             session_id=session_id,
             storage_adapter=storage_adapter,
             logger=logger,
-            **kwargs
+            **kwargs,
         )
 
     elif runtime == RuntimeType.JAVASCRIPT:
@@ -223,7 +217,7 @@ def create_sandbox(
             session_id=session_id,
             storage_adapter=storage_adapter,
             logger=logger,
-            **kwargs
+            **kwargs,
         )
 
     else:

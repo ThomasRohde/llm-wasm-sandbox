@@ -224,7 +224,7 @@ class SessionMetadata:
             session_id=data["session_id"],
             created_at=data["created_at"],
             updated_at=data["updated_at"],
-            version=data["version"]
+            version=data["version"],
         )
 
 
@@ -308,10 +308,7 @@ class PruneResult:
         return msg
 
 
-def _read_session_metadata(
-    session_id: str,
-    workspace_root: Path
-) -> SessionMetadata | None:
+def _read_session_metadata(session_id: str, workspace_root: Path) -> SessionMetadata | None:
     """Read session metadata from .metadata.json file.
 
     Attempts to parse the .metadata.json file in the session workspace and
@@ -360,17 +357,13 @@ def _read_session_metadata(
         # Log warning but don't fail - corrupted metadata shouldn't break operations
         # Using print to stderr since we may not have a logger here
         import sys
-        print(
-            f"Warning: Failed to read session metadata for {session_id}: {e}",
-            file=sys.stderr
-        )
+
+        print(f"Warning: Failed to read session metadata for {session_id}: {e}", file=sys.stderr)
         return None
 
 
 def _update_session_timestamp(
-    session_id: str,
-    workspace_root: Path,
-    logger: SandboxLogger | None = None
+    session_id: str, workspace_root: Path, logger: SandboxLogger | None = None
 ) -> None:
     """Update the updated_at timestamp in session metadata.
 
@@ -412,23 +405,16 @@ def _update_session_timestamp(
 
         # Log structured event if logger provided
         if logger is not None:
-            logger.log_session_metadata_updated(
-                session_id=session_id,
-                timestamp=data["updated_at"]
-            )
+            logger.log_session_metadata_updated(session_id=session_id, timestamp=data["updated_at"])
     except (json.JSONDecodeError, OSError) as e:
         # Log warning but don't fail execution
         import sys
-        print(
-            f"Warning: Failed to update session timestamp for {session_id}: {e}",
-            file=sys.stderr
-        )
+
+        print(f"Warning: Failed to update session timestamp for {session_id}: {e}", file=sys.stderr)
 
 
 def _validate_session_workspace(
-    session_id: str,
-    workspace_root: Path,
-    allow_non_uuid: bool = True
+    session_id: str, workspace_root: Path, allow_non_uuid: bool = True
 ) -> Path:
     """Validate session_id safety and return resolved workspace path.
 
@@ -483,11 +469,7 @@ def _validate_session_workspace(
     return workspace
 
 
-def _validate_session_path(
-    session_id: str,
-    relative_path: str,
-    workspace_root: Path
-) -> Path:
+def _validate_session_path(session_id: str, relative_path: str, workspace_root: Path) -> Path:
     """Validate and resolve a session file path, preventing path traversal.
 
     This function implements defense-in-depth path validation to prevent
@@ -536,9 +518,7 @@ def _validate_session_path(
     # Check if relative_path is absolute
     path_obj = Path(relative_path)
     if path_obj.is_absolute():
-        raise ValueError(
-            f"Path '{relative_path}' must be relative to session workspace"
-        )
+        raise ValueError(f"Path '{relative_path}' must be relative to session workspace")
 
     # Resolve full path and canonicalize (resolves symlinks)
     full_path = (workspace / relative_path).resolve()
@@ -555,10 +535,7 @@ def _validate_session_path(
     return full_path
 
 
-def _ensure_session_workspace(
-    session_id: str,
-    workspace_root: Path
-) -> Path:
+def _ensure_session_workspace(session_id: str, workspace_root: Path) -> Path:
     """Create session workspace directory if it doesn't exist.
 
     Idempotent operation that ensures the workspace directory exists for
@@ -606,12 +583,12 @@ def _format_bytes(size_bytes: int) -> str:
     """
     if size_bytes < 1024:
         return f"{size_bytes} B"
-    elif size_bytes < 1024 ** 2:
+    elif size_bytes < 1024**2:
         return f"{size_bytes / 1024:.1f} KB"
-    elif size_bytes < 1024 ** 3:
-        return f"{size_bytes / (1024 ** 2):.1f} MB"
+    elif size_bytes < 1024**3:
+        return f"{size_bytes / (1024**2):.1f} MB"
     else:
-        return f"{size_bytes / (1024 ** 3):.1f} GB"
+        return f"{size_bytes / (1024**3):.1f} GB"
 
 
 def _looks_like_uuid(name: str) -> bool:
@@ -703,7 +680,7 @@ def _calculate_session_age(metadata: SessionMetadata) -> float:
         True
     """
     # Parse updated_at timestamp (ISO 8601 format)
-    updated_at = datetime.fromisoformat(metadata.updated_at.replace('Z', '+00:00'))
+    updated_at = datetime.fromisoformat(metadata.updated_at.replace("Z", "+00:00"))
 
     # Calculate elapsed time
     now = datetime.now(UTC)
@@ -747,17 +724,13 @@ def _calculate_workspace_size(workspace_path: Path) -> int:
                 except (OSError, PermissionError) as e:
                     # Log warning but continue
                     import sys
-                    print(
-                        f"Warning: Failed to stat {item}: {e}",
-                        file=sys.stderr
-                    )
+
+                    print(f"Warning: Failed to stat {item}: {e}", file=sys.stderr)
     except (OSError, PermissionError) as e:
         # Log warning and return 0
         import sys
-        print(
-            f"Warning: Failed to access workspace {workspace_path}: {e}",
-            file=sys.stderr
-        )
+
+        print(f"Warning: Failed to access workspace {workspace_path}: {e}", file=sys.stderr)
         return 0
 
     return total_size
@@ -768,7 +741,7 @@ def list_session_files(
     workspace_root: Path | None = None,
     storage_adapter: StorageAdapter | None = None,
     pattern: str | None = None,
-    logger: SandboxLogger | None = None
+    logger: SandboxLogger | None = None,
 ) -> list[str]:
     """List all files in session workspace, optionally filtered by glob pattern.
 
@@ -820,6 +793,7 @@ def list_session_files(
     # Create storage adapter if not provided
     if storage_adapter is None:
         from sandbox.core.storage import DiskStorageAdapter
+
         if workspace_root is None:
             workspace_root = Path("workspace")
         storage_adapter = DiskStorageAdapter(workspace_root)
@@ -834,7 +808,7 @@ def list_session_files(
             operation="list",
             session_id=session_id,
             path=search_pattern,
-            file_count=len(sorted_paths)
+            file_count=len(sorted_paths),
         )
 
     return sorted_paths
@@ -845,7 +819,7 @@ def read_session_file(
     relative_path: str,
     workspace_root: Path | None = None,
     storage_adapter: StorageAdapter | None = None,
-    logger: SandboxLogger | None = None
+    logger: SandboxLogger | None = None,
 ) -> bytes:
     """Read file from session workspace as bytes.
 
@@ -890,6 +864,7 @@ def read_session_file(
     # Create storage adapter if not provided
     if storage_adapter is None:
         from sandbox.core.storage import DiskStorageAdapter
+
         if workspace_root is None:
             workspace_root = Path("workspace")
         storage_adapter = DiskStorageAdapter(workspace_root)
@@ -900,10 +875,7 @@ def read_session_file(
     # Log file operation
     if logger is not None:
         logger.log_file_operation(
-            operation="read",
-            session_id=session_id,
-            path=relative_path,
-            file_size=len(data)
+            operation="read", session_id=session_id, path=relative_path, file_size=len(data)
         )
 
     return data
@@ -916,7 +888,7 @@ def write_session_file(
     workspace_root: Path | None = None,
     storage_adapter: StorageAdapter | None = None,
     overwrite: bool = True,
-    logger: SandboxLogger | None = None
+    logger: SandboxLogger | None = None,
 ) -> None:
     """Write data to file in session workspace.
 
@@ -957,16 +929,17 @@ def write_session_file(
     # Create storage adapter if not provided
     if storage_adapter is None:
         from sandbox.core.storage import DiskStorageAdapter
+
         if workspace_root is None:
             workspace_root = Path("workspace")
         storage_adapter = DiskStorageAdapter(workspace_root)
 
     # Convert str to bytes if needed
     if isinstance(data, str):
-        data = data.encode('utf-8')
+        data = data.encode("utf-8")
 
     # Check overwrite flag (only for DiskStorageAdapter)
-    if not overwrite and hasattr(storage_adapter, '_validate_session_path'):
+    if not overwrite and hasattr(storage_adapter, "_validate_session_path"):
         try:
             existing_data = storage_adapter.read_file(session_id, relative_path)
             if existing_data:
@@ -983,12 +956,8 @@ def write_session_file(
     # Log file operation
     if logger is not None:
         logger.log_file_operation(
-            operation="write",
-            session_id=session_id,
-            path=relative_path,
-            file_size=len(data)
+            operation="write", session_id=session_id, path=relative_path, file_size=len(data)
         )
-
 
 
 def delete_session_path(
@@ -997,7 +966,7 @@ def delete_session_path(
     workspace_root: Path | None = None,
     storage_adapter: StorageAdapter | None = None,
     recursive: bool = False,
-    logger: SandboxLogger | None = None
+    logger: SandboxLogger | None = None,
 ) -> None:
     """Delete file or directory in session workspace.
 
@@ -1036,6 +1005,7 @@ def delete_session_path(
     # Create storage adapter if not provided
     if storage_adapter is None:
         from sandbox.core.storage import DiskStorageAdapter
+
         if workspace_root is None:
             workspace_root = Path("workspace")
         storage_adapter = DiskStorageAdapter(workspace_root)
@@ -1046,10 +1016,7 @@ def delete_session_path(
     # Log file operation
     if logger is not None:
         logger.log_file_operation(
-            operation="delete",
-            session_id=session_id,
-            path=relative_path,
-            recursive=recursive
+            operation="delete", session_id=session_id, path=relative_path, recursive=recursive
         )
 
 
@@ -1057,7 +1024,7 @@ def delete_session_workspace(
     session_id: str,
     workspace_root: Path | None = None,
     storage_adapter: StorageAdapter | None = None,
-    logger: SandboxLogger | None = None
+    logger: SandboxLogger | None = None,
 ) -> None:
     """Delete entire session workspace directory.
 
@@ -1086,6 +1053,7 @@ def delete_session_workspace(
     # Create storage adapter if not provided
     if storage_adapter is None:
         from sandbox.core.storage import DiskStorageAdapter
+
         if workspace_root is None:
             workspace_root = Path("workspace")
         storage_adapter = DiskStorageAdapter(workspace_root)
@@ -1103,7 +1071,7 @@ def prune_sessions(
     workspace_root: Path | None = None,
     storage_adapter: StorageAdapter | None = None,
     dry_run: bool = False,
-    logger: SandboxLogger | None = None
+    logger: SandboxLogger | None = None,
 ) -> PruneResult:
     """Delete session workspaces inactive for specified duration.
 
@@ -1122,6 +1090,7 @@ def prune_sessions(
     # Create storage adapter if not provided
     if storage_adapter is None:
         from sandbox.core.storage import DiskStorageAdapter
+
         if workspace_root is None:
             workspace_root = Path("workspace")
         storage_adapter = DiskStorageAdapter(workspace_root)
@@ -1136,10 +1105,7 @@ def prune_sessions(
 
     # Log start of pruning
     if logger is not None:
-        logger.log_prune_started(
-            older_than_hours=older_than_hours,
-            cutoff_time=cutoff.isoformat()
-        )
+        logger.log_prune_started(older_than_hours=older_than_hours, cutoff_time=cutoff.isoformat())
 
     # Enumerate all sessions
     for session_id in storage_adapter.enumerate_sessions():
@@ -1154,7 +1120,7 @@ def prune_sessions(
                     logger.log_prune_candidate(
                         session_id=session_id,
                         updated_at=metadata.updated_at,
-                        age_hours=(datetime.now(UTC) - updated_at).total_seconds() / 3600
+                        age_hours=(datetime.now(UTC) - updated_at).total_seconds() / 3600,
                     )
 
                 if not dry_run:
@@ -1163,20 +1129,14 @@ def prune_sessions(
                     reclaimed_bytes += session_size
 
                     if logger is not None:
-                        logger.log_prune_deleted(
-                            session_id=session_id,
-                            size_bytes=session_size
-                        )
+                        logger.log_prune_deleted(session_id=session_id, size_bytes=session_size)
 
                 deleted_sessions.append(session_id)
         except FileNotFoundError:
             # No metadata file - legacy session or incomplete session
             skipped_sessions.append(session_id)
             if logger is not None:
-                logger.log_prune_skipped(
-                    session_id=session_id,
-                    reason="missing_metadata"
-                )
+                logger.log_prune_skipped(session_id=session_id, reason="missing_metadata")
         except (json.JSONDecodeError, ValueError) as e:
             # Corrupted metadata or invalid timestamp format
             skipped_sessions.append(session_id)
@@ -1184,17 +1144,11 @@ def prune_sessions(
             if "isoformat" in str(e).lower() or "invalid" in str(e).lower():
                 reason = "corrupted_timestamp"
             if logger is not None:
-                logger.log_prune_skipped(
-                    session_id=session_id,
-                    reason=reason
-                )
+                logger.log_prune_skipped(session_id=session_id, reason=reason)
         except Exception as e:
             errors[session_id] = str(e)
             if logger is not None:
-                logger.log_prune_error(
-                    session_id=session_id,
-                    error=str(e)
-                )
+                logger.log_prune_error(session_id=session_id, error=str(e))
 
     # Log pruning operation
     if logger is not None:
@@ -1203,7 +1157,7 @@ def prune_sessions(
             skipped_count=len(skipped_sessions),
             error_count=len(errors),
             reclaimed_bytes=reclaimed_bytes,
-            dry_run=dry_run
+            dry_run=dry_run,
         )
 
     return PruneResult(
@@ -1211,5 +1165,5 @@ def prune_sessions(
         skipped_sessions=skipped_sessions,
         reclaimed_bytes=reclaimed_bytes,
         errors=errors,
-        dry_run=dry_run
+        dry_run=dry_run,
     )

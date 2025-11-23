@@ -47,13 +47,19 @@ class TestPathTraversalPrevention:
         """Path validation rejects ../ traversal attempts."""
         (temp_workspace / session_id).mkdir()
 
-        with pytest.raises(ValueError, match="path traversal detected|escapes session workspace boundary"):
+        with pytest.raises(
+            ValueError, match="path traversal detected|escapes session workspace boundary"
+        ):
             _validate_session_path(session_id, "../etc/passwd", temp_workspace)
 
-        with pytest.raises(ValueError, match="path traversal detected|escapes session workspace boundary"):
+        with pytest.raises(
+            ValueError, match="path traversal detected|escapes session workspace boundary"
+        ):
             _validate_session_path(session_id, "../../etc/passwd", temp_workspace)
 
-        with pytest.raises(ValueError, match="path traversal detected|escapes session workspace boundary"):
+        with pytest.raises(
+            ValueError, match="path traversal detected|escapes session workspace boundary"
+        ):
             _validate_session_path(session_id, "dir/../../../etc/passwd", temp_workspace)
 
     def test_validate_session_path_rejects_absolute_paths(
@@ -63,12 +69,18 @@ class TestPathTraversalPrevention:
         (temp_workspace / session_id).mkdir()
 
         # Absolute Unix-style path
-        with pytest.raises(ValueError, match="path traversal detected|escapes session workspace boundary|must be relative"):
+        with pytest.raises(
+            ValueError,
+            match="path traversal detected|escapes session workspace boundary|must be relative",
+        ):
             _validate_session_path(session_id, "/etc/passwd", temp_workspace)
 
         # Windows-style absolute path (if on Windows)
         if os.name == "nt":
-            with pytest.raises(ValueError, match="path traversal detected|escapes session workspace boundary|must be relative"):
+            with pytest.raises(
+                ValueError,
+                match="path traversal detected|escapes session workspace boundary|must be relative",
+            ):
                 _validate_session_path(session_id, "C:\\Windows\\System32", temp_workspace)
 
     def test_read_session_file_rejects_traversal(
@@ -108,9 +120,7 @@ class TestSymlinkEscapePrevention:
 class TestSessionIDValidation:
     """Test session_id validation prevents directory traversal."""
 
-    def test_session_id_with_forward_slash_rejected(
-        self, temp_workspace: Path
-    ) -> None:
+    def test_session_id_with_forward_slash_rejected(self, temp_workspace: Path) -> None:
         """Session IDs with forward slashes are rejected."""
         malicious_id = "../etc"
 
@@ -120,9 +130,7 @@ class TestSessionIDValidation:
         with pytest.raises(ValueError, match="must not contain path separators"):
             read_session_file(malicious_id, "file.txt", workspace_root=temp_workspace)
 
-    def test_session_id_with_backslash_rejected(
-        self, temp_workspace: Path
-    ) -> None:
+    def test_session_id_with_backslash_rejected(self, temp_workspace: Path) -> None:
         """Session IDs with backslashes are rejected."""
         malicious_id = "..\\etc"
 
@@ -130,22 +138,16 @@ class TestSessionIDValidation:
             _validate_session_path(malicious_id, "passwd", temp_workspace)
 
         with pytest.raises(ValueError, match="must not contain path separators"):
-            write_session_file(
-                malicious_id, "file.txt", b"data", workspace_root=temp_workspace
-            )
+            write_session_file(malicious_id, "file.txt", b"data", workspace_root=temp_workspace)
 
-    def test_session_id_with_os_separator_rejected(
-        self, temp_workspace: Path
-    ) -> None:
+    def test_session_id_with_os_separator_rejected(self, temp_workspace: Path) -> None:
         """Session IDs with OS path separator are rejected."""
         malicious_id = f"test{os.sep}path"
 
         with pytest.raises(ValueError, match="must not contain path separators"):
             _validate_session_path(malicious_id, "file.txt", temp_workspace)
 
-    def test_delete_workspace_rejects_traversal_in_session_id(
-        self, temp_workspace: Path
-    ) -> None:
+    def test_delete_workspace_rejects_traversal_in_session_id(self, temp_workspace: Path) -> None:
         """delete_session_workspace rejects session_id with path separators."""
         with pytest.raises(ValueError, match="must not contain path separators"):
             delete_session_workspace("../etc", workspace_root=temp_workspace)
@@ -156,9 +158,7 @@ class TestSessionIDValidation:
         with pytest.raises(ValueError, match="must not contain path separators"):
             delete_session_workspace("foo\\bar", workspace_root=temp_workspace)
 
-    def test_create_sandbox_rejects_traversal_session_ids(
-        self, temp_workspace: Path
-    ) -> None:
+    def test_create_sandbox_rejects_traversal_session_ids(self, temp_workspace: Path) -> None:
         """create_sandbox should reject path traversal before creating workspace."""
         with pytest.raises(ValueError):
             create_sandbox(
@@ -192,9 +192,7 @@ class TestSessionIDValidation:
 class TestWorkspaceRootValidation:
     """Test workspace_root parameter validation."""
 
-    def test_custom_workspace_root_accepted(
-        self, session_id: str, tmp_path: Path
-    ) -> None:
+    def test_custom_workspace_root_accepted(self, session_id: str, tmp_path: Path) -> None:
         """Custom workspace_root paths are accepted and used correctly."""
         custom_workspace = tmp_path / "custom_sessions"
         custom_workspace.mkdir()
@@ -218,9 +216,7 @@ class TestWorkspaceRootValidation:
         assert not new_workspace_root.exists()
 
         # Writing file should create workspace_root
-        write_session_file(
-            session_id, "file.txt", b"data", workspace_root=new_workspace_root
-        )
+        write_session_file(session_id, "file.txt", b"data", workspace_root=new_workspace_root)
 
         assert new_workspace_root.exists()
         assert (new_workspace_root / session_id / "file.txt").exists()
@@ -229,9 +225,7 @@ class TestWorkspaceRootValidation:
 class TestCrossSessions:
     """Test that sessions cannot access each other's workspaces."""
 
-    def test_session_cannot_list_another_sessions_files(
-        self, temp_workspace: Path
-    ) -> None:
+    def test_session_cannot_list_another_sessions_files(self, temp_workspace: Path) -> None:
         """Listing files in session A doesn't show session B's files."""
         session_a = str(uuid.uuid4())
         session_b = str(uuid.uuid4())
@@ -255,9 +249,7 @@ class TestCrossSessions:
         assert "file_b.txt" in files_b
         assert "file_a.txt" not in files_b
 
-    def test_session_cannot_read_another_sessions_file_directly(
-        self, temp_workspace: Path
-    ) -> None:
+    def test_session_cannot_read_another_sessions_file_directly(self, temp_workspace: Path) -> None:
         """Attempting to read another session's file using path tricks fails."""
         session_a = str(uuid.uuid4())
         session_b = str(uuid.uuid4())
@@ -276,9 +268,7 @@ class TestCrossSessions:
                 session_a, f"../{session_b}/secret.txt", workspace_root=temp_workspace
             )
 
-    def test_session_cannot_delete_another_sessions_file(
-        self, temp_workspace: Path
-    ) -> None:
+    def test_session_cannot_delete_another_sessions_file(self, temp_workspace: Path) -> None:
         """Session A cannot delete files in session B's workspace."""
         session_a = str(uuid.uuid4())
         session_b = str(uuid.uuid4())
@@ -305,13 +295,9 @@ class TestCrossSessions:
 class TestWASIIsolation:
     """Test that WASI guest code respects session boundaries."""
 
-    def test_guest_cannot_access_host_filesystem_outside_app(
-        self, temp_workspace: Path
-    ) -> None:
+    def test_guest_cannot_access_host_filesystem_outside_app(self, temp_workspace: Path) -> None:
         """Guest code cannot read files outside /app mount point."""
-        sandbox = create_sandbox(
-            runtime=RuntimeType.PYTHON, workspace_root=temp_workspace
-        )
+        sandbox = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=temp_workspace)
 
         # Try to read /etc/passwd (should fail - not mounted)
         result = sandbox.execute("""
@@ -328,22 +314,16 @@ except Exception as e:
         assert "SUCCESS" in result.stdout
         assert "SECURITY BREACH" not in result.stdout
 
-    def test_guest_cannot_traverse_to_parent_sessions(
-        self, temp_workspace: Path
-    ) -> None:
+    def test_guest_cannot_traverse_to_parent_sessions(self, temp_workspace: Path) -> None:
         """Guest code cannot use ../ to escape session workspace."""
         # Create session A with a file
-        sandbox_a = create_sandbox(
-            runtime=RuntimeType.PYTHON, workspace_root=temp_workspace
-        )
+        sandbox_a = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=temp_workspace)
         session_a = sandbox_a.session_id
         workspace_a = temp_workspace / session_a
         (workspace_a / "secret.txt").write_text("session A secret")
 
         # Create session B and try to access session A
-        sandbox_b = create_sandbox(
-            runtime=RuntimeType.PYTHON, workspace_root=temp_workspace
-        )
+        sandbox_b = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=temp_workspace)
 
         code = f"""
 import os
@@ -414,5 +394,3 @@ print(open('/data/payload.txt').read().strip())
 
         assert "WRITE-FAILED" in result.stdout
         assert not (data_dir / "new.txt").exists()
-
-

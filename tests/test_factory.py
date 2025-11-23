@@ -71,7 +71,7 @@ class TestCreateSandboxRuntimeSelection:
     def test_create_sandbox_with_javascript_runtime_returns_javascript_sandbox(self) -> None:
         """Test create_sandbox(runtime=JAVASCRIPT) returns JavaScriptSandbox."""
         from sandbox.runtimes.javascript.sandbox import JavaScriptSandbox
-        
+
         sandbox = create_sandbox(runtime=RuntimeType.JAVASCRIPT)
 
         assert isinstance(sandbox, JavaScriptSandbox)
@@ -105,9 +105,7 @@ class TestCreateSandboxCustomPolicy:
 
     def test_create_sandbox_policy_with_custom_env(self) -> None:
         """Test create_sandbox() preserves custom environment variables."""
-        custom_policy = ExecutionPolicy(
-            env={"CUSTOM_VAR": "test_value", "DEBUG": "1"}
-        )
+        custom_policy = ExecutionPolicy(env={"CUSTOM_VAR": "test_value", "DEBUG": "1"})
 
         sandbox = create_sandbox(policy=custom_policy)
 
@@ -213,7 +211,7 @@ class TestCreateSandboxIntegration:
             runtime=RuntimeType.PYTHON,
             wasm_binary_path=str(tmp_path / "missing.wasm"),
             workspace_root=tmp_path / "ws-root",
-            policy=policy
+            policy=policy,
         )
 
         with pytest.raises(FileNotFoundError):
@@ -247,9 +245,7 @@ class TestCreateSandboxJavaScriptIntegration:
         from sandbox.runtimes.javascript.sandbox import JavaScriptSandbox
 
         custom_policy = ExecutionPolicy(
-            fuel_budget=500_000_000,
-            memory_bytes=32 * 1024 * 1024,
-            env={"DEBUG": "1"}
+            fuel_budget=500_000_000, memory_bytes=32 * 1024 * 1024, env={"DEBUG": "1"}
         )
 
         sandbox = create_sandbox(runtime=RuntimeType.JAVASCRIPT, policy=custom_policy)
@@ -266,10 +262,7 @@ class TestCreateSandboxJavaScriptIntegration:
 
         custom_wasm = "custom/path/quickjs.wasm"
 
-        sandbox = create_sandbox(
-            runtime=RuntimeType.JAVASCRIPT,
-            wasm_binary_path=custom_wasm
-        )
+        sandbox = create_sandbox(runtime=RuntimeType.JAVASCRIPT, wasm_binary_path=custom_wasm)
 
         assert isinstance(sandbox, JavaScriptSandbox)
         assert sandbox.wasm_binary_path == custom_wasm
@@ -281,10 +274,7 @@ class TestCreateSandboxJavaScriptIntegration:
 
         custom_logger = SandboxLogger(logging.getLogger("js-test"))
 
-        sandbox = create_sandbox(
-            runtime=RuntimeType.JAVASCRIPT,
-            logger=custom_logger
-        )
+        sandbox = create_sandbox(runtime=RuntimeType.JAVASCRIPT, logger=custom_logger)
 
         assert isinstance(sandbox, JavaScriptSandbox)
         assert sandbox.logger == custom_logger
@@ -295,10 +285,7 @@ class TestCreateSandboxJavaScriptIntegration:
 
         custom_workspace = tmp_path / "js_workspace"
 
-        sandbox = create_sandbox(
-            runtime=RuntimeType.JAVASCRIPT,
-            workspace_root=custom_workspace
-        )
+        sandbox = create_sandbox(runtime=RuntimeType.JAVASCRIPT, workspace_root=custom_workspace)
 
         assert isinstance(sandbox, JavaScriptSandbox)
         assert sandbox.workspace_root == custom_workspace
@@ -320,7 +307,7 @@ class TestCreateSandboxJavaScriptIntegration:
             policy=custom_policy,
             workspace_root=custom_workspace,
             logger=custom_logger,
-            wasm_binary_path=custom_wasm
+            wasm_binary_path=custom_wasm,
         )
 
         assert isinstance(sandbox, JavaScriptSandbox)

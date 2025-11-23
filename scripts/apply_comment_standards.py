@@ -44,7 +44,7 @@ def main() -> None:
         result = subprocess.run(
             ["git", "diff", "--name-only", "HEAD"], capture_output=True, text=True, check=True
         )
-        uncommitted_files = set(result.stdout.strip().split('\n'))
+        uncommitted_files = set(result.stdout.strip().split("\n"))
     except subprocess.CalledProcessError:
         print("Error: Failed to get git status. Are you in a git repository?")
         sys.exit(1)
@@ -53,7 +53,7 @@ def main() -> None:
     python_files = [
         f
         for f in all_python_files
-        if str(f.relative_to(Path.cwd())).replace('\\', '/') not in uncommitted_files
+        if str(f.relative_to(Path.cwd())).replace("\\", "/") not in uncommitted_files
     ]
 
     if not python_files:

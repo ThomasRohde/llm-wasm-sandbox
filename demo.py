@@ -39,8 +39,7 @@ console = Console()
 
 # Enable console logging with structured events
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = SandboxLogger()
 
@@ -48,12 +47,12 @@ logger = SandboxLogger()
 def execute_in_session(code: str, session_id: str, reuse: bool = False) -> tuple[str, dict]:
     """
     Execute code in isolated session workspace with logging enabled.
-    
+
     Args:
         code: Python code to execute
         session_id: Session identifier for workspace isolation
         reuse: If True, reuse existing session; if False, create new session
-        
+
     Returns:
         Tuple of (session_id, result_dict)
     """
@@ -65,14 +64,12 @@ def execute_in_session(code: str, session_id: str, reuse: bool = False) -> tuple
             session_id=session_id,
             runtime=RuntimeType.PYTHON,
             workspace_root=workspace_base,
-            logger=logger
+            logger=logger,
         )
     else:
         # Create new session with isolated workspace
         sandbox = create_sandbox(
-            runtime=RuntimeType.PYTHON,
-            workspace_root=workspace_base,
-            logger=logger
+            runtime=RuntimeType.PYTHON, workspace_root=workspace_base, logger=logger
         )
         session_id = sandbox.session_id
 
@@ -81,16 +78,16 @@ def execute_in_session(code: str, session_id: str, reuse: bool = False) -> tuple
 
     # Return session_id and result dict
     return session_id, {
-        'stdout': result.stdout,
-        'stderr': result.stderr,
-        'fuel_consumed': result.fuel_consumed,
-        'mem_len': result.memory_used_bytes,
-        'mem_pages': result.memory_used_bytes // 65536,
-        'workspace': str(workspace_base / session_id),
-        'files_created': result.files_created,
-        'files_modified': result.files_modified,
-        'success': result.success,
-        'session_id': result.metadata.get('session_id', session_id),
+        "stdout": result.stdout,
+        "stderr": result.stderr,
+        "fuel_consumed": result.fuel_consumed,
+        "mem_len": result.memory_used_bytes,
+        "mem_pages": result.memory_used_bytes // 65536,
+        "workspace": str(workspace_base / session_id),
+        "files_created": result.files_created,
+        "files_modified": result.files_modified,
+        "success": result.success,
+        "session_id": result.metadata.get("session_id", session_id),
     }
 
 
@@ -99,7 +96,7 @@ def cleanup_workspace():
     workspace = Path("workspace")
     if workspace.exists():
         for item in workspace.iterdir():
-            if item.name not in ['.gitkeep', 'site-packages']:
+            if item.name not in [".gitkeep", "site-packages"]:
                 if item.is_dir():
                     shutil.rmtree(item)
                 else:
@@ -108,11 +105,13 @@ def cleanup_workspace():
 
 def demo_session_persistence():
     """Demo: Multi-turn execution with session persistence."""
-    console.print(Panel(
-        "[bold]Demo: Session Persistence[/bold] (Multi-Turn Execution)",
-        style="magenta",
-        expand=False
-    ))
+    console.print(
+        Panel(
+            "[bold]Demo: Session Persistence[/bold] (Multi-Turn Execution)",
+            style="magenta",
+            expand=False,
+        )
+    )
 
     # Turn 1: Create data
     console.print("\n[bold cyan]Turn 1:[/bold cyan] Create and save data")
@@ -126,7 +125,7 @@ print("✓ Created initial state")
 """
 
     session_id, result1 = execute_in_session(code_turn1, session_id="persistent-session")
-    console.print(result1['stdout'].strip())
+    console.print(result1["stdout"].strip())
     console.print(f"[dim]Session ID: {session_id[:16]}...[/dim]")
 
     # Turn 2: Read and modify
@@ -147,14 +146,16 @@ print(f"✓ History: {data['history']}")
 """
 
     _, result2 = execute_in_session(code_turn2, session_id=session_id, reuse=True)
-    console.print(result2['stdout'].strip())
+    console.print(result2["stdout"].strip())
 
     # Turn 3: Host-side file read
     console.print("\n[bold cyan]Turn 3:[/bold cyan] Read file from host side")
     workspace_base = Path("workspace")
     state_data = read_session_file(session_id, "state.json", workspace_root=workspace_base)
-    state = json.loads(state_data.decode('utf-8'))
-    console.print(f"[green]✓ Host read state.json: counter={state['counter']}, history={state['history']}[/green]")
+    state = json.loads(state_data.decode("utf-8"))
+    console.print(
+        f"[green]✓ Host read state.json: counter={state['counter']}, history={state['history']}[/green]"
+    )
 
     # Turn 4: Host writes new task
     console.print("\n[bold cyan]Turn 4:[/bold cyan] Host writes task file")
@@ -192,7 +193,7 @@ print("✓ Report generated")
 """
 
     _, result5 = execute_in_session(code_turn5, session_id=session_id, reuse=True)
-    console.print(result5['stdout'].strip())
+    console.print(result5["stdout"].strip())
 
     # Show all files in session
     console.print("\n[bold cyan]Final State:[/bold cyan] List all session files")
@@ -200,7 +201,9 @@ print("✓ Report generated")
     for file in files:
         console.print(f"  [cyan]📄[/cyan] {file}")
 
-    console.print(f"\n[green]✓ Session {session_id[:16]}... persisted across {result5['session_id'].count('turn') + 5} turns[/green]")
+    console.print(
+        f"\n[green]✓ Session {session_id[:16]}... persisted across {result5['session_id'].count('turn') + 5} turns[/green]"
+    )
     console.print()
 
 
@@ -208,24 +211,24 @@ def show_header():
     """Display welcome header."""
     cleanup_workspace()
     console.print()
-    console.print(Panel.fit(
-        "[bold cyan]LLM WASM Sandbox with Session Management[/bold cyan]\n"
-        "[dim]Production-grade security sandbox for untrusted Python code[/dim]\n"
-        "[yellow]Using isolated session workspaces with structured logging[/yellow]\n"
-        "[green]✓ Console logging enabled (detail level: full)[/green]",
-        border_style="cyan",
-        box=box.DOUBLE
-    ))
+    console.print(
+        Panel.fit(
+            "[bold cyan]LLM WASM Sandbox with Session Management[/bold cyan]\n"
+            "[dim]Production-grade security sandbox for untrusted Python code[/dim]\n"
+            "[yellow]Using isolated session workspaces with structured logging[/yellow]\n"
+            "[green]✓ Console logging enabled (detail level: full)[/green]",
+            border_style="cyan",
+            box=box.DOUBLE,
+        )
+    )
     console.print()
 
 
 def demo_basic_execution():
     """Demo 1: Basic code execution with session management."""
-    console.print(Panel(
-        "[bold]Demo 1:[/bold] Session-Based Execution",
-        style="green",
-        expand=False
-    ))
+    console.print(
+        Panel("[bold]Demo 1:[/bold] Session-Based Execution", style="green", expand=False)
+    )
 
     code = """
 print("Hello from WASM Python!")
@@ -240,7 +243,7 @@ print(f"Sum of squares (0-99): {result}")
     session_id, result = execute_in_session(code, session_id="demo-1-basic")
 
     console.print("\n[bold]Output:[/bold]")
-    console.print(result['stdout'].strip())
+    console.print(result["stdout"].strip())
     console.print(f"\n[dim]Session ID: {session_id}[/dim]")
     console.print(f"[dim]Workspace: {result['workspace']}[/dim]")
 
@@ -249,7 +252,7 @@ print(f"Sum of squares (0-99): {result}")
     table.add_row("[cyan]Session ID[/cyan]", session_id[:16] + "...")
     table.add_row("[cyan]Fuel consumed[/cyan]", f"{result['fuel_consumed']:,} instructions")
     table.add_row("[cyan]Memory used[/cyan]", f"{result['mem_len']:,} bytes")
-    table.add_row("[cyan]Memory pages[/cyan]", str(result['mem_pages']))
+    table.add_row("[cyan]Memory pages[/cyan]", str(result["mem_pages"]))
     console.print("\n[bold]Execution Metrics:[/bold]")
     console.print(table)
     console.print()
@@ -257,11 +260,9 @@ print(f"Sum of squares (0-99): {result}")
 
 def demo_security_fuel():
     """Demo 2: Fuel exhaustion (infinite loop protection)."""
-    console.print(Panel(
-        "[bold]Demo 2:[/bold] Security - Fuel Limits",
-        style="yellow",
-        expand=False
-    ))
+    console.print(
+        Panel("[bold]Demo 2:[/bold] Security - Fuel Limits", style="yellow", expand=False)
+    )
 
     console.print("\n[dim]Demonstrating fuel consumption tracking...[/dim]\n")
 
@@ -281,13 +282,15 @@ print("An infinite loop would hit the 2 billion instruction limit")
     _, result = execute_in_session(code, session_id="demo-2-fuel")
 
     console.print("[bold]Output:[/bold]")
-    console.print(result['stdout'].strip())
+    console.print(result["stdout"].strip())
 
     # Create metrics table
     table = Table(show_header=False, box=box.SIMPLE)
     table.add_row("[cyan]Fuel consumed[/cyan]", f"{result['fuel_consumed']:,} instructions")
     table.add_row("[cyan]Fuel budget[/cyan]", "2,000,000,000 instructions")
-    table.add_row("[cyan]Usage[/cyan]", f"{(result['fuel_consumed']/2_000_000_000)*100:.2f}% of budget")
+    table.add_row(
+        "[cyan]Usage[/cyan]", f"{(result['fuel_consumed'] / 2_000_000_000) * 100:.2f}% of budget"
+    )
 
     console.print("\n[bold]Fuel Metrics:[/bold]")
     console.print(table)
@@ -298,11 +301,9 @@ print("An infinite loop would hit the 2 billion instruction limit")
 
 def demo_security_filesystem():
     """Demo 3: Filesystem isolation."""
-    console.print(Panel(
-        "[bold]Demo 3:[/bold] Security - Filesystem Isolation",
-        style="yellow",
-        expand=False
-    ))
+    console.print(
+        Panel("[bold]Demo 3:[/bold] Security - Filesystem Isolation", style="yellow", expand=False)
+    )
 
     code = """
 import os
@@ -327,17 +328,13 @@ print("\\n✓ All escape attempts blocked by WASI capabilities")
     _, result = execute_in_session(code, session_id="demo-3-filesystem")
 
     console.print("\n[bold]Security Test Results:[/bold]")
-    console.print(result['stdout'].strip())
+    console.print(result["stdout"].strip())
     console.print()
 
 
 def demo_file_io():
     """Demo 4: Legitimate file I/O within sandbox."""
-    console.print(Panel(
-        "[bold]Demo 4:[/bold] File I/O Operations",
-        style="blue",
-        expand=False
-    ))
+    console.print(Panel("[bold]Demo 4:[/bold] File I/O Operations", style="blue", expand=False))
 
     code = """
 import json
@@ -373,18 +370,22 @@ for feature in loaded['features']:
     _, result = execute_in_session(code, session_id="demo-4-fileio")
 
     console.print("\n[bold]Output:[/bold]")
-    console.print(result['stdout'].strip())
-    console.print(f"\n[dim]Workspace: {result['workspace']} | Fuel: {result['fuel_consumed']:,} instructions[/dim]")
+    console.print(result["stdout"].strip())
+    console.print(
+        f"\n[dim]Workspace: {result['workspace']} | Fuel: {result['fuel_consumed']:,} instructions[/dim]"
+    )
     console.print()
 
 
 def demo_file_generation():
     """Demo 5: Python code that generates files (matplotlib-style)."""
-    console.print(Panel(
-        "[bold]Demo 5:[/bold] File Generation (e.g., Plots, Reports)",
-        style="blue",
-        expand=False
-    ))
+    console.print(
+        Panel(
+            "[bold]Demo 5:[/bold] File Generation (e.g., Plots, Reports)",
+            style="blue",
+            expand=False,
+        )
+    )
 
     code = """
 import json
@@ -453,21 +454,23 @@ for file in sorted(workspace.glob('*.csv')) + sorted(workspace.glob('*.json')) +
     _, result = execute_in_session(code, session_id="demo-5-generation")
 
     console.print("\n[bold]Output:[/bold]")
-    console.print(result['stdout'].strip())
+    console.print(result["stdout"].strip())
 
     # Show automatically tracked files
-    if result['files_created']:
+    if result["files_created"]:
         console.print("\n[bold green]📁 Files Created (auto-tracked):[/bold green]")
-        for file_path in result['files_created']:
+        for file_path in result["files_created"]:
             console.print(f"  [green]✓[/green] {result['workspace']}/{file_path}")
 
-    if result['files_modified']:
+    if result["files_modified"]:
         console.print("\n[bold yellow]📝 Files Modified:[/bold yellow]")
-        for file_path in result['files_modified']:
+        for file_path in result["files_modified"]:
             console.print(f"  [yellow]•[/yellow] {result['workspace']}/{file_path}")
 
     console.print(f"\n[dim]Fuel used: {result['fuel_consumed']:,} instructions[/dim]")
-    console.print("\n[yellow]💡 Key Point:[/yellow] Files written to [cyan]/app/[/cyan] in the sandbox")
+    console.print(
+        "\n[yellow]💡 Key Point:[/yellow] Files written to [cyan]/app/[/cyan] in the sandbox"
+    )
     console.print("   are automatically visible in [cyan]workspace/[/cyan] on the host.")
     console.print("   [bold]File paths are now included in the result dict![/bold]")
     console.print()
@@ -475,11 +478,7 @@ for file in sorted(workspace.glob('*.csv')) + sorted(workspace.glob('*.json')) +
 
 def demo_sqlite():
     """Demo 6: SQLite database operations."""
-    console.print(Panel(
-        "[bold]Demo 6:[/bold] SQLite Database",
-        style="blue",
-        expand=False
-    ))
+    console.print(Panel("[bold]Demo 6:[/bold] SQLite Database", style="blue", expand=False))
 
     code = """
 import sqlite3
@@ -532,17 +531,17 @@ print("\\n✓ Database operations completed")
     _, result = execute_in_session(code, session_id="demo-6-sqlite")
 
     console.print("\n[bold]Output:[/bold]")
-    console.print(result['stdout'].strip())
+    console.print(result["stdout"].strip())
     console.print()
 
 
 def demo_vendored_packages():
     """Demo 7: Using vendored packages."""
-    console.print(Panel(
-        "[bold]Demo 7:[/bold] Vendored Packages (Auto-injected)",
-        style="magenta",
-        expand=False
-    ))
+    console.print(
+        Panel(
+            "[bold]Demo 7:[/bold] Vendored Packages (Auto-injected)", style="magenta", expand=False
+        )
+    )
 
     code = """
 # LLM-generated code doesn't need to know about sys.path!
@@ -572,22 +571,20 @@ print("  (urllib3 networking operations blocked by WASI)")
     console.print("\n[dim]Using vendored packages...[/dim]")
     _, result = execute_in_session(code, session_id="demo-7-packages")
 
-    if result['stderr']:
+    if result["stderr"]:
         console.print("\n[bold red]Error:[/bold red]")
-        console.print(result['stderr'])
+        console.print(result["stderr"])
 
     console.print("\n[bold]Output:[/bold]")
-    console.print(result['stdout'].strip() if result['stdout'] else "[dim]No output[/dim]")
+    console.print(result["stdout"].strip() if result["stdout"] else "[dim]No output[/dim]")
     console.print()
 
 
 def demo_unicode():
     """Demo 8: Unicode and encoding support."""
-    console.print(Panel(
-        "[bold]Demo 8:[/bold] Unicode & International Text",
-        style="cyan",
-        expand=False
-    ))
+    console.print(
+        Panel("[bold]Demo 8:[/bold] Unicode & International Text", style="cyan", expand=False)
+    )
 
     code = """
 import json
@@ -619,15 +616,15 @@ print("✓ All encodings handled correctly")
     _, result = execute_in_session(code, session_id="demo-8-unicode")
 
     console.print("\n[bold]Output:[/bold]")
-    console.print(result['stdout'].strip())
+    console.print(result["stdout"].strip())
     console.print()
 
 
 def demo_llm_integration():
     """Demo 9: LLM integration pattern.
-    
+
     This demonstrates the complete flow for integrating with an LLM:
-    
+
     1. LLM generates Python code (untrusted)
     2. Code is written to workspace/user_code.py with auto-injected sys.path
     3. WASM sandbox executes the code with:
@@ -645,11 +642,9 @@ def demo_llm_integration():
        - Performance metrics for optimization
        - Error messages for debugging
     """
-    console.print(Panel(
-        "[bold]Demo 9:[/bold] LLM Integration Pattern",
-        style="green",
-        expand=False
-    ))
+    console.print(
+        Panel("[bold]Demo 9:[/bold] LLM Integration Pattern", style="green", expand=False)
+    )
 
     # Simulated LLM-generated code
     llm_code = """
@@ -699,11 +694,11 @@ print("\\n✓ Report saved to /app/report.json")
 
     console.print("\n[bold cyan]Step 3: Capture Output[/bold cyan]")
     console.print("[bold]Console Output (stdout):[/bold]")
-    console.print(result['stdout'].strip())
+    console.print(result["stdout"].strip())
 
-    if result['stderr']:
+    if result["stderr"]:
         console.print("\n[bold red]Errors (stderr):[/bold red]")
-        console.print(result['stderr'].strip())
+        console.print(result["stderr"].strip())
 
     console.print("\n[bold cyan]Step 4: Collect Metrics[/bold cyan]")
 
@@ -713,17 +708,21 @@ print("\\n✓ Report saved to /app/report.json")
     table.add_column("Value", style="green")
     table.add_column("Assessment", style="yellow")
 
-    success = bool(result['stdout']) and not result['stderr']
-    fuel_pct = (result['fuel_consumed'] / 2_000_000_000) * 100
+    success = bool(result["stdout"]) and not result["stderr"]
+    fuel_pct = (result["fuel_consumed"] / 2_000_000_000) * 100
 
     table.add_row("Success", "✓" if success else "✗", "Code executed without errors")
     table.add_row("Fuel Used", f"{result['fuel_consumed']:,}", f"{fuel_pct:.2f}% of budget")
     table.add_row("Memory", f"{result['mem_len']:,} bytes", "Well within limits")
 
-    if result['files_created']:
-        table.add_row("Files Created", str(len(result['files_created'])), ", ".join(result['files_created'][:3]))
+    if result["files_created"]:
+        table.add_row(
+            "Files Created",
+            str(len(result["files_created"])),
+            ", ".join(result["files_created"][:3]),
+        )
 
-    if result['stderr']:
+    if result["stderr"]:
         table.add_row("Errors", "Yes", "Check stderr for details")
 
     console.print()
@@ -750,10 +749,11 @@ print("\\n✓ Report saved to /app/report.json")
 def show_summary():
     """Display summary of capabilities."""
     console.print()
-    console.print(Panel.fit(
-        "[bold green]✓ All Demos Completed Successfully[/bold green]",
-        border_style="green"
-    ))
+    console.print(
+        Panel.fit(
+            "[bold green]✓ All Demos Completed Successfully[/bold green]", border_style="green"
+        )
+    )
 
     tree = Tree("🔒 [bold]Sandbox Capabilities[/bold]")
 
@@ -802,7 +802,7 @@ def main():
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
         console=console,
-        transient=True
+        transient=True,
     ) as progress:
         for name, demo_func in demos:
             task = progress.add_task(f"Running {name}...", total=None)

@@ -122,9 +122,7 @@ class TestListSessionFiles:
         tests.mkdir()
         (tests / "test_helper.py").write_text("def test(): pass")
 
-        py_files = list_session_files(
-            session_id, workspace_root=temp_workspace, pattern="**/*.py"
-        )
+        py_files = list_session_files(session_id, workspace_root=temp_workspace, pattern="**/*.py")
 
         assert sorted(py_files) == ["lib/helper.py", "lib/tests/test_helper.py", "main.py"]
 
@@ -194,9 +192,7 @@ class TestReadSessionFile:
 
         assert data == b'{"result": 42}'
 
-    def test_read_missing_file_raises_error(
-        self, session_id: str, temp_workspace: Path
-    ) -> None:
+    def test_read_missing_file_raises_error(self, session_id: str, temp_workspace: Path) -> None:
         """FileNotFoundError raised for missing file."""
         workspace = temp_workspace / session_id
         workspace.mkdir()
@@ -204,9 +200,7 @@ class TestReadSessionFile:
         with pytest.raises(FileNotFoundError):
             read_session_file(session_id, "nonexistent.txt", workspace_root=temp_workspace)
 
-    def test_read_directory_raises_error(
-        self, session_id: str, temp_workspace: Path
-    ) -> None:
+    def test_read_directory_raises_error(self, session_id: str, temp_workspace: Path) -> None:
         """Error raised when path is directory (IsADirectoryError or PermissionError on Windows)."""
         workspace = temp_workspace / session_id
         workspace.mkdir()
@@ -215,9 +209,7 @@ class TestReadSessionFile:
         with pytest.raises((IsADirectoryError, PermissionError)):
             read_session_file(session_id, "dir", workspace_root=temp_workspace)
 
-    def test_path_traversal_rejected(
-        self, session_id: str, temp_workspace: Path
-    ) -> None:
+    def test_path_traversal_rejected(self, session_id: str, temp_workspace: Path) -> None:
         """Path traversal attempts blocked."""
         workspace = temp_workspace / session_id
         workspace.mkdir()
@@ -225,9 +217,7 @@ class TestReadSessionFile:
         with pytest.raises(ValueError, match="escapes session workspace"):
             read_session_file(session_id, "../etc/passwd", workspace_root=temp_workspace)
 
-    def test_absolute_path_rejected(
-        self, session_id: str, temp_workspace: Path
-    ) -> None:
+    def test_absolute_path_rejected(self, session_id: str, temp_workspace: Path) -> None:
         """Absolute paths rejected."""
         workspace = temp_workspace / session_id
         workspace.mkdir()
@@ -252,17 +242,13 @@ class TestWriteSessionFile:
     def test_write_binary_file(self, session_id: str, temp_workspace: Path) -> None:
         """Writes binary data to file."""
         binary_data = b"\x89PNG\r\n\x1a\n"
-        write_session_file(
-            session_id, "image.png", binary_data, workspace_root=temp_workspace
-        )
+        write_session_file(session_id, "image.png", binary_data, workspace_root=temp_workspace)
 
         file_path = temp_workspace / session_id / "image.png"
         assert file_path.exists()
         assert file_path.read_bytes() == binary_data
 
-    def test_write_creates_nested_directories(
-        self, session_id: str, temp_workspace: Path
-    ) -> None:
+    def test_write_creates_nested_directories(self, session_id: str, temp_workspace: Path) -> None:
         """Parent directories created automatically."""
         write_session_file(
             session_id,
@@ -275,31 +261,21 @@ class TestWriteSessionFile:
         assert file_path.exists()
         assert file_path.read_text() == '{"key": "value"}'
 
-    def test_write_overwrites_by_default(
-        self, session_id: str, temp_workspace: Path
-    ) -> None:
+    def test_write_overwrites_by_default(self, session_id: str, temp_workspace: Path) -> None:
         """Existing file overwritten by default."""
         # Write initial content
-        write_session_file(
-            session_id, "data.txt", "original", workspace_root=temp_workspace
-        )
+        write_session_file(session_id, "data.txt", "original", workspace_root=temp_workspace)
 
         # Overwrite
-        write_session_file(
-            session_id, "data.txt", "updated", workspace_root=temp_workspace
-        )
+        write_session_file(session_id, "data.txt", "updated", workspace_root=temp_workspace)
 
         file_path = temp_workspace / session_id / "data.txt"
         assert file_path.read_text() == "updated"
 
-    def test_write_respects_overwrite_false(
-        self, session_id: str, temp_workspace: Path
-    ) -> None:
+    def test_write_respects_overwrite_false(self, session_id: str, temp_workspace: Path) -> None:
         """FileExistsError raised when overwrite=False."""
         # Write initial file
-        write_session_file(
-            session_id, "data.txt", "original", workspace_root=temp_workspace
-        )
+        write_session_file(session_id, "data.txt", "original", workspace_root=temp_workspace)
 
         # Attempt to overwrite with flag set to False
         with pytest.raises(FileExistsError, match="already exists"):
@@ -331,31 +307,19 @@ class TestWriteSessionFile:
         assert file_path.exists()
         assert file_path.read_text() == "data"
 
-    def test_path_traversal_rejected(
-        self, session_id: str, temp_workspace: Path
-    ) -> None:
+    def test_path_traversal_rejected(self, session_id: str, temp_workspace: Path) -> None:
         """Path traversal attempts blocked."""
         with pytest.raises(ValueError, match="escapes session workspace"):
-            write_session_file(
-                session_id, "../etc/evil", "data", workspace_root=temp_workspace
-            )
+            write_session_file(session_id, "../etc/evil", "data", workspace_root=temp_workspace)
 
-    def test_absolute_path_rejected(
-        self, session_id: str, temp_workspace: Path
-    ) -> None:
+    def test_absolute_path_rejected(self, session_id: str, temp_workspace: Path) -> None:
         """Absolute paths rejected."""
         with pytest.raises(ValueError, match="escapes session workspace"):
-            write_session_file(
-                session_id, "/etc/evil", "data", workspace_root=temp_workspace
-            )
+            write_session_file(session_id, "/etc/evil", "data", workspace_root=temp_workspace)
 
-    def test_string_auto_encoded_utf8(
-        self, session_id: str, temp_workspace: Path
-    ) -> None:
+    def test_string_auto_encoded_utf8(self, session_id: str, temp_workspace: Path) -> None:
         """String data automatically UTF-8 encoded."""
-        write_session_file(
-            session_id, "text.txt", "Hello 世界", workspace_root=temp_workspace
-        )
+        write_session_file(session_id, "text.txt", "Hello 世界", workspace_root=temp_workspace)
 
         file_path = temp_workspace / session_id / "text.txt"
         assert file_path.read_bytes() == "Hello 世界".encode()
@@ -405,9 +369,7 @@ class TestDeleteSessionPath:
         # Directory still exists
         assert dir_path.exists()
 
-    def test_delete_directory_recursive(
-        self, session_id: str, temp_workspace: Path
-    ) -> None:
+    def test_delete_directory_recursive(self, session_id: str, temp_workspace: Path) -> None:
         """Deletes directory recursively when recursive=True."""
         workspace = temp_workspace / session_id
         workspace.mkdir()
@@ -418,54 +380,38 @@ class TestDeleteSessionPath:
         subdir.mkdir()
         (subdir / "file2.txt").write_text("data2")
 
-        delete_session_path(
-            session_id, "cache", workspace_root=temp_workspace, recursive=True
-        )
+        delete_session_path(session_id, "cache", workspace_root=temp_workspace, recursive=True)
 
         assert not dir_path.exists()
 
-    def test_delete_empty_directory_recursive(
-        self, session_id: str, temp_workspace: Path
-    ) -> None:
+    def test_delete_empty_directory_recursive(self, session_id: str, temp_workspace: Path) -> None:
         """Deletes empty directory when recursive=True."""
         workspace = temp_workspace / session_id
         workspace.mkdir()
         dir_path = workspace / "empty"
         dir_path.mkdir()
 
-        delete_session_path(
-            session_id, "empty", workspace_root=temp_workspace, recursive=True
-        )
+        delete_session_path(session_id, "empty", workspace_root=temp_workspace, recursive=True)
 
         assert not dir_path.exists()
 
-    def test_delete_missing_file_raises_error(
-        self, session_id: str, temp_workspace: Path
-    ) -> None:
+    def test_delete_missing_file_raises_error(self, session_id: str, temp_workspace: Path) -> None:
         """FileNotFoundError raised for missing file."""
         workspace = temp_workspace / session_id
         workspace.mkdir()
 
         with pytest.raises(FileNotFoundError):
-            delete_session_path(
-                session_id, "nonexistent.txt", workspace_root=temp_workspace
-            )
+            delete_session_path(session_id, "nonexistent.txt", workspace_root=temp_workspace)
 
-    def test_path_traversal_rejected(
-        self, session_id: str, temp_workspace: Path
-    ) -> None:
+    def test_path_traversal_rejected(self, session_id: str, temp_workspace: Path) -> None:
         """Path traversal attempts blocked."""
         workspace = temp_workspace / session_id
         workspace.mkdir()
 
         with pytest.raises(ValueError, match="escapes session workspace"):
-            delete_session_path(
-                session_id, "../etc/passwd", workspace_root=temp_workspace
-            )
+            delete_session_path(session_id, "../etc/passwd", workspace_root=temp_workspace)
 
-    def test_absolute_path_rejected(
-        self, session_id: str, temp_workspace: Path
-    ) -> None:
+    def test_absolute_path_rejected(self, session_id: str, temp_workspace: Path) -> None:
         """Absolute paths rejected."""
         workspace = temp_workspace / session_id
         workspace.mkdir()

@@ -24,9 +24,11 @@ with open('/app/test_output.json', 'w') as f:
 print(f"Computed: {result}")
 """
 
+
 def benchmark_api(iterations: int = 10) -> tuple[float, list[float]]:
     """Benchmark the create_sandbox() API."""
     import time as time_module
+
     times = []
     policy = ExecutionPolicy()
 
@@ -48,6 +50,7 @@ def benchmark_api(iterations: int = 10) -> tuple[float, list[float]]:
                 pass  # File still locked, skip cleanup
 
     return sum(times) / len(times), times
+
 
 def main():
     print("╔══════════════════════════════════════════════════╗")
@@ -88,6 +91,7 @@ def main():
 
     print("✓ Benchmark completed successfully")
     return 0
+
 
 if __name__ == "__main__":
     exit(main())

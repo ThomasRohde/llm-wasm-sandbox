@@ -17,6 +17,7 @@ class PolicyValidationError(Exception):
     This exception wraps Pydantic ValidationError with a clearer
     domain-specific name for sandbox consumers.
     """
+
     pass
 
 
@@ -28,4 +29,5 @@ class SandboxExecutionError(Exception):
     or runtime crashes. User code errors (syntax errors, exceptions)
     are captured in SandboxResult.stderr and do not raise this exception.
     """
+
     pass

@@ -96,7 +96,7 @@ class JavaScriptSandbox(BaseSandbox):
         policy: ExecutionPolicy,
         session_id: str,
         storage_adapter: StorageAdapter,
-        logger: Any = None
+        logger: Any = None,
     ) -> None:
         """Initialize JavaScriptSandbox with WASM binary path and session config.
 
@@ -178,9 +178,7 @@ class JavaScriptSandbox(BaseSandbox):
 
         # Log execution start with session_id
         self.logger.log_execution_start(
-            runtime="javascript",
-            policy=self.policy,
-            session_id=self.session_id
+            runtime="javascript", policy=self.policy, session_id=self.session_id
         )
 
         # Write code to workspace
@@ -195,9 +193,7 @@ class JavaScriptSandbox(BaseSandbox):
         # Delegate to low-level host execution
         try:
             raw_result = run_untrusted_javascript(
-                wasm_path=str(wasm_path),
-                workspace_dir=str(self.workspace),
-                policy=self.policy
+                wasm_path=str(wasm_path), workspace_dir=str(self.workspace), policy=self.policy
             )
         except Exception as e:
             duration_seconds = time.perf_counter() - start_time
@@ -207,6 +203,7 @@ class JavaScriptSandbox(BaseSandbox):
             mem_pages = max(1, mem_len // 65536)
 
             from sandbox.host import SandboxResult as HostSandboxResult
+
             raw_result = HostSandboxResult(
                 stdout="",
                 stderr=msg,
@@ -216,24 +213,19 @@ class JavaScriptSandbox(BaseSandbox):
                 logs_dir=None,
                 exit_code=1,
                 trapped=True,
-                trap_reason=trap_reason
+                trap_reason=trap_reason,
             )
 
         duration_seconds = time.perf_counter() - start_time
 
         # Detect file changes
         files_created, files_modified = self._detect_file_delta(
-            before_files,
-            exclude=user_code_path
+            before_files, exclude=user_code_path
         )
 
         # Map to typed SandboxResult (always include session_id)
         result = self._map_to_sandbox_result(
-            raw_result,
-            duration_seconds,
-            files_created,
-            files_modified,
-            session_id=self.session_id
+            raw_result, duration_seconds, files_created, files_modified, session_id=self.session_id
         )
 
         # Update session timestamp after successful execution
@@ -289,11 +281,7 @@ class JavaScriptSandbox(BaseSandbox):
             Relative path to written user_code.js file
         """
         filename = self.storage_adapter.JAVASCRIPT_CODE_FILENAME
-        self.storage_adapter.write_file(
-            self.session_id,
-            filename,
-            code.encode("utf-8")
-        )
+        self.storage_adapter.write_file(self.session_id, filename, code.encode("utf-8"))
         return filename
 
     def _snapshot_workspace(self, exclude: str) -> dict[str, float]:
@@ -314,9 +302,7 @@ class JavaScriptSandbox(BaseSandbox):
         return snapshot
 
     def _detect_file_delta(
-        self,
-        before_files: dict[str, float],
-        exclude: str
+        self, before_files: dict[str, float], exclude: str
     ) -> tuple[list[str], list[str]]:
         """Detect files created or modified during execution.
 
@@ -333,18 +319,16 @@ class JavaScriptSandbox(BaseSandbox):
         """
         # Get current snapshot
         after_files = self.storage_adapter.get_workspace_snapshot(self.session_id)
-        
+
         # Detect changes via adapter
         files_created, files_modified = self.storage_adapter.detect_file_changes(
-            self.session_id,
-            before_files,
-            after_files
+            self.session_id, before_files, after_files
         )
-        
+
         # Filter out excluded file
         files_created = [f for f in files_created if f != exclude]
         files_modified = [f for f in files_modified if f != exclude]
-        
+
         return (files_created, files_modified)
 
     def _map_to_sandbox_result(
@@ -353,7 +337,7 @@ class JavaScriptSandbox(BaseSandbox):
         duration_seconds: float,
         files_created: list[str],
         files_modified: list[str],
-        session_id: str | None = None
+        session_id: str | None = None,
     ) -> SandboxResult:
         """Map host.SandboxResult to core.SandboxResult Pydantic model.
 
@@ -407,9 +391,7 @@ class JavaScriptSandbox(BaseSandbox):
 
         # Determine success based on exit code, traps, and stderr contents
         success = self._determine_success(
-            exit_code=exit_code,
-            trapped=trapped,
-            stderr=raw_result.stderr
+            exit_code=exit_code, trapped=trapped, stderr=raw_result.stderr
         )
 
         return SandboxResult(
@@ -423,7 +405,7 @@ class JavaScriptSandbox(BaseSandbox):
             files_created=files_created,
             files_modified=files_modified,
             workspace_path=str(self.workspace),
-            metadata=metadata
+            metadata=metadata,
         )
 
     @staticmethod
@@ -444,7 +426,7 @@ class JavaScriptSandbox(BaseSandbox):
             "referenceerror",
             "syntaxerror",
             "typeerror",
-            "rangeerror"
+            "rangeerror",
         )
         return not any(token in lowered for token in failure_tokens)
 
@@ -461,13 +443,13 @@ class JavaScriptSandbox(BaseSandbox):
             # Log structured event
             metadata = self.storage_adapter.read_metadata(self.session_id)
             self.logger.log_session_metadata_updated(
-                session_id=self.session_id,
-                timestamp=metadata.updated_at
+                session_id=self.session_id, timestamp=metadata.updated_at
             )
         except Exception as e:
             # Log warning but don't fail execution
             import sys
+
             print(
                 f"Warning: Failed to update session timestamp for {self.session_id}: {e}",
-                file=sys.stderr
+                file=sys.stderr,
             )

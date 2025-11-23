@@ -40,9 +40,7 @@ def temp_workspace(tmp_path: Path) -> Path:
 class TestSessionLifecycleLogging:
     """Test session creation, retrieval, and deletion logging."""
 
-    def test_create_session_logs_event(
-        self, temp_workspace: Path, mock_logger: Mock
-    ) -> None:
+    def test_create_session_logs_event(self, temp_workspace: Path, mock_logger: Mock) -> None:
         """Verify create_sandbox logs session.created or session.retrieved event."""
         sandbox = create_sandbox(
             runtime=RuntimeType.PYTHON,
@@ -56,9 +54,7 @@ class TestSessionLifecycleLogging:
         call_args = mock_logger.log_session_created.call_args
         assert call_args[0][0] == session_id
 
-    def test_get_session_logs_event(
-        self, temp_workspace: Path, mock_logger: Mock
-    ) -> None:
+    def test_get_session_logs_event(self, temp_workspace: Path, mock_logger: Mock) -> None:
         """Verify create_sandbox with existing session_id logs session.retrieved event."""
         # Create session first (without logger to avoid interference)
         sandbox = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=temp_workspace)
@@ -84,20 +80,17 @@ class TestSessionLifecycleLogging:
         assert call_args[0][0] == session_id
         assert session_id in call_args[0][1]
 
-    def test_delete_session_logs_event(
-        self, temp_workspace: Path, mock_logger: Mock
-    ) -> None:
+    def test_delete_session_logs_event(self, temp_workspace: Path, mock_logger: Mock) -> None:
         """Verify delete_session_workspace no longer logs (logging removed from this function)."""
         # Create session first
-        sandbox = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=temp_workspace, logger=mock_logger)
+        sandbox = create_sandbox(
+            runtime=RuntimeType.PYTHON, workspace_root=temp_workspace, logger=mock_logger
+        )
 
         session_id = sandbox.session_id
 
         # Delete session (no longer accepts logger parameter)
-        delete_session_workspace(
-            session_id=session_id,
-            workspace_root=temp_workspace
-        )
+        delete_session_workspace(session_id=session_id, workspace_root=temp_workspace)
 
         # This function no longer logs directly - logging is handled elsewhere
         # So we just verify it completes without error
@@ -105,7 +98,9 @@ class TestSessionLifecycleLogging:
 
     def test_session_creation_without_logger(self, temp_workspace: Path) -> None:
         """Verify session creation works without logger (no crash)."""
-        sandbox = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=temp_workspace, logger=None)
+        sandbox = create_sandbox(
+            runtime=RuntimeType.PYTHON, workspace_root=temp_workspace, logger=None
+        )
 
         session_id = sandbox.session_id
 
@@ -117,9 +112,7 @@ class TestSessionLifecycleLogging:
 class TestFileOperationLogging:
     """Test file operation logging (list, read, write, delete)."""
 
-    def test_list_files_logs_event(
-        self, temp_workspace: Path, mock_logger: Mock
-    ) -> None:
+    def test_list_files_logs_event(self, temp_workspace: Path, mock_logger: Mock) -> None:
         """Verify list_session_files logs session.file.list event."""
         # Create session and write some files
         sandbox = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=temp_workspace)
@@ -142,9 +135,7 @@ class TestFileOperationLogging:
         assert call_args[1]["session_id"] == session_id
         assert call_args[1]["file_count"] == len(files)
 
-    def test_read_file_logs_event(
-        self, temp_workspace: Path, mock_logger: Mock
-    ) -> None:
+    def test_read_file_logs_event(self, temp_workspace: Path, mock_logger: Mock) -> None:
         """Verify read_session_file logs session.file.read event."""
         # Create session and write file
         sandbox = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=temp_workspace)
@@ -174,9 +165,7 @@ class TestFileOperationLogging:
         assert call_args[1]["path"] == "test.txt"
         assert call_args[1]["file_size"] == len(test_data)
 
-    def test_write_file_logs_event(
-        self, temp_workspace: Path, mock_logger: Mock
-    ) -> None:
+    def test_write_file_logs_event(self, temp_workspace: Path, mock_logger: Mock) -> None:
         """Verify write_session_file logs session.file.write event."""
         # Create session
         sandbox = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=temp_workspace)
@@ -203,9 +192,7 @@ class TestFileOperationLogging:
         assert call_args[1]["path"] == "test.txt"
         assert call_args[1]["file_size"] == len(test_data.encode("utf-8"))
 
-    def test_delete_file_logs_event(
-        self, temp_workspace: Path, mock_logger: Mock
-    ) -> None:
+    def test_delete_file_logs_event(self, temp_workspace: Path, mock_logger: Mock) -> None:
         """Verify delete_session_path logs session.file.delete event."""
         # Create session and write file
         sandbox = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=temp_workspace)
@@ -287,9 +274,7 @@ class TestExecutionLogging:
         complete_call = mock_logger.log_execution_complete.call_args
         assert complete_call[1].get("session_id") == session_id
 
-    def test_execution_includes_session_id_in_result_metadata(
-        self, temp_workspace: Path
-    ) -> None:
+    def test_execution_includes_session_id_in_result_metadata(self, temp_workspace: Path) -> None:
         """Verify session-aware execution includes session_id in result.metadata."""
         # Create session
         sandbox = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=temp_workspace)
@@ -306,9 +291,7 @@ class TestExecutionLogging:
     def test_all_sandboxes_include_session_id(self, temp_workspace: Path) -> None:
         """Verify all sandboxes include session_id in metadata (greenfield architecture)."""
         # Create sandbox - all sandboxes are session-aware by default
-        sandbox = create_sandbox(
-            runtime=RuntimeType.PYTHON, workspace_root=temp_workspace
-        )
+        sandbox = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=temp_workspace)
 
         # Execute code
         result = sandbox.execute("print('hello')")
@@ -393,10 +376,7 @@ class TestLoggingEdgeCases:
     ) -> None:
         """Verify deleting nonexistent session completes without error (idempotent)."""
         # Delete nonexistent session (no longer accepts logger)
-        delete_session_workspace(
-            session_id="nonexistent-id",
-            workspace_root=temp_workspace
-        )
+        delete_session_workspace(session_id="nonexistent-id", workspace_root=temp_workspace)
 
         # Should complete without error (idempotent operation)
         assert True  # Test passes if no exception raised

@@ -41,9 +41,7 @@ def session_id() -> str:
 class TestSessionFileRoundtrip:
     """Integration tests for complete host-guest file workflows."""
 
-    def test_host_to_guest_to_host_text_file(
-        self, temp_workspace: Path
-    ) -> None:
+    def test_host_to_guest_to_host_text_file(self, temp_workspace: Path) -> None:
         """Complete workflow: write from host, process in guest, read from host."""
         # Create session
         sandbox = create_sandbox(
@@ -54,9 +52,7 @@ class TestSessionFileRoundtrip:
 
         # Write input file from host
         input_data = "Hello from host side"
-        write_session_file(
-            session_id, "input.txt", input_data, workspace_root=temp_workspace
-        )
+        write_session_file(session_id, "input.txt", input_data, workspace_root=temp_workspace)
 
         # Execute code that reads input and writes output
         code = """
@@ -78,9 +74,7 @@ print(f"Processed {len(data)} characters")
         assert "Processed 20 characters" in result.stdout
 
         # Read output file from host
-        output_data = read_session_file(
-            session_id, "output.txt", workspace_root=temp_workspace
-        )
+        output_data = read_session_file(session_id, "output.txt", workspace_root=temp_workspace)
         assert output_data.decode("utf-8") == "EDIS TSOH MORF OLLEH"
 
         # List all files
@@ -102,9 +96,7 @@ print(f"Processed {len(data)} characters")
 
         # Write configuration from host
         config_json = '{"name": "test", "count": 3, "prefix": "item"}'
-        write_session_file(
-            session_id, "config.json", config_json, workspace_root=temp_workspace
-        )
+        write_session_file(session_id, "config.json", config_json, workspace_root=temp_workspace)
 
         # Execute code that reads config and generates multiple files
         code = """
@@ -128,18 +120,14 @@ print(f"Generated {config['count']} files")
         assert "Generated 3 files" in result.stdout
 
         # List and verify all generated files
-        files = list_session_files(
-            session_id, workspace_root=temp_workspace, pattern="item_*.txt"
-        )
+        files = list_session_files(session_id, workspace_root=temp_workspace, pattern="item_*.txt")
         assert len(files) == 3
         assert "item_0.txt" in files
         assert "item_1.txt" in files
         assert "item_2.txt" in files
 
         # Read one of the generated files
-        item_0_data = read_session_file(
-            session_id, "item_0.txt", workspace_root=temp_workspace
-        )
+        item_0_data = read_session_file(session_id, "item_0.txt", workspace_root=temp_workspace)
         assert item_0_data.decode("utf-8") == "test - item 0\n"
 
     def test_binary_file_roundtrip(self, temp_workspace: Path) -> None:
@@ -153,9 +141,7 @@ print(f"Generated {config['count']} files")
 
         # Write binary data from host
         binary_input = bytes(range(256))  # All byte values 0-255
-        write_session_file(
-            session_id, "data.bin", binary_input, workspace_root=temp_workspace
-        )
+        write_session_file(session_id, "data.bin", binary_input, workspace_root=temp_workspace)
 
         # Execute code that reads binary, transforms it, writes output
         code = """
@@ -241,9 +227,7 @@ print("Created nested output")
         session_id = sandbox.session_id
 
         # Turn 1: Write initial state file from host
-        write_session_file(
-            session_id, "state.txt", "0", workspace_root=temp_workspace
-        )
+        write_session_file(session_id, "state.txt", "0", workspace_root=temp_workspace)
 
         # Turn 2: Guest reads, increments, writes
         code_turn_1 = """
@@ -267,14 +251,10 @@ print(f"Count: {count}")
         assert "Count: 2" in result2.stdout
 
         # Turn 4: Host reads final state
-        final_state = read_session_file(
-            session_id, "state.txt", workspace_root=temp_workspace
-        )
+        final_state = read_session_file(session_id, "state.txt", workspace_root=temp_workspace)
         assert final_state.decode("utf-8") == "2"
 
-    def test_list_files_discovers_guest_created_files(
-        self, temp_workspace: Path
-    ) -> None:
+    def test_list_files_discovers_guest_created_files(self, temp_workspace: Path) -> None:
         """Host can discover files created by guest without prior knowledge."""
         # Create session
         sandbox = create_sandbox(
@@ -309,7 +289,5 @@ print(f"Created {count} files")
 
         # Host can read each discovered file
         for filename in random_files:
-            data = read_session_file(
-                session_id, filename, workspace_root=temp_workspace
-            )
+            data = read_session_file(session_id, filename, workspace_root=temp_workspace)
             assert b"Random file" in data

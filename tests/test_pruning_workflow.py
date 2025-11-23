@@ -65,11 +65,7 @@ class TestPruningE2E:
 
         # 3. Prune recent sessions (should not delete)
         # Set threshold to 1 hour, session is seconds old
-        result = prune_sessions(
-            older_than_hours=1.0,
-            workspace_root=workspace_root,
-            dry_run=False
-        )
+        result = prune_sessions(older_than_hours=1.0, workspace_root=workspace_root, dry_run=False)
 
         assert session_id not in result.deleted_sessions
         assert session_dir.exists()
@@ -80,20 +76,16 @@ class TestPruningE2E:
         metadata_file = session_dir / ".metadata.json"
         with open(metadata_file) as f:
             metadata = json.load(f)
-        
+
         # Set timestamps to 2 hours in the past
         old_time = (datetime.now(UTC) - timedelta(hours=2)).isoformat()
         metadata["updated_at"] = old_time
         metadata["created_at"] = old_time
-        
+
         with open(metadata_file, "w") as f:
             json.dump(metadata, f)
 
-        result = prune_sessions(
-            older_than_hours=1.0,
-            workspace_root=workspace_root,
-            dry_run=False
-        )
+        result = prune_sessions(older_than_hours=1.0, workspace_root=workspace_root, dry_run=False)
 
         assert session_id in result.deleted_sessions
         assert not session_dir.exists()
@@ -118,9 +110,7 @@ class TestPruningE2E:
         # 2. Execute code in legacy session
         # create_sandbox with existing session_id should work even without metadata
         sandbox = create_sandbox(
-            session_id=legacy_id,
-            runtime=RuntimeType.PYTHON,
-            workspace_root=workspace_root
+            session_id=legacy_id, runtime=RuntimeType.PYTHON, workspace_root=workspace_root
         )
 
         # Execution should succeed
@@ -139,20 +129,16 @@ class TestPruningE2E:
         metadata_file = legacy_dir / ".metadata.json"
         with open(metadata_file) as f:
             metadata = json.load(f)
-        
+
         # Set timestamps to 25 hours in the past
         old_time = (datetime.now(UTC) - timedelta(hours=25)).isoformat()
         metadata["updated_at"] = old_time
         metadata["created_at"] = old_time
-        
+
         with open(metadata_file, "w") as f:
             json.dump(metadata, f)
 
-        result = prune_sessions(
-            older_than_hours=24.0,
-            workspace_root=workspace_root,
-            dry_run=False
-        )
+        result = prune_sessions(older_than_hours=24.0, workspace_root=workspace_root, dry_run=False)
 
         # In greenfield refactor, metadata was auto-created, so session is eligible for deletion
         assert legacy_id in result.deleted_sessions
@@ -171,7 +157,7 @@ class TestPruningE2E:
             session_id=old_id,
             created_at=old_time.isoformat(),
             updated_at=old_time.isoformat(),
-            version=1
+            version=1,
         )
         with open(old_dir / ".metadata.json", "w") as f:
             json.dump(old_meta.to_dict(), f)
@@ -186,7 +172,7 @@ class TestPruningE2E:
             session_id=new_id,
             created_at=new_time.isoformat(),
             updated_at=new_time.isoformat(),
-            version=1
+            version=1,
         )
         with open(new_dir / ".metadata.json", "w") as f:
             json.dump(new_meta.to_dict(), f)
@@ -197,11 +183,7 @@ class TestPruningE2E:
         legacy_dir.mkdir()
 
         # Prune sessions older than 2 hours
-        result = prune_sessions(
-            older_than_hours=2.0,
-            workspace_root=workspace_root,
-            dry_run=False
-        )
+        result = prune_sessions(older_than_hours=2.0, workspace_root=workspace_root, dry_run=False)
 
         assert old_id in result.deleted_sessions
         assert not old_dir.exists()

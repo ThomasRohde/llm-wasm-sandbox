@@ -29,9 +29,17 @@ class CompleteSandbox(BaseSandbox):
 
     def execute(self, code: str, **kwargs: Any) -> SandboxResult:
         return SandboxResult(
-            success=True, stdout="", stderr="", exit_code=0,
-            fuel_consumed=None, memory_used_bytes=0, duration_ms=0.0,
-            files_created=[], files_modified=[], workspace_path="", metadata={}
+            success=True,
+            stdout="",
+            stderr="",
+            exit_code=0,
+            fuel_consumed=None,
+            memory_used_bytes=0,
+            duration_ms=0.0,
+            files_created=[],
+            files_modified=[],
+            workspace_path="",
+            metadata={},
         )
 
     def validate_code(self, code: str) -> bool:
@@ -90,7 +98,7 @@ class TestBaseSandboxSubclassing:
                     files_created=[],
                     files_modified=[],
                     workspace_path="",
-                    metadata={}
+                    metadata={},
                 )
 
         policy = ExecutionPolicy()
@@ -119,7 +127,7 @@ class TestBaseSandboxSubclassing:
                     files_created=[],
                     files_modified=[],
                     workspace_path=str(self.workspace),
-                    metadata={}
+                    metadata={},
                 )
 
             def validate_code(self, code: str) -> bool:
@@ -148,9 +156,17 @@ class TestBaseSandboxInitialization:
         class TestRuntime(BaseSandbox):
             def execute(self, code: str, **kwargs: Any) -> SandboxResult:
                 return SandboxResult(
-                    success=True, stdout="", stderr="", exit_code=0,
-                    fuel_consumed=None, memory_used_bytes=0, duration_ms=0.0,
-                    files_created=[], files_modified=[], workspace_path="", metadata={}
+                    success=True,
+                    stdout="",
+                    stderr="",
+                    exit_code=0,
+                    fuel_consumed=None,
+                    memory_used_bytes=0,
+                    duration_ms=0.0,
+                    files_created=[],
+                    files_modified=[],
+                    workspace_path="",
+                    metadata={},
                 )
 
             def validate_code(self, code: str) -> bool:
@@ -171,9 +187,17 @@ class TestBaseSandboxInitialization:
         class TestRuntime(BaseSandbox):
             def execute(self, code: str, **kwargs: Any) -> SandboxResult:
                 return SandboxResult(
-                    success=True, stdout="", stderr="", exit_code=0,
-                    fuel_consumed=None, memory_used_bytes=0, duration_ms=0.0,
-                    files_created=[], files_modified=[], workspace_path="", metadata={}
+                    success=True,
+                    stdout="",
+                    stderr="",
+                    exit_code=0,
+                    fuel_consumed=None,
+                    memory_used_bytes=0,
+                    duration_ms=0.0,
+                    files_created=[],
+                    files_modified=[],
+                    workspace_path="",
+                    metadata={},
                 )
 
             def validate_code(self, code: str) -> bool:
@@ -194,9 +218,17 @@ class TestBaseSandboxInitialization:
         class TestRuntime(BaseSandbox):
             def execute(self, code: str, **kwargs: Any) -> SandboxResult:
                 return SandboxResult(
-                    success=True, stdout="", stderr="", exit_code=0,
-                    fuel_consumed=None, memory_used_bytes=0, duration_ms=0.0,
-                    files_created=[], files_modified=[], workspace_path="", metadata={}
+                    success=True,
+                    stdout="",
+                    stderr="",
+                    exit_code=0,
+                    fuel_consumed=None,
+                    memory_used_bytes=0,
+                    duration_ms=0.0,
+                    files_created=[],
+                    files_modified=[],
+                    workspace_path="",
+                    metadata={},
                 )
 
             def validate_code(self, code: str) -> bool:
@@ -218,9 +250,17 @@ class TestBaseSandboxInitialization:
         class TestRuntime(BaseSandbox):
             def execute(self, code: str, **kwargs: Any) -> SandboxResult:
                 return SandboxResult(
-                    success=True, stdout="", stderr="", exit_code=0,
-                    fuel_consumed=None, memory_used_bytes=0, duration_ms=0.0,
-                    files_created=[], files_modified=[], workspace_path="", metadata={}
+                    success=True,
+                    stdout="",
+                    stderr="",
+                    exit_code=0,
+                    fuel_consumed=None,
+                    memory_used_bytes=0,
+                    duration_ms=0.0,
+                    files_created=[],
+                    files_modified=[],
+                    workspace_path="",
+                    metadata={},
                 )
 
             def validate_code(self, code: str) -> bool:
@@ -247,7 +287,7 @@ class TestBaseSandboxHelperMethods:
             policy=ExecutionPolicy(),
             session_id="test-session",
             storage_adapter=DiskStorageAdapter(Path("/tmp")),
-            logger=SandboxLogger(mock_logger)
+            logger=SandboxLogger(mock_logger),
         )
 
         result = SandboxResult(
@@ -260,7 +300,7 @@ class TestBaseSandboxHelperMethods:
             duration_ms=10.5,
             files_created=["output.txt"],
             files_modified=[],
-            workspace_path="/tmp/test"
+            workspace_path="/tmp/test",
         )
 
         # Call the helper method

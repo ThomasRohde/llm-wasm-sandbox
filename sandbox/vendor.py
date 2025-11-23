@@ -41,9 +41,7 @@ def setup_vendor_dir(vendor_dir: str | Path = "vendor") -> Path:
 
 
 def install_pure_python_package(
-    package: str,
-    vendor_dir: str | Path = "vendor",
-    python_version: str = "3.12"
+    package: str, vendor_dir: str | Path = "vendor", python_version: str = "3.12"
 ) -> bool:
     """Install a pure-Python package to vendor directory using wheels only.
 
@@ -66,36 +64,47 @@ def install_pure_python_package(
 
     try:
         import shutil
+
         uv_path = shutil.which("uv")
 
         if uv_path:
             result = subprocess.run(
                 [
-                    uv_path, "pip", "install",
-                    "--target", str(site_packages),
+                    uv_path,
+                    "pip",
+                    "install",
+                    "--target",
+                    str(site_packages),
                     "--only-binary=:all:",
-                    "--python-version", python_version,
+                    "--python-version",
+                    python_version,
                     "--no-deps",
-                    package
+                    package,
                 ],
                 capture_output=True,
                 text=True,
-                check=False
+                check=False,
             )
         else:
             result = subprocess.run(
                 [
-                    sys.executable, "-m", "pip", "install",
-                    "--target", str(site_packages),
+                    sys.executable,
+                    "-m",
+                    "pip",
+                    "install",
+                    "--target",
+                    str(site_packages),
                     "--only-binary=:all:",
-                    "--python-version", python_version,
-                    "--platform", "any",
+                    "--python-version",
+                    python_version,
+                    "--platform",
+                    "any",
                     "--no-deps",
-                    package
+                    package,
                 ],
                 capture_output=True,
                 text=True,
-                check=False
+                check=False,
             )
 
         if result.returncode == 0:
@@ -111,8 +120,7 @@ def install_pure_python_package(
 
 
 def copy_vendor_to_workspace(
-    vendor_dir: str | Path = "vendor",
-    workspace_dir: str | Path = "workspace"
+    vendor_dir: str | Path = "vendor", workspace_dir: str | Path = "workspace"
 ) -> None:
     """Copy vendored packages into workspace for WASM guest access.
 
@@ -185,35 +193,114 @@ def list_vendored_packages(vendor_dir: str | Path = "vendor") -> list[str]:
 
 
 RECOMMENDED_PACKAGES = [
+    # HTTP/Network utilities (note: actual networking requires WASI-sockets support)
     "certifi",
     "charset-normalizer",
     "idna",
     "urllib3",
+    # Document processing - Excel
+    "openpyxl",  # Read/write Excel .xlsx files
+    "XlsxWriter",  # Write Excel .xlsx files (write-only, lighter than openpyxl)
+    # Document processing - PDF
+    "PyPDF2",  # Read/write/merge PDF files
+    # Document processing - Other formats
+    "odfpy",  # Read/write OpenDocument Format (.odf, .ods, .odp)
+    "mammoth",  # Convert Word .docx to HTML/markdown
 ]
 """Curated list of pure-Python packages compatible with WASM sandbox.
 
 These packages have been verified to work without native extensions and are
-commonly useful for LLM-generated code (HTTP clients, text processing, etc.).
+commonly useful for LLM-generated code.
 
-Note: urllib3 networking functions will still fail in baseline WASI due to
-lack of socket API - included here for potential future WASI-sockets support.
+**Network utilities** (certifi, charset-normalizer, idna, urllib3):
+- urllib3 networking functions will fail in baseline WASI (no socket API)
+- Included for potential future WASI-sockets support and for encoding utilities
+
+**Document processing packages** (openpyxl, XlsxWriter, PyPDF2, odfpy, mammoth):
+- Successfully tested in WASM with fuel budgets of 3-7B instructions
+- Enable reading/writing Excel, PDF, and OpenDocument formats
+- mammoth provides Word .docx to HTML/markdown conversion
+
+**Known incompatible packages** (have native dependencies):
+- python-docx: Requires lxml native extensions (use mammoth for .docx parsing instead)
+- pdfminer.six: Requires cryptography native extensions (use PyPDF2 instead)
+- Any package requiring lxml, cryptography, or other compiled extensions
+
+**Installation notes**:
+- Packages may include optional native extensions (.pyd, .so) that are safely ignored
+- charset-normalizer has mypyc-compiled optimizations that gracefully fall back to pure Python
+- Always test new packages in WASM before adding to this list
 """
 
 
 def bootstrap_common_packages(vendor_dir: str | Path = "vendor") -> None:
-    """Install all packages from RECOMMENDED_PACKAGES list.
+    """Install all packages from RECOMMENDED_PACKAGES list with dependencies.
 
     Convenience function for setting up a standard vendored library environment.
     Automatically creates vendor directory structure if it doesn't exist.
 
+    Note: This installs dependencies for document processing packages, which may
+    include packages with optional native extensions (e.g., et_xmlfile for openpyxl).
+    These are safe as long as pure Python fallbacks exist.
+
     Args:
         vendor_dir: Path to vendor root directory (default: "vendor")
     """
-    print("Bootstrapping common pure-Python packages...")
-    setup_vendor_dir(vendor_dir)
+    import subprocess
 
-    for package in RECOMMENDED_PACKAGES:
-        install_pure_python_package(package, vendor_dir)
+    print("Bootstrapping common pure-Python packages...")
+    vendor_path = setup_vendor_dir(vendor_dir)
+    site_packages = vendor_path / "site-packages"
+
+    # Install all packages with dependencies using uv or pip
+    try:
+        uv_path = shutil.which("uv")
+
+        if uv_path:
+            # Use uv - faster and better dependency resolution
+            result = subprocess.run(
+                [
+                    uv_path,
+                    "pip",
+                    "install",
+                    "--target",
+                    str(site_packages),
+                    "--python-version",
+                    "3.12",
+                    *RECOMMENDED_PACKAGES,
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        else:
+            # Fallback to pip
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "pip",
+                    "install",
+                    "--target",
+                    str(site_packages),
+                    "--python-version",
+                    "3.12",
+                    *RECOMMENDED_PACKAGES,
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+        if result.returncode == 0:
+            print(f"✓ Installed {len(RECOMMENDED_PACKAGES)} packages with dependencies")
+        else:
+            print(f"✗ Installation failed: {result.stderr}")
+            return
+
+    except Exception as e:
+        print(f"✗ Error during bootstrap: {e}")
+        return
 
     print("\nVendored packages:")
     for pkg in list_vendored_packages(vendor_dir):

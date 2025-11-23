@@ -32,7 +32,7 @@ def test_session_metadata_creation() -> None:
         session_id="550e8400-e29b-41d4-a716-446655440000",
         created_at=now_utc,
         updated_at=now_utc,
-        version=1
+        version=1,
     )
 
     assert metadata.session_id == "550e8400-e29b-41d4-a716-446655440000"
@@ -47,7 +47,7 @@ def test_session_metadata_to_dict() -> None:
         session_id="abc-123",
         created_at="2025-11-22T10:00:00Z",
         updated_at="2025-11-22T14:00:00Z",
-        version=1
+        version=1,
     )
 
     data = metadata.to_dict()
@@ -65,7 +65,7 @@ def test_session_metadata_from_dict() -> None:
         "session_id": "abc-123",
         "created_at": "2025-11-22T10:00:00Z",
         "updated_at": "2025-11-22T14:00:00Z",
-        "version": 1
+        "version": 1,
     }
 
     metadata = SessionMetadata.from_dict(data)
@@ -82,7 +82,7 @@ def test_session_metadata_roundtrip() -> None:
         session_id="test-id",
         created_at="2025-11-22T10:00:00.123456Z",
         updated_at="2025-11-22T14:30:00.654321Z",
-        version=1
+        version=1,
     )
 
     data = original.to_dict()
@@ -96,10 +96,7 @@ def test_session_metadata_roundtrip() -> None:
 
 def test_create_session_writes_metadata(tmp_path: Path) -> None:
     """Test that create_sandbox writes .metadata.json."""
-    sandbox = create_sandbox(
-        runtime=RuntimeType.PYTHON,
-        workspace_root=tmp_path
-    )
+    sandbox = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=tmp_path)
     session_id = sandbox.session_id
 
     metadata_path = tmp_path / session_id / ".metadata.json"
@@ -109,10 +106,7 @@ def test_create_session_writes_metadata(tmp_path: Path) -> None:
 
 def test_metadata_json_format(tmp_path: Path) -> None:
     """Test that .metadata.json contains valid JSON with expected fields."""
-    sandbox = create_sandbox(
-        runtime=RuntimeType.PYTHON,
-        workspace_root=tmp_path
-    )
+    sandbox = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=tmp_path)
     session_id = sandbox.session_id
 
     metadata_path = tmp_path / session_id / ".metadata.json"
@@ -128,10 +122,7 @@ def test_metadata_json_format(tmp_path: Path) -> None:
 
 def test_metadata_timestamps_are_utc_iso8601(tmp_path: Path) -> None:
     """Test that metadata timestamps are ISO 8601 UTC format."""
-    sandbox = create_sandbox(
-        runtime=RuntimeType.PYTHON,
-        workspace_root=tmp_path
-    )
+    sandbox = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=tmp_path)
     session_id = sandbox.session_id
 
     metadata_path = tmp_path / session_id / ".metadata.json"
@@ -149,10 +140,7 @@ def test_metadata_timestamps_are_utc_iso8601(tmp_path: Path) -> None:
 
 def test_metadata_created_and_updated_at_same_on_creation(tmp_path: Path) -> None:
     """Test that created_at and updated_at are identical at session creation."""
-    sandbox = create_sandbox(
-        runtime=RuntimeType.PYTHON,
-        workspace_root=tmp_path
-    )
+    sandbox = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=tmp_path)
     session_id = sandbox.session_id
 
     metadata_path = tmp_path / session_id / ".metadata.json"
@@ -163,10 +151,7 @@ def test_metadata_created_and_updated_at_same_on_creation(tmp_path: Path) -> Non
 
 def test_read_session_metadata_success(tmp_path: Path) -> None:
     """Test _read_session_metadata with valid metadata."""
-    sandbox = create_sandbox(
-        runtime=RuntimeType.PYTHON,
-        workspace_root=tmp_path
-    )
+    sandbox = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=tmp_path)
     session_id = sandbox.session_id
 
     metadata = _read_session_metadata(session_id, tmp_path)
@@ -214,11 +199,15 @@ def test_read_session_metadata_missing_fields(tmp_path: Path, capsys) -> None:
     workspace = tmp_path / session_id
     workspace.mkdir(parents=True)
     metadata_path = workspace / ".metadata.json"
-    metadata_path.write_text(json.dumps({
-        "session_id": session_id,
-        "created_at": "2025-11-22T10:00:00Z"
-        # Missing updated_at and version
-    }))
+    metadata_path.write_text(
+        json.dumps(
+            {
+                "session_id": session_id,
+                "created_at": "2025-11-22T10:00:00Z",
+                # Missing updated_at and version
+            }
+        )
+    )
 
     metadata = _read_session_metadata(session_id, tmp_path)
 
@@ -326,7 +315,7 @@ def test_update_session_timestamp_permission_error(tmp_path: Path) -> None:
         session_id=session_id,
         created_at=datetime.now(UTC).isoformat(),
         updated_at=datetime.now(UTC).isoformat(),
-        version=1
+        version=1,
     )
     (session_dir / ".metadata.json").write_text(json.dumps(metadata.to_dict()))
 
@@ -418,7 +407,9 @@ def test_existing_session_preserves_metadata(tmp_path: Path) -> None:
     assert result1.success
 
     # Retrieve session using existing session_id
-    sandbox2 = create_sandbox(runtime=RuntimeType.PYTHON, session_id=session_id, workspace_root=tmp_path)
+    sandbox2 = create_sandbox(
+        runtime=RuntimeType.PYTHON, session_id=session_id, workspace_root=tmp_path
+    )
 
     metadata_path = tmp_path / session_id / ".metadata.json"
     before_data = json.loads(metadata_path.read_text())
@@ -443,11 +434,7 @@ def test_metadata_created_logging(tmp_path: Path) -> None:
     """Test that session.metadata.created event is logged."""
     logger = SandboxLogger()
 
-    _sandbox = create_sandbox(
-        runtime=RuntimeType.PYTHON,
-        workspace_root=tmp_path,
-        logger=logger
-    )
+    _sandbox = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=tmp_path, logger=logger)
 
     # Event logging is verified by successful execution
     # Actual log output verification would require log capture setup
@@ -458,11 +445,7 @@ def test_metadata_updated_logging(tmp_path: Path) -> None:
     """Test that session.metadata.updated event is logged."""
     logger = SandboxLogger()
 
-    sandbox = create_sandbox(
-        runtime=RuntimeType.PYTHON,
-        workspace_root=tmp_path,
-        logger=logger
-    )
+    sandbox = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=tmp_path, logger=logger)
 
     # Execute to trigger update
     result = sandbox.execute("print('test')")
@@ -483,7 +466,9 @@ def test_legacy_session_without_metadata_executes(tmp_path: Path) -> None:
     workspace.mkdir(parents=True)
 
     # With new architecture, retrieving session creates metadata if missing
-    sandbox = create_sandbox(runtime=RuntimeType.PYTHON, session_id=session_id, workspace_root=tmp_path)
+    sandbox = create_sandbox(
+        runtime=RuntimeType.PYTHON, session_id=session_id, workspace_root=tmp_path
+    )
 
     result = sandbox.execute("print('legacy session works')")
     assert result.success
@@ -495,9 +480,7 @@ def test_legacy_session_without_metadata_executes(tmp_path: Path) -> None:
 
 
 def test_metadata_write_failure_does_not_prevent_session_creation(
-    tmp_path: Path,
-    capsys,
-    monkeypatch
+    tmp_path: Path, capsys, monkeypatch
 ) -> None:
     """Test that session creation succeeds even if metadata write fails."""
     # Mock Path.write_text to simulate write failure

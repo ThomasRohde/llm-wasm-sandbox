@@ -25,7 +25,9 @@ from sandbox.core.storage import DiskStorageAdapter
 @pytest.fixture
 def temp_workspace():
     """Create temporary workspace directory for test isolation."""
-    with tempfile.TemporaryDirectory(prefix="test-workspace-", ignore_cleanup_errors=True) as tmpdir:
+    with tempfile.TemporaryDirectory(
+        prefix="test-workspace-", ignore_cleanup_errors=True
+    ) as tmpdir:
         yield Path(tmpdir)
 
 
@@ -35,6 +37,7 @@ class TestJavaScriptFuelExhaustion:
     def test_fuel_exhaustion_on_infinite_loop(self, temp_workspace):
         """Test that infinite loops trigger fuel exhaustion."""
         import uuid
+
         # Use very low fuel budget to trigger exhaustion quickly
         policy = ExecutionPolicy(fuel_budget=100_000)
         session_id = str(uuid.uuid4())
@@ -43,7 +46,7 @@ class TestJavaScriptFuelExhaustion:
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            storage_adapter=DiskStorageAdapter(temp_workspace)
+            storage_adapter=DiskStorageAdapter(temp_workspace),
         )
 
         code = """
@@ -65,6 +68,7 @@ while (true) {
     def test_fuel_exhaustion_on_tight_computation(self, temp_workspace):
         """Test that tight computational loops hit fuel limits."""
         import uuid
+
         policy = ExecutionPolicy(fuel_budget=500_000)
         session_id = str(uuid.uuid4())
 
@@ -72,7 +76,7 @@ while (true) {
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            storage_adapter=DiskStorageAdapter(temp_workspace)
+            storage_adapter=DiskStorageAdapter(temp_workspace),
         )
 
         code = """
@@ -91,6 +95,7 @@ for (let i = 0; i < 10000000; i++) {
     def test_normal_code_within_fuel_budget(self, temp_workspace):
         """Test that normal code completes within default fuel budget."""
         import uuid
+
         policy = ExecutionPolicy()  # Default budget
         session_id = str(uuid.uuid4())
 
@@ -98,7 +103,7 @@ for (let i = 0; i < 10000000; i++) {
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            storage_adapter=DiskStorageAdapter(temp_workspace)
+            storage_adapter=DiskStorageAdapter(temp_workspace),
         )
 
         code = """
@@ -119,6 +124,7 @@ class TestJavaScriptMemoryLimits:
     def test_memory_limit_configured(self, temp_workspace):
         """Test that memory limits are configured in sandbox."""
         import uuid
+
         # Use small memory limit
         policy = ExecutionPolicy(memory_bytes=10_000_000)  # 10 MB
         session_id = str(uuid.uuid4())
@@ -127,7 +133,7 @@ class TestJavaScriptMemoryLimits:
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            storage_adapter=DiskStorageAdapter(temp_workspace)
+            storage_adapter=DiskStorageAdapter(temp_workspace),
         )
 
         code = """
@@ -149,6 +155,7 @@ try {
     def test_memory_metrics_captured(self, temp_workspace):
         """Test that memory usage metrics are captured."""
         import uuid
+
         policy = ExecutionPolicy()
         session_id = str(uuid.uuid4())
 
@@ -156,7 +163,7 @@ try {
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            storage_adapter=DiskStorageAdapter(temp_workspace)
+            storage_adapter=DiskStorageAdapter(temp_workspace),
         )
 
         code = "const arr = new Array(1000).fill(42);"
@@ -166,10 +173,12 @@ try {
         assert "memory_pages" in result.metadata
 
 
-@pytest.mark.skip(reason="QuickJS WASI build does not support require('std') - file I/O APIs not available")
+@pytest.mark.skip(
+    reason="QuickJS WASI build does not support require('std') - file I/O APIs not available"
+)
 class TestJavaScriptFilesystemIsolation:
     """Test WASI filesystem isolation and capability-based access.
-    
+
     NOTE: These tests are skipped because file I/O testing requires APIs
     not available in the QuickJS WASI build. Filesystem isolation is still
     enforced by WASI at the host layer (configured in host.py).
@@ -178,6 +187,7 @@ class TestJavaScriptFilesystemIsolation:
     def test_filesystem_isolation_prevents_etc_passwd_access(self, temp_workspace):
         """Test that WASI prevents access to /etc/passwd."""
         import uuid
+
         policy = ExecutionPolicy()
         session_id = str(uuid.uuid4())
 
@@ -185,7 +195,7 @@ class TestJavaScriptFilesystemIsolation:
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            storage_adapter=DiskStorageAdapter(temp_workspace)
+            storage_adapter=DiskStorageAdapter(temp_workspace),
         )
 
         code = """
@@ -207,6 +217,7 @@ try {
     def test_filesystem_isolation_prevents_root_access(self, temp_workspace):
         """Test that guest cannot access root filesystem."""
         import uuid
+
         policy = ExecutionPolicy()
         session_id = str(uuid.uuid4())
 
@@ -214,7 +225,7 @@ try {
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            storage_adapter=DiskStorageAdapter(temp_workspace)
+            storage_adapter=DiskStorageAdapter(temp_workspace),
         )
 
         code = """
@@ -235,6 +246,7 @@ try {
     def test_filesystem_access_allowed_within_app(self, temp_workspace):
         """Test that filesystem access is allowed within /app preopen."""
         import uuid
+
         policy = ExecutionPolicy()
         session_id = str(uuid.uuid4())
 
@@ -242,7 +254,7 @@ try {
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            storage_adapter=DiskStorageAdapter(temp_workspace)
+            storage_adapter=DiskStorageAdapter(temp_workspace),
         )
 
         code = """
@@ -260,10 +272,12 @@ console.log('SUCCESS: Created file in /app');
         assert (sandbox.workspace / "allowed.txt").exists()
 
 
-@pytest.mark.skip(reason="QuickJS WASI build does not support require('std') - file I/O APIs not available")
+@pytest.mark.skip(
+    reason="QuickJS WASI build does not support require('std') - file I/O APIs not available"
+)
 class TestJavaScriptFilesystemEscapePrevention:
     """Test prevention of filesystem escape via path traversal.
-    
+
     NOTE: These tests are skipped because path traversal testing requires
     file I/O APIs not available in QuickJS WASI. Path isolation is still
     enforced by WASI preopen configuration in host.py.
@@ -272,6 +286,7 @@ class TestJavaScriptFilesystemEscapePrevention:
     def test_parent_directory_traversal_blocked(self, temp_workspace):
         """Test that ../ traversal is blocked."""
         import uuid
+
         policy = ExecutionPolicy()
         session_id = str(uuid.uuid4())
 
@@ -285,7 +300,7 @@ class TestJavaScriptFilesystemEscapePrevention:
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            storage_adapter=DiskStorageAdapter(temp_workspace)
+            storage_adapter=DiskStorageAdapter(temp_workspace),
         )
 
         code = f"""
@@ -306,6 +321,7 @@ try {{
     def test_absolute_path_outside_app_blocked(self, temp_workspace):
         """Test that absolute paths outside /app are blocked."""
         import uuid
+
         policy = ExecutionPolicy()
         session_id = str(uuid.uuid4())
 
@@ -313,7 +329,7 @@ try {{
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            storage_adapter=DiskStorageAdapter(temp_workspace)
+            storage_adapter=DiskStorageAdapter(temp_workspace),
         )
 
         code = """
@@ -338,6 +354,7 @@ class TestJavaScriptOutputCapping:
     def test_stdout_capping_enforced(self, temp_workspace):
         """Test that stdout output is capped at configured limit."""
         import uuid
+
         policy = ExecutionPolicy(stdout_max_bytes=100)
         session_id = str(uuid.uuid4())
 
@@ -345,7 +362,7 @@ class TestJavaScriptOutputCapping:
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            storage_adapter=DiskStorageAdapter(temp_workspace)
+            storage_adapter=DiskStorageAdapter(temp_workspace),
         )
 
         code = """
@@ -362,6 +379,7 @@ for (let i = 0; i < 100; i++) {
     def test_stderr_capping_enforced(self, temp_workspace):
         """Test that stderr output is capped at configured limit."""
         import uuid
+
         policy = ExecutionPolicy(stderr_max_bytes=100)
         session_id = str(uuid.uuid4())
 
@@ -369,7 +387,7 @@ for (let i = 0; i < 100; i++) {
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            storage_adapter=DiskStorageAdapter(temp_workspace)
+            storage_adapter=DiskStorageAdapter(temp_workspace),
         )
 
         # Use syntax errors to generate stderr output since console.error is not available
@@ -391,6 +409,7 @@ const e = 'missing quote
     def test_output_within_limits_not_truncated(self, temp_workspace):
         """Test that output within limits is not truncated."""
         import uuid
+
         policy = ExecutionPolicy(stdout_max_bytes=1000, stderr_max_bytes=1000)
         session_id = str(uuid.uuid4())
 
@@ -398,7 +417,7 @@ const e = 'missing quote
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            storage_adapter=DiskStorageAdapter(temp_workspace)
+            storage_adapter=DiskStorageAdapter(temp_workspace),
         )
 
         code = """
@@ -418,6 +437,7 @@ class TestJavaScriptEnvironmentVariableIsolation:
     def test_custom_env_vars_accessible(self, temp_workspace):
         """Test that whitelisted environment variables are accessible."""
         import uuid
+
         policy = ExecutionPolicy(env={"CUSTOM_VAR": "test_value", "DEBUG": "1"})
         session_id = str(uuid.uuid4())
 
@@ -425,7 +445,7 @@ class TestJavaScriptEnvironmentVariableIsolation:
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            storage_adapter=DiskStorageAdapter(temp_workspace)
+            storage_adapter=DiskStorageAdapter(temp_workspace),
         )
 
         # Note: QuickJS WASI may not have env access like Node.js
@@ -456,7 +476,7 @@ console.log('Env configured');
                 wasm_binary_path="bin/quickjs.wasm",
                 policy=policy,
                 session_id=session_id,
-                storage_adapter=DiskStorageAdapter(temp_workspace)
+                storage_adapter=DiskStorageAdapter(temp_workspace),
             )
 
             # Note: QuickJS may not have env access, but policy should isolate anyway
@@ -483,6 +503,7 @@ class TestJavaScriptNoNetworkAccess:
     def test_no_network_capabilities(self, temp_workspace):
         """Test that network operations are not available."""
         import uuid
+
         policy = ExecutionPolicy()
         session_id = str(uuid.uuid4())
 
@@ -490,7 +511,7 @@ class TestJavaScriptNoNetworkAccess:
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            storage_adapter=DiskStorageAdapter(temp_workspace)
+            storage_adapter=DiskStorageAdapter(temp_workspace),
         )
 
         # QuickJS in WASI mode should not have network capabilities
@@ -512,6 +533,7 @@ class TestJavaScriptSecurityMetadata:
     def test_trap_reason_captured_on_fuel_exhaustion(self, temp_workspace):
         """Test that trap_reason is captured when fuel is exhausted."""
         import uuid
+
         policy = ExecutionPolicy(fuel_budget=100_000)
         session_id = str(uuid.uuid4())
 
@@ -519,7 +541,7 @@ class TestJavaScriptSecurityMetadata:
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            storage_adapter=DiskStorageAdapter(temp_workspace)
+            storage_adapter=DiskStorageAdapter(temp_workspace),
         )
 
         code = "while (true) {}"
@@ -531,6 +553,7 @@ class TestJavaScriptSecurityMetadata:
     def test_fuel_consumed_captured(self, temp_workspace):
         """Test that fuel consumption is captured in results."""
         import uuid
+
         policy = ExecutionPolicy()
         session_id = str(uuid.uuid4())
 
@@ -538,7 +561,7 @@ class TestJavaScriptSecurityMetadata:
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            storage_adapter=DiskStorageAdapter(temp_workspace)
+            storage_adapter=DiskStorageAdapter(temp_workspace),
         )
 
         code = "const x = 42;"
@@ -550,17 +573,15 @@ class TestJavaScriptSecurityMetadata:
     def test_policy_snapshot_in_metadata(self, temp_workspace):
         """Test that policy limits are captured in metadata."""
         import uuid
-        policy = ExecutionPolicy(
-            fuel_budget=1_000_000_000,
-            memory_bytes=64 * 1024 * 1024
-        )
+
+        policy = ExecutionPolicy(fuel_budget=1_000_000_000, memory_bytes=64 * 1024 * 1024)
         session_id = str(uuid.uuid4())
 
         sandbox = JavaScriptSandbox(
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            storage_adapter=DiskStorageAdapter(temp_workspace)
+            storage_adapter=DiskStorageAdapter(temp_workspace),
         )
 
         code = "console.log('test');"

@@ -21,10 +21,7 @@ from sandbox.sessions import SessionMetadata, prune_sessions
 
 
 def _create_dummy_session(
-    workspace_root: Path,
-    session_id: str,
-    age_hours: float,
-    size_bytes: int = 1024
+    workspace_root: Path, session_id: str, age_hours: float, size_bytes: int = 1024
 ) -> None:
     """Helper to create a dummy session with specific age and size."""
     session_dir = workspace_root / session_id
@@ -39,7 +36,7 @@ def _create_dummy_session(
         session_id=session_id,
         created_at=past_time.isoformat(),
         updated_at=past_time.isoformat(),
-        version=1
+        version=1,
     )
     (session_dir / ".metadata.json").write_text(json.dumps(metadata.to_dict()))
 
@@ -89,11 +86,7 @@ def test_prune_dry_run(tmp_path: Path) -> None:
     old_id = str(uuid.uuid4())
     _create_dummy_session(tmp_path, old_id, age_hours=30.0)
 
-    result = prune_sessions(
-        older_than_hours=24.0,
-        workspace_root=tmp_path,
-        dry_run=True
-    )
+    result = prune_sessions(older_than_hours=24.0, workspace_root=tmp_path, dry_run=True)
 
     # Verify result indicates what would happen
     assert old_id in result.deleted_sessions
@@ -258,8 +251,8 @@ def test_prune_respects_workspace_boundary(tmp_path: Path) -> None:
 def test_prune_validates_session_id_format(tmp_path: Path) -> None:
     """Test that only valid UUID directories are considered."""
     # Create various directories
-    (tmp_path / "valid-uuid-1234").mkdir() # Not a real UUID
-    (tmp_path / "550e8400-e29b-41d4-a716-446655440000").mkdir() # Real UUID
+    (tmp_path / "valid-uuid-1234").mkdir()  # Not a real UUID
+    (tmp_path / "550e8400-e29b-41d4-a716-446655440000").mkdir()  # Real UUID
 
     # Mock _read_session_metadata to return None so we don't need files
     with patch("sandbox.sessions._read_session_metadata", return_value=None):
@@ -287,6 +280,7 @@ def test_prune_throughput(tmp_path: Path) -> None:
 
         # Generating 100 folders is fast enough.
         import uuid
+
         sid = str(uuid.uuid4())
         _create_dummy_session(tmp_path, sid, age_hours=30.0, size_bytes=100)
 
@@ -301,7 +295,7 @@ def test_prune_throughput(tmp_path: Path) -> None:
     assert duration < 10.0
 
     # Calculate rate
-    rate = count / duration if duration > 0 else float('inf')
+    rate = count / duration if duration > 0 else float("inf")
     print(f"Pruning rate: {rate:.1f} sessions/sec")
 
 
@@ -316,11 +310,7 @@ def test_prune_logging(tmp_path: Path) -> None:
     session_id = str(uuid.uuid4())
     _create_dummy_session(tmp_path, session_id, age_hours=25.0)
 
-    prune_sessions(
-        older_than_hours=24.0,
-        workspace_root=tmp_path,
-        logger=logger
-    )
+    prune_sessions(older_than_hours=24.0, workspace_root=tmp_path, logger=logger)
 
     # Verify log calls
     logger.log_prune_started.assert_called_once()
@@ -338,11 +328,7 @@ def test_prune_error_logging(tmp_path: Path) -> None:
 
     # Mock shutil.rmtree to raise PermissionError
     with patch("shutil.rmtree", side_effect=PermissionError("Access denied")):
-        prune_sessions(
-            older_than_hours=24.0,
-            workspace_root=tmp_path,
-            logger=logger
-        )
+        prune_sessions(older_than_hours=24.0, workspace_root=tmp_path, logger=logger)
 
     logger.log_prune_error.assert_called_once()
 
@@ -360,15 +346,11 @@ def test_prune_corrupted_timestamp_logging(tmp_path: Path) -> None:
         "session_id": session_id,
         "created_at": "invalid-date",
         "updated_at": "invalid-date",
-        "version": 1
+        "version": 1,
     }
     (session_dir / ".metadata.json").write_text(json.dumps(metadata))
 
-    prune_sessions(
-        older_than_hours=24.0,
-        workspace_root=tmp_path,
-        logger=logger
-    )
+    prune_sessions(older_than_hours=24.0, workspace_root=tmp_path, logger=logger)
 
     logger.log_prune_skipped.assert_called_once()
     args = logger.log_prune_skipped.call_args[1]

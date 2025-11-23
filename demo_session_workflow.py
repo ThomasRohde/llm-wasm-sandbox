@@ -161,9 +161,9 @@ with open('/app/report.txt', 'w') as f:
     for i in range(3):
         temp_sandbox = create_sandbox(runtime=RuntimeType.PYTHON)
         temp_id = temp_sandbox.session_id
-        temp_sandbox.execute(f"print('Temporary session {i+1}')")
+        temp_sandbox.execute(f"print('Temporary session {i + 1}')")
         temp_sessions.append(temp_id)
-        print(f"  Created temp session {i+1}: {temp_id}")
+        print(f"  Created temp session {i + 1}: {temp_id}")
 
     # Demonstrate dry-run pruning
     print("\nDry-run pruning (preview only, no deletions):")
@@ -176,12 +176,15 @@ with open('/app/report.txt', 'w') as f:
     print("\nActual pruning (deleting sessions older than 0 hours for demo):")
     prune_result = prune_sessions(older_than_hours=0.0)
     print(f"  {prune_result}")
-    print(f"  Deleted sessions: {prune_result.deleted_sessions[:3]}{'...' if len(prune_result.deleted_sessions) > 3 else ''}")
+    print(
+        f"  Deleted sessions: {prune_result.deleted_sessions[:3]}{'...' if len(prune_result.deleted_sessions) > 3 else ''}"
+    )
     print(f"  Total reclaimed: {prune_result.reclaimed_bytes:,} bytes")
 
     # Verify sessions were deleted
     print("\nVerifying sessions were deleted:")
     from pathlib import Path
+
     for temp_id in temp_sessions:
         workspace_exists = (Path("workspace") / temp_id).exists()
         print(f"  {temp_id}: {'EXISTS' if workspace_exists else 'DELETED'}")

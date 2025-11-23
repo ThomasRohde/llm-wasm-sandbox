@@ -18,22 +18,17 @@ from sandbox.core.models import ExecutionPolicy
 DEFAULT_POLICY = {
     # WASM instruction limit - prevents infinite loops and excessive computation
     "fuel_budget": 2_000_000_000,
-
     # Linear memory cap - prevents memory bombs
     "memory_bytes": 128_000_000,
-
     # Output size caps - prevents log flooding attacks
     "stdout_max_bytes": 2_000_000,
     "stderr_max_bytes": 1_000_000,
     "preserve_logs": False,
-
     # WASI filesystem preopen for capability-based isolation
     "mount_host_dir": "workspace",
     "guest_mount_path": "/app",
-
     # Guest argv - "-I" isolates from user site-packages for predictability
     "argv": ["python", "-I", "/app/user_code.py", "-X", "utf8"],
-
     # Environment whitelist - only expose explicitly required variables
     "env": {
         "PYTHONUTF8": "1",
@@ -43,6 +38,7 @@ DEFAULT_POLICY = {
         "DEMO_GREETING": "Hej fra WASM 👋",
     },
 }
+
 
 def load_policy(path: str = "config/policy.toml") -> ExecutionPolicy:
     """Load and merge user policy configuration with secure defaults.

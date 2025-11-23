@@ -36,7 +36,7 @@ class BaseSandbox(ABC):
         policy: ExecutionPolicy,
         session_id: str,
         storage_adapter: StorageAdapter,
-        logger: SandboxLogger | None = None
+        logger: SandboxLogger | None = None,
     ) -> None:
         """Initialize BaseSandbox with policy, session, storage, and logger.
 
@@ -54,6 +54,7 @@ class BaseSandbox(ABC):
         if logger is None:
             # Import here to avoid circular dependency
             from sandbox.core.logging import SandboxLogger
+
             self.logger = SandboxLogger()
         else:
             self.logger = logger
@@ -71,13 +72,11 @@ class BaseSandbox(ABC):
         Raises:
             AttributeError: If storage adapter doesn't have workspace_root Path
         """
-        if hasattr(self.storage_adapter, 'workspace_root') and isinstance(
+        if hasattr(self.storage_adapter, "workspace_root") and isinstance(
             self.storage_adapter.workspace_root, Path
         ):
             return self.storage_adapter.workspace_root
-        raise AttributeError(
-            "workspace_root property only available with DiskStorageAdapter"
-        )
+        raise AttributeError("workspace_root property only available with DiskStorageAdapter")
 
     @property
     def workspace(self) -> Path:
@@ -92,13 +91,11 @@ class BaseSandbox(ABC):
         Raises:
             AttributeError: If storage adapter doesn't support Path-based access
         """
-        if hasattr(self.storage_adapter, 'workspace_root') and isinstance(
+        if hasattr(self.storage_adapter, "workspace_root") and isinstance(
             self.storage_adapter.workspace_root, Path
         ):
             return self.storage_adapter.workspace_root / self.session_id
-        raise AttributeError(
-            "workspace property only available with DiskStorageAdapter"
-        )
+        raise AttributeError("workspace property only available with DiskStorageAdapter")
 
     @abstractmethod
     def execute(self, code: str, **kwargs: Any) -> SandboxResult:
@@ -144,11 +141,7 @@ class BaseSandbox(ABC):
         """
         pass
 
-    def _log_execution_metrics(
-        self,
-        result: SandboxResult,
-        runtime: str
-    ) -> None:
+    def _log_execution_metrics(self, result: SandboxResult, runtime: str) -> None:
         """Helper method to log execution completion with metrics.
 
         Convenience method for runtime implementations to emit structured

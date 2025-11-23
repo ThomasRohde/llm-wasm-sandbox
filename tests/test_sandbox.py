@@ -1,4 +1,5 @@
 """Consolidated test suite for sandbox functionality using pytest."""
+
 import os
 import tempfile
 from pathlib import Path
@@ -32,15 +33,15 @@ def execute(code: str, inject_setup: bool = True, policy: ExecutionPolicy | None
     # Map memory_used_bytes to both mem_pages (approximate) and mem_len for compatibility
     mem_pages = result.memory_used_bytes // 65536  # Approximate pages (64KB each)
     return {
-        'stdout': result.stdout,
-        'stderr': result.stderr,
-        'fuel_consumed': result.fuel_consumed,
-        'mem_pages': mem_pages,  # Backwards compat - approximate
-        'mem_len': result.memory_used_bytes,  # Backwards compat
-        'logs_dir': result.workspace_path,  # Use workspace as logs_dir equivalent
-        'success': result.success,
-        'exit_code': result.exit_code,
-        'metadata': result.metadata,
+        "stdout": result.stdout,
+        "stderr": result.stderr,
+        "fuel_consumed": result.fuel_consumed,
+        "mem_pages": mem_pages,  # Backwards compat - approximate
+        "mem_len": result.memory_used_bytes,  # Backwards compat
+        "logs_dir": result.workspace_path,  # Use workspace as logs_dir equivalent
+        "success": result.success,
+        "exit_code": result.exit_code,
+        "metadata": result.metadata,
     }
 
 
@@ -62,11 +63,11 @@ except Exception as e:
 """
         result = execute(code, policy=policy)
 
-        assert "Hello from WASM Python" in result['stdout']
-        assert "Hello from custom policy" in result['stdout']
-        assert result['fuel_consumed'] is not None
-        assert result['mem_pages'] > 0
-        assert result['logs_dir'] is not None
+        assert "Hello from WASM Python" in result["stdout"]
+        assert "Hello from custom policy" in result["stdout"]
+        assert result["fuel_consumed"] is not None
+        assert result["mem_pages"] > 0
+        assert result["logs_dir"] is not None
 
 
 class TestFilesystemIsolation:
@@ -82,7 +83,7 @@ except Exception as e:
     print("FS sandbox caught:", type(e).__name__, str(e)[:80])
 """
         result = execute(code)
-        assert "FS sandbox caught" in result['stdout']
+        assert "FS sandbox caught" in result["stdout"]
 
     def test_parent_directory_escape_blocked(self):
         """Test that parent directory traversal is blocked."""
@@ -94,7 +95,7 @@ except Exception as e:
     print("Parent escape caught:", type(e).__name__, str(e)[:80])
 """
         result = execute(code)
-        assert "Parent escape caught" in result['stdout']
+        assert "Parent escape caught" in result["stdout"]
 
     def test_allowed_preopen_access(self):
         """Test that reads within /app preopen succeed."""
@@ -110,7 +111,12 @@ except Exception as e:
         session_id = sandbox.session_id
 
         # Write input file using session-aware API
-        write_session_file(session_id, "input.txt", "This text came from the host filesystem", workspace_root=workspace_root)
+        write_session_file(
+            session_id,
+            "input.txt",
+            "This text came from the host filesystem",
+            workspace_root=workspace_root,
+        )
 
         code = """
 try:
@@ -138,10 +144,10 @@ while True:
         result = execute(code, policy=policy)
 
         # Fuel should be consumed (either fully exhausted or partially)
-        assert result['fuel_consumed'] is not None
-        assert result['success'] is False
-        assert result['exit_code'] != 0
-        assert "OutOfFuel" in result['stderr'] or "fuel" in result['stderr'].lower()
+        assert result["fuel_consumed"] is not None
+        assert result["success"] is False
+        assert result["exit_code"] != 0
+        assert "OutOfFuel" in result["stderr"] or "fuel" in result["stderr"].lower()
 
 
 class TestMemoryLimits:
@@ -162,10 +168,12 @@ except Exception as e:
         result = execute(code)
 
         # Either Python catches MemoryError or trap occurs
-        assert ("Memory limit" in result['stdout'] or
-                "MemoryError" in result['stderr'] or
-                "Other error" in result['stdout'])
-        assert result['mem_pages'] is not None
+        assert (
+            "Memory limit" in result["stdout"]
+            or "MemoryError" in result["stderr"]
+            or "Other error" in result["stdout"]
+        )
+        assert result["mem_pages"] is not None
 
 
 class TestSandboxMetrics:
@@ -176,16 +184,16 @@ class TestSandboxMetrics:
         code = "print('test')"
         result = execute(code)
 
-        assert 'stdout' in result
-        assert 'stderr' in result
-        assert 'fuel_consumed' in result
-        assert 'mem_pages' in result
-        assert 'mem_len' in result
-        assert 'logs_dir' in result
+        assert "stdout" in result
+        assert "stderr" in result
+        assert "fuel_consumed" in result
+        assert "mem_pages" in result
+        assert "mem_len" in result
+        assert "logs_dir" in result
 
-        assert isinstance(result['stdout'], str)
-        assert isinstance(result['stderr'], str)
-        assert result['logs_dir'] is not None
+        assert isinstance(result["stdout"], str)
+        assert isinstance(result["stderr"], str)
+        assert result["logs_dir"] is not None
 
 
 class TestPolicyManagement:
@@ -207,6 +215,7 @@ class TestPolicyManagement:
     def test_load_policy_default(self):
         """Test loading policy when file doesn't exist."""
         from sandbox.core.models import ExecutionPolicy
+
         policy = load_policy("nonexistent/policy.toml")
         assert isinstance(policy, ExecutionPolicy)
         assert policy.fuel_budget == DEFAULT_POLICY["fuel_budget"]
@@ -214,6 +223,7 @@ class TestPolicyManagement:
     def test_load_policy_existing(self):
         """Test loading existing policy file."""
         from sandbox.core.models import ExecutionPolicy
+
         policy = load_policy("config/policy.toml")
         assert isinstance(policy, ExecutionPolicy)
         assert hasattr(policy, "fuel_budget")
@@ -232,6 +242,7 @@ class TestUtilities:
     def test_setup_logging(self):
         """Test logging setup."""
         import logging
+
         logger = setup_logging(logging.DEBUG)
         assert logger is not None
         assert logger.name == "llm-wasm-sandbox"
@@ -239,6 +250,7 @@ class TestUtilities:
     def test_ensure_dir_exists(self):
         """Test directory creation."""
         import os
+
         with tempfile.TemporaryDirectory() as tmpdir:
             test_path = os.path.join(tmpdir, "test", "nested", "dir")
             result = ensure_dir_exists(test_path)
@@ -355,7 +367,7 @@ class TestHostDirect:
             trap_reason=None,
             trap_message=None,
             stdout_truncated=False,
-            stderr_truncated=True
+            stderr_truncated=True,
         )
 
         assert result.stdout == "test stdout"
@@ -371,7 +383,9 @@ class TestHostDirect:
         assert result.stdout_truncated is False
         assert result.stderr_truncated is True
 
-    def test_run_untrusted_python_raises_when_memory_limits_missing(self, monkeypatch, tmp_path: Path):
+    def test_run_untrusted_python_raises_when_memory_limits_missing(
+        self, monkeypatch, tmp_path: Path
+    ):
         """Memory limit enforcement should fail closed when set_limits is unavailable."""
         import sandbox.host as host_module
 
@@ -426,9 +440,9 @@ class TestEdgeCases:
     def test_empty_code_execution(self):
         """Test executing empty code."""
         result = execute("")
-        assert result['stdout'] == ""
-        assert result['fuel_consumed'] is not None
-        assert result['success'] is True
+        assert result["stdout"] == ""
+        assert result["fuel_consumed"] is not None
+        assert result["success"] is True
 
     def test_syntax_error_in_code(self):
         """Test executing code with syntax errors causes trap."""
@@ -438,10 +452,10 @@ if True
     print('missing colon')
 """
         result = execute(code)
-        assert result['fuel_consumed'] is not None
-        assert result['success'] is False
-        assert result['exit_code'] != 0
-        assert "traceback" in result['stderr'].lower() or "syntax" in result['stderr'].lower()
+        assert result["fuel_consumed"] is not None
+        assert result["success"] is False
+        assert result["exit_code"] != 0
+        assert "traceback" in result["stderr"].lower() or "syntax" in result["stderr"].lower()
 
     def test_import_error_handling(self):
         """Test handling of import errors."""
@@ -452,13 +466,13 @@ except ImportError as e:
     print("Import error caught:", str(e)[:50])
 """
         result = execute(code)
-        assert "Import error caught:" in result['stdout']
+        assert "Import error caught:" in result["stdout"]
 
     def test_unicode_handling(self):
         """Test that unicode is handled correctly."""
         code = 'print("Unicode: 你好 мир 🌍")'
         result = execute(code)
-        assert "Unicode:" in result['stdout']
+        assert "Unicode:" in result["stdout"]
 
     def test_multiline_output(self):
         """Test handling multiline output."""
@@ -467,8 +481,8 @@ for i in range(5):
     print(f"Line {i}")
 """
         result = execute(code)
-        assert "Line 0" in result['stdout']
-        assert "Line 4" in result['stdout']
+        assert "Line 0" in result["stdout"]
+        assert "Line 4" in result["stdout"]
 
     def test_large_output_capped(self):
         """Test that large output is capped."""
@@ -479,8 +493,8 @@ for i in range(100000):
 """
         result = execute(code)
         # Output should exist but be capped
-        assert len(result['stdout']) > 0
-        assert result['fuel_consumed'] is not None
+        assert len(result["stdout"]) > 0
+        assert result["fuel_consumed"] is not None
         assert result["metadata"].get("stdout_truncated") is True
 
 
@@ -490,6 +504,7 @@ class TestVendorBootstrap:
     def test_recommended_packages_list(self):
         """Test that RECOMMENDED_PACKAGES is defined."""
         from sandbox.vendor import RECOMMENDED_PACKAGES
+
         assert isinstance(RECOMMENDED_PACKAGES, list)
         assert len(RECOMMENDED_PACKAGES) > 0
 
@@ -559,4 +574,3 @@ guest_data_path = "/data"
             policy = load_policy(str(policy_file))
             assert policy.mount_data_dir == "/some/data/path"
             assert policy.guest_data_path == "/data"
-
