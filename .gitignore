@@ -66,10 +66,10 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# Temporary WASM logs
-wasm-python-*/
-*.db
-vendor/
+# MCP Server
+mcp_sessions/
+mcp_logs/
+*.mcp
 
 custom_workspace/
 integration_workspace/

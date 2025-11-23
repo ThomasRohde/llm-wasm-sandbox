@@ -27,6 +27,7 @@ Execute untrusted code safely using WebAssembly sandboxing with multi-layered se
 - [Quick Start](#-quick-start)
 - [Architecture](#-architecture)
 - [LLM Integration](#-llm-integration)
+- [MCP Integration](#-mcp-integration)
 - [Security Model](#-security-model)
 - [Troubleshooting](#-troubleshooting)
 - [Development](#️-development)
@@ -363,6 +364,95 @@ For production LLM agent integrations, see the [OpenAI Agents SDK integration ex
 - Automatic error recovery and debugging
 
 See the [OpenAI Agents integration README](examples/openai_agents/README.md) for setup instructions and detailed usage patterns.
+
+---
+
+## 🔗 MCP Integration
+
+The sandbox now includes **Model Context Protocol (MCP) server support** for standardized tool use in AI applications. MCP provides a consistent interface for LLM clients like Claude Desktop to securely execute code.
+
+### Quick MCP Start
+
+**Install MCP dependencies:**
+```bash
+pip install llm-wasm-sandbox[mcp]
+# OR from source
+uv sync
+```
+
+**Start MCP server with stdio transport:**
+```bash
+uv run python examples/mcp_stdio_example.py
+```
+
+**Configure Claude Desktop:**
+```json
+{
+  "mcpServers": {
+    "llm-wasm-sandbox": {
+      "command": "uv",
+      "args": ["run", "python", "examples/mcp_stdio_example.py"],
+      "cwd": "/path/to/llm-wasm-sandbox"
+    }
+  }
+}
+```
+
+### MCP Tools
+
+The MCP server exposes these tools to LLM clients:
+
+- **`execute_code`**: Execute Python or JavaScript code securely
+- **`list_runtimes`**: Enumerate available language runtimes
+- **`create_session`**: Create new execution sessions
+- **`destroy_session`**: Clean up sessions
+- **`install_package`**: Install Python packages (Python only)
+- **`get_workspace_info`**: Inspect session state
+- **`reset_workspace`**: Clear session files
+
+### MCP Transports
+
+**Stdio Transport** (recommended for Claude Desktop):
+- Single workspace per MCP client connection
+- Automatic session management
+- Best for local MCP clients
+
+**HTTP Transport** (for web/remote clients):
+- Multi-client support with session isolation
+- CORS configuration for web applications
+- Rate limiting and authentication options
+
+### Session Management
+
+MCP clients automatically get isolated workspaces:
+
+```python
+# Sessions persist across tool calls
+await session.call_tool("execute_code", {
+    "code": "x = 42",
+    "language": "python"
+})
+
+await session.call_tool("execute_code", {
+    "code": "print(x * 2)",  # x is still available
+    "language": "python"
+})
+```
+
+### Security Features
+
+MCP inherits all sandbox security:
+- **WASM isolation** with memory safety
+- **Filesystem restrictions** to `/app` directory
+- **Fuel limits** preventing infinite loops
+- **Input validation** on all MCP requests
+
+### Examples & Documentation
+
+- **Stdio Example**: `examples/mcp_stdio_example.py`
+- **HTTP Example**: `examples/mcp_http_example.py`
+- **Claude Desktop Config**: `examples/mcp_claude_desktop_config.json`
+- **Full Documentation**: [`docs/MCP_INTEGRATION.md`](docs/MCP_INTEGRATION.md)
 
 ---
 

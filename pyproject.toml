@@ -38,6 +38,9 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
+    "fastmcp>=2.13.1",
+    "mcp>=1.22.0",
+    "mcp-server>=0.1.4",
     "pydantic>=2.0.0,<3.0.0",
     "rich>=14.2.0",
     "structlog>=25.5.0",
@@ -83,6 +86,7 @@ include = [
 dev-dependencies = [
     "mypy>=1.18.2",
     "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
     "pytest-cov>=4.0.0",
     "ruff>=0.14.6",
     "twine>=6.2.0",

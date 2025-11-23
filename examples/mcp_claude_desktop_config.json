@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "llm-wasm-sandbox": {
+      "command": "uv",
+      "args": [
+        "run",
+        "python",
+        "examples/mcp_stdio_example.py"
+      ],
+      "cwd": "/path/to/llm-wasm-sandbox",
+      "env": {
+        "MCP_CONFIG": "config/mcp.toml"
+      }
+    }
+  }
+}

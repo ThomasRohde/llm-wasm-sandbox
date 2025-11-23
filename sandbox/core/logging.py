@@ -59,11 +59,14 @@ class SandboxLogger:
         """Initialize SandboxLogger with optional custom logger.
 
         Args:
-            logger: Optional structlog BoundLogger or logging.Logger. If None,
-                    a default structlog logger named 'sandbox' is created.
+            logger: Optional structlog BoundLogger, logging.Logger, or string name.
+                    If None, a default structlog logger named 'sandbox' is created.
+                    If string, creates a structlog logger with that name.
         """
         if logger is None:
             self._logger = structlog.get_logger("sandbox")
+        elif isinstance(logger, str):
+            self._logger = structlog.get_logger(logger)
         else:
             self._logger = logger
 

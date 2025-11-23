@@ -1,0 +1,31 @@
+# MCP Server Configuration
+# Configuration for the Model Context Protocol server
+
+[server]
+# Server identification
+name = "llm-wasm-sandbox"
+version = "0.1.0"
+instructions = "This server provides secure code execution in a WebAssembly sandbox. Use the execute_code tool to run Python or JavaScript code safely."
+
+[transport.stdio]
+# stdio transport (default for local clients like Claude Desktop)
+enabled = true
+
+[transport.http]
+# HTTP transport for remote clients
+enabled = false
+host = "127.0.0.1"
+port = 8080
+path = "/mcp"
+# auth_token = "your-secret-token"  # Uncomment to enable authentication
+
+[sessions]
+# Workspace session management
+default_timeout_seconds = 600  # 10 minutes
+max_sessions_per_client = 5
+max_memory_mb = 256
+
+[logging]
+# MCP-specific logging
+level = "INFO"
+structured = true
