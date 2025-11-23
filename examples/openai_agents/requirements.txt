@@ -1,0 +1,10 @@
+# OpenAI Agents SDK Integration Requirements
+# Install with: pip install -r requirements.txt
+
+openai-agents>=0.6.0
+python-dotenv>=1.0.0
+rich>=13.0.0
+
+# Note: llm-wasm-sandbox should be installed separately
+# From repo root: pip install -e .
+# Or from PyPI: pip install llm-wasm-sandbox

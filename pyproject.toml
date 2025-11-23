@@ -55,6 +55,11 @@ dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
 ]
+openai-example = [
+    "openai-agents>=0.6.0",
+    "python-dotenv>=1.0.0",
+    "rich>=13.0.0",
+]
 
 [build-system]
 requires = ["hatchling"]

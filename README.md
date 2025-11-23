@@ -348,6 +348,22 @@ sandbox = create_sandbox(
 )
 ```
 
+### Agent Integration Examples
+
+For production LLM agent integrations, see the [OpenAI Agents SDK integration examples](examples/openai_agents/):
+
+**Basic Agent** ([`examples/openai_agents/basic_agent.py`](examples/openai_agents/basic_agent.py)):
+- Function calling tools for Python/JavaScript execution
+- Structured result handling with security metrics
+- Conservative execution policies for untrusted code
+
+**Stateful Agent** ([`examples/openai_agents/stateful_agent.py`](examples/openai_agents/stateful_agent.py)):
+- Session-based multi-turn conversations
+- File persistence across agent interactions
+- Automatic error recovery and debugging
+
+See the [OpenAI Agents integration README](examples/openai_agents/README.md) for setup instructions and detailed usage patterns.
+
 ---
 
 ## 🔒 Security Model
