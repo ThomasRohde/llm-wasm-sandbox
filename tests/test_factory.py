@@ -45,8 +45,9 @@ class TestCreateSandboxDefaults:
         sandbox = create_sandbox()
 
         # With new architecture, workspace is workspace_root/session_id
-        assert sandbox.workspace_root == Path("workspace")
-        assert sandbox.workspace.parent == Path("workspace")
+        expected_root = Path("workspace").resolve()
+        assert sandbox.workspace_root == expected_root
+        assert sandbox.workspace.parent == expected_root
         assert str(sandbox.session_id) in str(sandbox.workspace)
 
     def test_create_sandbox_default_creates_logger(self) -> None:
@@ -129,15 +130,18 @@ class TestCreateSandboxCustomWorkspace:
 
         sandbox = create_sandbox(workspace_root=custom_workspace)
 
-        assert sandbox.workspace_root == custom_workspace
-        assert sandbox.workspace.parent == custom_workspace
+        expected_root = custom_workspace.resolve()
+        assert sandbox.workspace_root == expected_root
+        assert sandbox.workspace.parent == expected_root
 
     def test_create_sandbox_workspace_as_string(self) -> None:
         """Test create_sandbox() accepts workspace_root as Path."""
-        sandbox = create_sandbox(workspace_root=Path("my_workspace"))
+        custom_workspace = Path("my_workspace")
+        sandbox = create_sandbox(workspace_root=custom_workspace)
 
-        assert sandbox.workspace_root == Path("my_workspace")
-        assert sandbox.workspace.parent == Path("my_workspace")
+        expected_root = custom_workspace.resolve()
+        assert sandbox.workspace_root == expected_root
+        assert sandbox.workspace.parent == expected_root
 
 
 class TestCreateSandboxCustomLogger:

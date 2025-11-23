@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from sandbox import RuntimeType, create_sandbox
+from sandbox import ExecutionPolicy, RuntimeType, create_sandbox
 from sandbox.sessions import (
     _validate_session_path,
     delete_session_path,
@@ -155,6 +155,38 @@ class TestSessionIDValidation:
 
         with pytest.raises(ValueError, match="must not contain path separators"):
             delete_session_workspace("foo\\bar", workspace_root=temp_workspace)
+
+    def test_create_sandbox_rejects_traversal_session_ids(
+        self, temp_workspace: Path
+    ) -> None:
+        """create_sandbox should reject path traversal before creating workspace."""
+        with pytest.raises(ValueError):
+            create_sandbox(
+                runtime=RuntimeType.PYTHON,
+                session_id="../escape",
+                workspace_root=temp_workspace,
+            )
+
+        assert not (temp_workspace.parent / "escape").exists()
+
+    def test_create_sandbox_can_require_uuid_ids(self, temp_workspace: Path) -> None:
+        """allow_non_uuid=False enforces UUID-only session IDs."""
+        with pytest.raises(ValueError):
+            create_sandbox(
+                runtime=RuntimeType.PYTHON,
+                session_id="custom-session",
+                workspace_root=temp_workspace,
+                allow_non_uuid=False,
+            )
+
+        sandbox = create_sandbox(
+            runtime=RuntimeType.PYTHON,
+            workspace_root=temp_workspace,
+            allow_non_uuid=False,
+        )
+
+        # Valid UUID string generated or accepted
+        uuid.UUID(sandbox.session_id)
 
 
 class TestWorkspaceRootValidation:
@@ -330,5 +362,57 @@ except Exception as e:
         assert result.success
         assert "SUCCESS" in result.stdout
         assert "SECURITY BREACH" not in result.stdout
+
+
+class TestGuestMountHardening:
+    """Test isolation of vendored packages and read-only data mounts."""
+
+    def test_site_packages_isolated_per_session(self, temp_workspace: Path) -> None:
+        """Mutating /app/site-packages in one session does not affect others."""
+        shared_pkg = temp_workspace / "site-packages" / "sharedpkg"
+        shared_pkg.mkdir(parents=True)
+        (shared_pkg / "__init__.py").write_text("VALUE = 'clean'\n")
+
+        sandbox_a = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=temp_workspace)
+        sandbox_b = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=temp_workspace)
+
+        sandbox_a.execute(
+            "open('/app/site-packages/sharedpkg/__init__.py','w').write(\"VALUE='tampered'\\n\")"
+        )
+        result_b = sandbox_b.execute("import sharedpkg; print(sharedpkg.VALUE)")
+
+        assert "clean" in result_b.stdout
+        assert "tampered" not in result_b.stdout
+        assert "VALUE = 'clean'" in (shared_pkg / "__init__.py").read_text()
+
+    def test_data_mount_is_read_only(self, tmp_path: Path) -> None:
+        """Writes to /data should fail when mount_data_dir is configured."""
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        (data_dir / "payload.txt").write_text("safe")
+
+        workspace_root = tmp_path / "workspace"
+        policy = ExecutionPolicy(mount_data_dir=str(data_dir), guest_data_path="/data")
+        sandbox = create_sandbox(
+            runtime=RuntimeType.PYTHON,
+            workspace_root=workspace_root,
+            policy=policy,
+        )
+
+        result = sandbox.execute(
+            """
+import os
+try:
+    open('/data/new.txt', 'w').write('hacked')
+    print('WRITE-SUCCEEDED')
+except Exception as e:
+    print('WRITE-FAILED', type(e).__name__)
+
+print(open('/data/payload.txt').read().strip())
+"""
+        )
+
+        assert "WRITE-FAILED" in result.stdout
+        assert not (data_dir / "new.txt").exists()
 
 

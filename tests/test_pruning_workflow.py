@@ -202,3 +202,23 @@ class TestPruningE2E:
 
         assert legacy_id in result.skipped_sessions
         assert legacy_dir.exists()
+
+    def test_prune_non_uuid_session_ids(self, workspace_root):
+        """Pruning should include custom (non-UUID) session IDs."""
+        session_id = "custom-session-id"
+        session_dir = workspace_root / session_id
+        session_dir.mkdir()
+
+        stale_time = datetime.now(UTC) - timedelta(hours=2)
+        meta = SessionMetadata(
+            session_id=session_id,
+            created_at=stale_time.isoformat(),
+            updated_at=stale_time.isoformat(),
+            version="1.0",
+        )
+        (session_dir / ".metadata.json").write_text(json.dumps(meta.to_dict()))
+
+        result = prune_sessions(older_than_hours=0, workspace_root=workspace_root, dry_run=False)
+
+        assert session_id in result.deleted_sessions
+        assert not session_dir.exists()

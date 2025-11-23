@@ -128,6 +128,7 @@ import contextlib
 import json
 import os
 import shutil
+import uuid
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -425,6 +426,64 @@ def _update_session_timestamp(
         )
 
 
+def _validate_session_workspace(
+    session_id: str,
+    workspace_root: Path,
+    allow_non_uuid: bool = True
+) -> Path:
+    """Validate session_id safety and return resolved workspace path.
+
+    Ensures session identifiers cannot perform path traversal (no separators,
+    no '..' segments) and optionally enforces UUID formatting. Returns the
+    fully resolved workspace path and verifies it remains inside the provided
+    workspace_root.
+
+    Args:
+        session_id: Caller-provided session identifier
+        workspace_root: Root directory containing all session workspaces
+        allow_non_uuid: If False, session_id must be a valid UUID string
+
+    Returns:
+        Path: Resolved session workspace path under workspace_root
+
+    Raises:
+        ValueError: If session_id is empty, contains traversal characters, fails
+                    UUID enforcement, or resolves outside workspace_root
+    """
+    if not session_id:
+        raise ValueError("session_id must not be empty")
+
+    separators = {"/", "\\"}
+    if os.sep:
+        separators.add(os.sep)
+    if os.altsep:
+        separators.add(os.altsep)
+
+    if any(sep in session_id for sep in separators) or ".." in session_id:
+        raise ValueError(
+            f"session_id '{session_id}' must not contain path separators or traversal sequences"
+        )
+
+    normalized_id = session_id
+    if not allow_non_uuid:
+        try:
+            normalized_id = str(uuid.UUID(session_id))
+        except ValueError as exc:
+            raise ValueError("session_id must be a valid UUID string") from exc
+
+    root = Path(workspace_root).resolve()
+    workspace = (root / normalized_id).resolve()
+
+    try:
+        workspace.relative_to(root)
+    except ValueError as exc:
+        raise ValueError(
+            f"session workspace '{workspace}' escapes workspace_root '{root}'"
+        ) from exc
+
+    return workspace
+
+
 def _validate_session_path(
     session_id: str,
     relative_path: str,
@@ -472,14 +531,8 @@ def _validate_session_path(
         >>> _validate_session_path("../etc", "passwd", Path("workspace"))
         ValueError: session_id must not contain path separators
     """
-    # Validate session_id contains no path separators
-    if os.sep in session_id or "/" in session_id or "\\" in session_id:
-        raise ValueError(
-            f"session_id '{session_id}' must not contain path separators (/, \\)"
-        )
-
-    # Resolve workspace path: workspace_root / session_id / relative_path
-    workspace = workspace_root / session_id
+    # Resolve workspace path after validating session_id safety
+    workspace = _validate_session_workspace(session_id, workspace_root)
 
     # Check if relative_path is absolute
     path_obj = Path(relative_path)
@@ -530,7 +583,7 @@ def _ensure_session_workspace(
         >>> workspace == workspace2
         True
     """
-    workspace = workspace_root / session_id
+    workspace = _validate_session_workspace(session_id, workspace_root)
     workspace.mkdir(parents=True, exist_ok=True)
     return workspace.resolve()
 
@@ -562,18 +615,28 @@ def _format_bytes(size_bytes: int) -> str:
         return f"{size_bytes / (1024 ** 3):.1f} GB"
 
 
-def _enumerate_sessions(workspace_root: Path) -> list[str]:
-    """List all UUID-formatted session directories in workspace.
+def _looks_like_uuid(name: str) -> bool:
+    """Lightweight check to see if a string can be parsed as a UUID."""
+    try:
+        uuid.UUID(name)
+        return True
+    except ValueError:
+        return False
 
-    Enumerates subdirectories in workspace_root and filters to those matching
-    UUID format (36 characters with hyphens in standard positions). Non-UUID
-    directories are ignored (no error).
+
+def _enumerate_sessions(workspace_root: Path) -> list[str]:
+    """List session directories in workspace, including custom IDs.
+
+    Enumerates subdirectories in workspace_root and includes any directory
+    that either contains a .metadata.json file (canonical session marker) or
+    is UUID-shaped for backwards compatibility. Hidden directories and known
+    non-session folders (e.g., site-packages) are skipped.
 
     Args:
         workspace_root: Root directory containing session workspaces
 
     Returns:
-        list[str]: List of session IDs (directory names) that match UUID format
+        list[str]: List of session IDs (directory names) eligible for pruning
 
     Examples:
         >>> # Returns only UUID directories
@@ -590,23 +653,25 @@ def _enumerate_sessions(workspace_root: Path) -> list[str]:
     if not workspace_root.exists():
         return []
 
+    reserved = {"site-packages"}
+    root = workspace_root.resolve()
     sessions = []
-    for item in workspace_root.iterdir():
+    
+    for item in root.iterdir():
         if not item.is_dir():
             continue
+        if item.name.startswith(".") or item.name in reserved:
+            continue
 
-        # Check if directory name matches UUID format (loose check)
-        name = item.name
-        if len(name) == 36 and name.count('-') == 4:
-            # Basic UUID format validation (8-4-4-4-12 pattern)
-            parts = name.split('-')
-            if (len(parts) == 5 and
-                len(parts[0]) == 8 and
-                len(parts[1]) == 4 and
-                len(parts[2]) == 4 and
-                len(parts[3]) == 4 and
-                len(parts[4]) == 12):
-                sessions.append(name)
+        metadata_path = item / ".metadata.json"
+        # Include any directory with metadata (UUID or custom session IDs)
+        if metadata_path.exists():
+            sessions.append(item.name)
+            continue
+
+        # For backwards compatibility: include UUID-shaped dirs without metadata
+        if _looks_like_uuid(item.name):
+            sessions.append(item.name)
 
     return sessions
 
@@ -741,15 +806,10 @@ def delete_session_workspace(
     """
     if workspace_root is None:
         workspace_root = Path("workspace")
+    else:
+        workspace_root = Path(workspace_root)
 
-    # Validate session_id (prevents path traversal)
-    if os.sep in session_id or "/" in session_id or "\\" in session_id:
-        raise ValueError(
-            f"session_id '{session_id}' must not contain path separators (/, \\)"
-        )
-
-    # Resolve workspace path
-    workspace = workspace_root / session_id
+    workspace = _validate_session_workspace(session_id, workspace_root)
 
     # Delete workspace directory recursively
     with contextlib.suppress(FileNotFoundError):
@@ -814,6 +874,10 @@ def prune_sessions(
     """
     if workspace_root is None:
         workspace_root = Path("workspace")
+    else:
+        workspace_root = Path(workspace_root)
+
+    workspace_root = workspace_root.resolve()
 
     # Initialize result tracking
     deleted_sessions: list[str] = []

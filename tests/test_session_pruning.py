@@ -204,24 +204,23 @@ def test_prune_custom_workspace_root(tmp_path: Path) -> None:
 
 
 def test_prune_ignores_non_uuid_directories(tmp_path: Path) -> None:
-    """Test that pruning ignores directories that don't look like session IDs."""
-    # Create directory that isn't a UUID
+    """Test that pruning ignores directories without metadata."""
+    # Create directory that isn't a UUID and has NO metadata
     (tmp_path / "system_files").mkdir()
 
-    # Even if it has metadata and is old
+    # Create a non-UUID directory WITH metadata (should be pruned)
     _create_dummy_session(tmp_path, "not-a-uuid", age_hours=30.0)
 
     result = prune_sessions(older_than_hours=24.0, workspace_root=tmp_path)
 
-    # Should not be touched or reported
+    # Should not touch directory without metadata
     assert "system_files" not in result.deleted_sessions
     assert "system_files" not in result.skipped_sessions
     assert (tmp_path / "system_files").exists()
 
-    # Note: The current implementation of _enumerate_sessions filters by UUID format.
-    # So "not-a-uuid" should be ignored completely.
-    assert "not-a-uuid" not in result.deleted_sessions
-    assert (tmp_path / "not-a-uuid").exists()
+    # Non-UUID sessions WITH metadata should be pruned if old enough
+    assert "not-a-uuid" in result.deleted_sessions
+    assert not (tmp_path / "not-a-uuid").exists()
 
 
 # Security Tests

@@ -8,6 +8,7 @@ All sandboxes are session-aware with auto-generated session IDs.
 from __future__ import annotations
 
 import json
+import shutil
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -15,6 +16,30 @@ from typing import Any
 
 from sandbox.core.logging import SandboxLogger
 from sandbox.core.models import ExecutionPolicy, RuntimeType
+from sandbox.sessions import _validate_session_workspace
+
+
+def _hydrate_session_site_packages(session_workspace: Path, workspace_root: Path) -> None:
+    """Copy shared site-packages into the session workspace if available.
+
+    This ensures guest-visible packages are isolated per session to prevent
+    cross-session tampering. If the session already has a site-packages
+    directory, it is left untouched to preserve session-local state.
+    """
+    shared_packages = workspace_root / "site-packages"
+    if not shared_packages.exists():
+        return
+
+    target = session_workspace / "site-packages"
+    if target.exists():
+        return
+
+    try:
+        shutil.copytree(shared_packages, target)
+    except OSError as exc:
+        raise ValueError(
+            f"Failed to prepare session site-packages for {session_workspace}: {exc}"
+        ) from exc
 
 
 def create_sandbox(
@@ -23,6 +48,7 @@ def create_sandbox(
     session_id: str | None = None,
     workspace_root: Path | None = None,
     logger: SandboxLogger | None = None,
+    allow_non_uuid: bool = True,
     **kwargs: Any
 ) -> Any:  # Returns BaseSandbox but avoid circular import in type hint
     """Create a session-aware sandbox instance for the specified runtime type.
@@ -38,6 +64,7 @@ def create_sandbox(
         session_id: Optional explicit session identifier. If None, auto-generates UUIDv4.
         workspace_root: Optional root directory for session workspaces. Default: Path("workspace")
         logger: Optional SandboxLogger. If None, runtime creates default logger.
+        allow_non_uuid: If False, session_id must be a valid UUID string.
         **kwargs: Additional runtime-specific arguments passed to constructor.
                   For PythonSandbox: wasm_binary_path (default: "bin/python.wasm")
                   For JavaScriptSandbox: wasm_binary_path (default: "bin/quickjs.wasm")
@@ -85,14 +112,26 @@ def create_sandbox(
 
     if workspace_root is None:
         workspace_root = Path("workspace")
+    else:
+        workspace_root = Path(workspace_root)
+
+    workspace_root = workspace_root.resolve()
 
     # Auto-generate session_id if not provided
     if session_id is None:
         session_id = str(uuid.uuid4())
 
-    # Ensure session workspace exists
-    session_workspace = workspace_root / session_id
+    # Validate workspace path and ensure it remains under workspace_root
+    session_workspace = _validate_session_workspace(
+        session_id=session_id,
+        workspace_root=workspace_root,
+        allow_non_uuid=allow_non_uuid
+    )
+    session_id = session_workspace.name
     session_workspace.mkdir(parents=True, exist_ok=True)
+
+    # Copy shared packages into the session workspace to isolate mutations
+    _hydrate_session_site_packages(session_workspace, workspace_root)
 
     # Create or update session metadata
     metadata_path = session_workspace / ".metadata.json"

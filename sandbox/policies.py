@@ -25,6 +25,7 @@ DEFAULT_POLICY = {
     # Output size caps - prevents log flooding attacks
     "stdout_max_bytes": 2_000_000,
     "stderr_max_bytes": 1_000_000,
+    "preserve_logs": False,
 
     # WASI filesystem preopen for capability-based isolation
     "mount_host_dir": "workspace",

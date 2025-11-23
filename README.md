@@ -608,6 +608,12 @@ print(f"Updated: {data}")
 print(result2.stdout)  # "Updated: {'users': ['Alice', 'Bob', 'Charlie'], 'count': 3}"
 ```
 
+Session workspaces are canonicalized before creation (no `/`, `\\`, or `..` in
+IDs) and you can enforce UUID-only IDs via `allow_non_uuid=False`. Vendored
+packages are copied per-session so one guest cannot poison another, optional
+`mount_data_dir` mounts are read-only, and host-side logs are cleaned up unless
+you opt in with `ExecutionPolicy(preserve_logs=True)`.
+
 ---
 
 ## 🔒 Security Model

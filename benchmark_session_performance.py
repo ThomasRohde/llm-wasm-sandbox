@@ -12,7 +12,7 @@ import time
 
 from sandbox import (
     RuntimeType,
-    create_session_sandbox,
+    create_sandbox,
     delete_session_workspace,
     list_session_files,
     read_session_file,
@@ -57,8 +57,8 @@ def test_session_creation_performance():
     def create_sessions():
         sessions = []
         for _ in range(10):
-            session_id, sandbox = create_session_sandbox(runtime=RuntimeType.PYTHON)
-            sessions.append(session_id)
+            sandbox = create_sandbox(runtime=RuntimeType.PYTHON)
+            sessions.append(sandbox.session_id)
         return sessions
 
     sessions = create_sessions()
@@ -71,7 +71,8 @@ def test_session_creation_performance():
 
 def test_file_operation_performance():
     """Benchmark file write/read/list operations."""
-    session_id, sandbox = create_session_sandbox(runtime=RuntimeType.PYTHON)
+    sandbox = create_sandbox(runtime=RuntimeType.PYTHON)
+    session_id = sandbox.session_id
 
     try:
         # Write performance
@@ -108,7 +109,8 @@ def test_file_operation_performance():
 
 def test_large_file_performance():
     """Benchmark large file operations."""
-    session_id, sandbox = create_session_sandbox(runtime=RuntimeType.PYTHON)
+    sandbox = create_sandbox(runtime=RuntimeType.PYTHON)
+    session_id = sandbox.session_id
 
     try:
         # 10MB file
@@ -139,8 +141,8 @@ def test_concurrent_session_performance():
     def create_many_sessions():
         sessions = []
         for _ in range(100):
-            session_id, sandbox = create_session_sandbox(runtime=RuntimeType.PYTHON)
-            sessions.append(session_id)
+            sandbox = create_sandbox(runtime=RuntimeType.PYTHON)
+            sessions.append(sandbox.session_id)
         return sessions
 
     sessions = create_many_sessions()
@@ -167,7 +169,8 @@ def test_concurrent_session_performance():
 
 def test_nested_directory_performance():
     """Test performance with nested directory structures."""
-    session_id, sandbox = create_session_sandbox(runtime=RuntimeType.PYTHON)
+    sandbox = create_sandbox(runtime=RuntimeType.PYTHON)
+    session_id = sandbox.session_id
 
     try:
 
@@ -196,7 +199,8 @@ def test_nested_directory_performance():
 
 def test_execution_with_session_performance():
     """Benchmark execution performance in session context."""
-    session_id, sandbox = create_session_sandbox(runtime=RuntimeType.PYTHON)
+    sandbox = create_sandbox(runtime=RuntimeType.PYTHON)
+    session_id = sandbox.session_id
 
     try:
         code = """

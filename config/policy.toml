@@ -5,13 +5,14 @@ memory_bytes = 128_000_000          # ~128 MiB cap for guest linear memory
 # IO capture & output size caps (host-side)
 stdout_max_bytes = 2_000_000        # 2 MB for larger outputs
 stderr_max_bytes = 1_000_000        # 1 MB for error logs
+preserve_logs = false               # Set true to keep host-side stdout/stderr logs
 
 # WASI configuration - Primary writable workspace
 mount_host_dir = "workspace"        # host dir to preopen (writable)
 guest_mount_path = "/app"           # visible to guest
 
 # Optional: Additional read-only data directory
-# Uncomment to enable:
+# Mounts are copied and exposed read-only inside the guest. Uncomment to enable:
 # mount_data_dir = "data"
 # guest_data_path = "/data"
 

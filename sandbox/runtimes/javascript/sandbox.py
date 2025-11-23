@@ -211,7 +211,7 @@ class JavaScriptSandbox(BaseSandbox):
                 fuel_consumed=None,
                 mem_pages=mem_pages,
                 mem_len=mem_len,
-                logs_dir="",
+                logs_dir=None,
                 exit_code=1,
                 trapped=True,
                 trap_reason=trap_reason
@@ -396,12 +396,14 @@ class JavaScriptSandbox(BaseSandbox):
             "fuel_budget": self.policy.fuel_budget,
             "memory_limit_bytes": self.policy.memory_bytes,
             "memory_pages": raw_result.mem_pages,
-            "logs_dir": raw_result.logs_dir,
             "stdout_truncated": stdout_truncated,
             "stderr_truncated": stderr_truncated,
             "exit_code": exit_code,
             "trapped": trapped,
         }
+
+        if raw_result.logs_dir:
+            metadata["logs_dir"] = raw_result.logs_dir
 
         # Include session_id in metadata if provided
         if session_id is not None:

@@ -7,6 +7,7 @@ and integrates with structured logging.
 
 from __future__ import annotations
 
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -454,15 +455,37 @@ class TestJavaScriptSandboxWorkspace:
 
         assert result.workspace_path == str(javascript_sandbox.workspace)
 
-    def test_result_includes_logs_dir(self, javascript_sandbox):
-        """Test that SandboxResult includes logs_dir path in metadata."""
+    def test_logs_dir_cleaned_by_default(self, javascript_sandbox):
+        """Logs are cleaned up unless preservation is requested."""
+        before = {p for p in Path(tempfile.gettempdir()).glob("wasm-javascript-*")}
+
         code = "console.log('Test');"
         result = javascript_sandbox.execute(code)
 
-        assert "logs_dir" in result.metadata
-        assert len(result.metadata["logs_dir"]) > 0
-        # Logs dir should exist
+        after = {p for p in Path(tempfile.gettempdir()).glob("wasm-javascript-*")}
+        created = [p for p in after if p not in before]
+
+        assert result.metadata.get("logs_dir") is None
+        assert all(not p.exists() for p in created)
+
+    def test_logs_dir_preserved_when_requested(self, temp_workspace):
+        """Preserve logs when ExecutionPolicy opts in."""
+        import uuid
+
+        session_id = str(uuid.uuid4())
+        policy = ExecutionPolicy(preserve_logs=True)
+        sandbox = JavaScriptSandbox(
+            wasm_binary_path="bin/quickjs.wasm",
+            policy=policy,
+            session_id=session_id,
+            workspace_root=temp_workspace,
+        )
+
+        result = sandbox.execute("console.log('Test');")
+
+        assert result.metadata.get("logs_dir")
         assert Path(result.metadata["logs_dir"]).exists()
+        shutil.rmtree(result.metadata["logs_dir"], ignore_errors=True)
 
 
 class TestJavaScriptSandboxTruncation:

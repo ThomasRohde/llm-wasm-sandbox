@@ -199,8 +199,10 @@ class TestPolicyManagement:
         assert DEFAULT_POLICY["stderr_max_bytes"] > 0
         assert "mount_host_dir" in DEFAULT_POLICY
         assert "guest_mount_path" in DEFAULT_POLICY
+        assert "preserve_logs" in DEFAULT_POLICY
         assert "argv" in DEFAULT_POLICY
         assert "env" in DEFAULT_POLICY
+        assert DEFAULT_POLICY["preserve_logs"] is False
 
     def test_load_policy_default(self):
         """Test loading policy when file doesn't exist."""

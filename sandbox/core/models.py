@@ -44,6 +44,7 @@ class ExecutionPolicy(BaseModel):
         argv: Guest process command-line arguments
         env: Environment variables exposed to guest (whitelist pattern)
         timeout_seconds: Optional OS-level timeout (None = no timeout)
+        preserve_logs: Whether to retain host-side stdout/stderr logs after execution
     """
 
     fuel_budget: int = Field(
@@ -109,6 +110,11 @@ class ExecutionPolicy(BaseModel):
         default=None,
         ge=0,
         description="Optional OS-level timeout (None = no timeout)"
+    )
+
+    preserve_logs: bool = Field(
+        default=False,
+        description="If True, retain temporary stdout/stderr log directories instead of cleaning them up after execution"
     )
 
     @model_validator(mode="before")

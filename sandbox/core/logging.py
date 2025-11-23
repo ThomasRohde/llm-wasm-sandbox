@@ -131,6 +131,7 @@ class SandboxLogger:
             "guest_mount_path": policy.guest_mount_path,
             "mount_data_dir": policy.mount_data_dir,
             "guest_data_path": policy.guest_data_path,
+            "preserve_logs": getattr(policy, "preserve_logs", False),
         }
 
         log_kwargs: dict[str, Any] = {
