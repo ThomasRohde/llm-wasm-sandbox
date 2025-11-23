@@ -51,7 +51,7 @@ def execute_in_session(code: str, session_id: str, reuse: bool = False) -> tuple
     Returns:
         Tuple of (session_id, result_dict)
     """
-    workspace_base = Path("workspace")
+    workspace_base = Path("../workspace")
 
     if reuse:
         # Retrieve existing session

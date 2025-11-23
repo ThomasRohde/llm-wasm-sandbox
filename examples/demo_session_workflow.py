@@ -186,7 +186,7 @@ with open('/app/report.txt', 'w') as f:
     from pathlib import Path
 
     for temp_id in temp_sessions:
-        workspace_exists = (Path("workspace") / temp_id).exists()
+        workspace_exists = (Path("../workspace") / temp_id).exists()
         print(f"  {temp_id}: {'EXISTS' if workspace_exists else 'DELETED'}")
 
     print("\n" + "=" * 70)

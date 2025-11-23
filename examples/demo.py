@@ -56,7 +56,7 @@ def execute_in_session(code: str, session_id: str, reuse: bool = False) -> tuple
     Returns:
         Tuple of (session_id, result_dict)
     """
-    workspace_base = Path("workspace")
+    workspace_base = Path("../workspace")
 
     if reuse:
         # Retrieve existing session
@@ -93,7 +93,7 @@ def execute_in_session(code: str, session_id: str, reuse: bool = False) -> tuple
 
 def cleanup_workspace():
     """Clean up workspace directory before demo."""
-    workspace = Path("workspace")
+    workspace = Path("../workspace")
     if workspace.exists():
         for item in workspace.iterdir():
             if item.name not in [".gitkeep", "site-packages"]:
@@ -150,7 +150,7 @@ print(f"✓ History: {data['history']}")
 
     # Turn 3: Host-side file read
     console.print("\n[bold cyan]Turn 3:[/bold cyan] Read file from host side")
-    workspace_base = Path("workspace")
+    workspace_base = Path("../workspace")
     state_data = read_session_file(session_id, "state.json", workspace_root=workspace_base)
     state = json.loads(state_data.decode("utf-8"))
     console.print(
