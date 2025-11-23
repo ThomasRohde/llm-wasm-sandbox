@@ -1,58 +1,66 @@
-# PRD: Harden Python WASM sandbox correctness and observability
+# PRD: Sandbox Security & Reliability Hardening
 
-## Overview
-Recent code review surfaced gaps between the implementation and the OpenSpec requirements for the Python runtime, logging, and policy handling. The fixes here focus on preserving security boundaries (memory limits, missing binary failures), making logging interoperable with standard loggers and spec-compliant event schemas, and tightening policy validation and configuration defaults.
-
-## Problems to Fix
-- Logging API assumes `structlog` and will raise `TypeError` when given a standard `logging.Logger`; emitted event names/fields diverge from spec and omit filesystem delta logging (sandbox/core/logging.py:51-180).
-- Memory limits silently disable if `wasmtime.Store.set_limits` is unavailable, leaving the sandbox without a cap (sandbox/host.py:133-139).
-- Missing or misconfigured WASM binaries are swallowed and converted into a successful return path instead of raising a clear error (sandbox/runtimes/python/sandbox.py:104-135), violating factory error expectations.
-- Invalid `ExecutionPolicy` constructions raise raw `pydantic.ValidationError` instead of `PolicyValidationError`; mount_data_dir lacks default guest path when built programmatically (sandbox/core/models.py:26-142).
-- `validate_code` uses `compile(..., "<string>", ...)` instead of the agreed `<sandbox>` marker (sandbox/runtimes/python/sandbox.py:164-179).
+## Background
+The WASM sandbox currently allows untrusted user code to run under session isolation. A code review uncovered several gaps that risk host file exposure, cross-session tampering, and uncontrolled disk growth. This PRD defines the fixes needed to close those holes and make session lifecycle predictable.
 
 ## Goals
-- Enforce memory caps and binary presence deterministically; never degrade silently.
-- Make logging usable with `logging.Logger` and align event names/payloads with spec (execution start/complete, security events, filesystem deltas).
-- Ensure policy validation always raises `PolicyValidationError`, with correct defaults for optional data mounts.
-- Preserve existing public API surface and backward-compatible test expectations.
+- Enforce safe, canonical session workspaces (no traversal, no off-root mounts).
+- Prevent cross-session package tampering and keep optional data mounts read-only.
+- Ensure session cleanup works for all session IDs and does not leak temp artifacts.
+- Preserve existing public APIs while tightening safety guarantees.
 
 ## Non-Goals
-- No new runtime types or WASI capability expansions.
-- No redesign of session management or workspace layout.
-- No dependency upgrades beyond what is required to implement the fixes.
+- Adding new runtimes or changing resource limit defaults.
+- Shipping network/socket capabilities inside the sandbox.
+- Building a full policy management UI.
 
-## User Stories
-- As a platform engineer, I need missing or invalid WASM binaries to fail fast so deployment misconfigurations are caught early.
-- As an observability engineer, I need execution and security events to use standard loggers and spec-compliant fields so logs ingest cleanly.
-- As a security reviewer, I need memory caps to remain enforced even when wasmtime APIs differ, to prevent memory exhaustion attacks.
-- As an API consumer, I need policy validation errors to be predictable and typed (`PolicyValidationError`) regardless of how the policy is constructed.
+## Problems to Fix
+1) **Session path traversal**: `create_sandbox` accepts arbitrary `session_id` strings and concatenates them into `workspace_root` before preopening the directory (sandbox/core/factory.py:90-118). A crafted `session_id="../host"` mounts host paths into `/app`, defeating isolation.  
+2) **Shared site-packages writable by guests**: Python runtime preopens `workspace/site-packages` as `/app/site-packages` (sandbox/host.py:115-118) with default WASI rights (read/write). Any session can poison packages for all other sessions.  
+3) **Data mount not actually read-only**: Optional `mount_data_dir` is also preopened without reduced rights (sandbox/host.py:119-123, 302-305), so “read-only data” is writable by guest code.  
+4) **Pruning misses custom session IDs**: `create_sandbox` documents custom `session_id`s, but pruning only enumerates UUID-shaped directories (sandbox/sessions.py:565-611). Non-UUID sessions never get pruned, causing unbounded disk use.  
+5) **Temp log directories accumulate**: Each execution creates `tempfile.mkdtemp` logs (sandbox/host.py:101-104, 289-292) and never deletes them. Heavy use leaks disk and may expose artifacts outside the workspace model.
 
-## Proposed Changes
-1) **Logging compatibility and schema**
-   - Accept both `structlog` and `logging.Logger` instances without runtime errors; normalize to a common interface internally.
-   - Emit execution start/complete/security events with spec message keys (`sandbox.execution.start`, `sandbox.execution.complete`, `sandbox.security.*`) and required fields (`event`, `runtime`, policy snapshot, success, duration_ms, fuel_consumed, memory_used_bytes, exit_code).
-   - Add filesystem delta logging (counts and truncated paths) on completion.
+## Requirements
+- Reject or normalize any `session_id` containing path separators or traversal sequences before workspace creation and WASI preopen.
+- Ensure guest-visible package paths cannot be modified across sessions; either mount read-only or copy per-session.
+- Enforce read-only semantics for `mount_data_dir` or drop the mount if that cannot be guaranteed.
+- Pruning must cover all session directories that were allowed at creation; no orphaned workspaces.
+- Log retention must be bounded and opt-in; defaults should not leak temp files.
+- Keep API compatibility (constructors, return types) where possible; raise explicit errors on invalid inputs instead of silently proceeding.
 
-2) **Resource enforcement**
-   - Enforce memory caps even when `Store.set_limits` is unavailable: detect support at initialization and fail fast or provide a guarded fallback; add explicit tests for cap enforcement.
-   - Surface missing `wasm_binary_path` as `FileNotFoundError` from `PythonSandbox.execute`/`create_sandbox` rather than wrapping it into a success=False result.
+## Proposed Approach
+1) **Session validation guardrail**  
+   - Add a validation helper reused by `create_sandbox` to reject session IDs with `/`, `\\`, or `..` components and optionally require UUID format unless explicitly overridden by a `allow_non_uuid` flag.  
+   - Resolve the workspace path and ensure it remains under `workspace_root` (similar to `_validate_session_path`).  
+   - Update tests to cover traversal attempts and legacy valid IDs.
 
-3) **Policy validation and defaults**
-   - Wrap `ExecutionPolicy` validation errors in `PolicyValidationError` for direct instantiation and keep field-level details.
-   - Auto-set `guest_data_path="/data"` when `mount_data_dir` is provided programmatically (not only via TOML).
+2) **Package mount hardening**  
+   - Stop preopening shared `workspace/site-packages` as read/write. Options:  
+     a) Copy vendored packages into each session workspace before execution (isolated, simplest).  
+     b) If wasmtime Python supports rights, preopen with read-only caps; otherwise, mark mount as read-only via filesystem permissions and verify writes fail in tests.  
+   - Document that `/app/site-packages` is immutable per execution and add regression tests for cross-session tamper attempts.
 
-4) **Validation consistency**
-   - Update `validate_code` to compile with the `<sandbox>` filename sentinel to match spec wording.
+3) **Read-only data mount**  
+   - Apply the same rights strategy to `mount_data_dir`: enforce read-only or refuse to mount.  
+   - Add tests that guest writes to `/data` fail when `mount_data_dir` is configured.
 
-## Acceptance Criteria
-- Logging methods accept a plain `logging.Logger` without raising, and emitted records include spec-required keys; filesystem delta counts/paths appear in execution.complete logs with truncation for long paths.
-- Memory limit enforcement fails closed: if limits cannot be set, execution raises a clear exception before running guest code; out-of-memory attempts trigger a trap or error that bubbles into `SandboxResult` with `trap_reason="memory_limit"`.
-- Calling `create_sandbox(runtime=RuntimeType.PYTHON, wasm_binary_path="missing.wasm").execute("print(1)")` raises `FileNotFoundError` with the missing path in the message.
-- `ExecutionPolicy(fuel_budget=-1)` raises `PolicyValidationError`; `ExecutionPolicy(mount_data_dir="datasets")` sets `guest_data_path="/data"` by default.
-- `PythonSandbox.validate_code("x=1")` returns True and uses `<sandbox>` in compile(), while invalid code returns False without execution.
-- Test coverage updated for the above behaviors (logging acceptance via unit/contract tests, memory cap enforcement, missing binary, policy validation).
+4) **Pruning correctness**  
+   - Align session creation and pruning: either enforce UUID session IDs or change `_enumerate_sessions` to include all non-hidden directories while still rejecting traversal.  
+   - Add coverage for pruning non-UUID sessions and ensure metrics/logging remain accurate.
 
-## Rollout & Verification
-- Add unit tests for logging schema, policy validation errors, data mount defaults, missing WASM binary handling, and memory cap enforcement.
-- Run `uv run pytest` locally; ensure logging assertions avoid brittle ordering by asserting structured fields.
-- Document behavioral changes in README and docstrings where relevant (logging expectations, policy validation).
+5) **Temp log lifecycle**  
+   - Add a retention policy: default to cleanup after execution unless `preserve_logs=True` is requested.  
+   - Expose the preserved path in metadata only when kept.  
+   - Add tests to verify cleanup and opt-in retention.
+
+## Deliverables
+- Code changes implementing the above requirements.
+- Updated tests (security, pruning, lifecycle) with coverage for each fix.
+- Documentation updates (README/AGENTS/policy) describing new safeguards and any new flags.
+
+## Success Metrics
+- Creating a sandbox with a traversal `session_id` raises immediately; no host directories are created or mounted.
+- Guest writes to `/app/site-packages` and `/data` are blocked or isolated per session.
+- Pruning removes old sessions regardless of ID format (or disallows non-UUID IDs up front).
+- No orphaned temp log directories after default executions; preserved logs only when explicitly requested.
