@@ -9,10 +9,11 @@
 [![Wasmtime](https://img.shields.io/badge/wasmtime-38.x-green.svg)](https://github.com/bytecodealliance/wasmtime-py)
 
 Execute untrusted code safely using WebAssembly sandboxing with multi-layered security:
-- 🔐 **WASM Memory Safety** - Bounds-checked execution
-- 🛡️ **WASI Capability-Based I/O** - Filesystem isolation
-- ⏱️ **Deterministic Limits** - Fuel metering & resource caps
-- 🐍 **Python & JavaScript** - CPython WASM + QuickJS runtimes
+
+🔐 **WASM Memory Safety** - Bounds-checked execution  
+🛡️ **WASI Capability-Based I/O** - Filesystem isolation  
+⏱️ **Deterministic Limits** - Fuel metering & resource caps  
+🐍 **Python & JavaScript** - CPython WASM + QuickJS runtimes
 
 ![LLM WASM Sandbox Architecture](llm-wasm-sandbox.jpeg)
 
