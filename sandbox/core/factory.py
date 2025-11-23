@@ -12,34 +12,15 @@ import shutil
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sandbox.core.logging import SandboxLogger
 from sandbox.core.models import ExecutionPolicy, RuntimeType
+from sandbox.core.storage import DiskStorageAdapter
 from sandbox.sessions import _validate_session_workspace
 
-
-def _hydrate_session_site_packages(session_workspace: Path, workspace_root: Path) -> None:
-    """Copy shared site-packages into the session workspace if available.
-
-    This ensures guest-visible packages are isolated per session to prevent
-    cross-session tampering. If the session already has a site-packages
-    directory, it is left untouched to preserve session-local state.
-    """
-    shared_packages = workspace_root / "site-packages"
-    if not shared_packages.exists():
-        return
-
-    target = session_workspace / "site-packages"
-    if target.exists():
-        return
-
-    try:
-        shutil.copytree(shared_packages, target)
-    except OSError as exc:
-        raise ValueError(
-            f"Failed to prepare session site-packages for {session_workspace}: {exc}"
-        ) from exc
+if TYPE_CHECKING:
+    from sandbox.core.storage import StorageAdapter
 
 
 def create_sandbox(
@@ -47,6 +28,7 @@ def create_sandbox(
     policy: ExecutionPolicy | None = None,
     session_id: str | None = None,
     workspace_root: Path | None = None,
+    storage_adapter: StorageAdapter | None = None,
     logger: SandboxLogger | None = None,
     allow_non_uuid: bool = True,
     **kwargs: Any
@@ -63,6 +45,9 @@ def create_sandbox(
         policy: Optional ExecutionPolicy. If None, uses default policy.
         session_id: Optional explicit session identifier. If None, auto-generates UUIDv4.
         workspace_root: Optional root directory for session workspaces. Default: Path("workspace")
+                       Ignored if storage_adapter is provided.
+        storage_adapter: Optional StorageAdapter for workspace operations.
+                        If None, creates DiskStorageAdapter with workspace_root.
         logger: Optional SandboxLogger. If None, runtime creates default logger.
         allow_non_uuid: If False, session_id must be a valid UUID string.
         **kwargs: Additional runtime-specific arguments passed to constructor.
@@ -98,6 +83,11 @@ def create_sandbox(
 
         >>> # Create with custom workspace root
         >>> sandbox = create_sandbox(workspace_root=Path("/var/lib/sandbox/sessions"))
+
+        >>> # Create with custom storage adapter
+        >>> from sandbox.core.storage import DiskStorageAdapter
+        >>> adapter = DiskStorageAdapter(Path("/custom/path"))
+        >>> sandbox = create_sandbox(storage_adapter=adapter)
     """
     # Validate runtime type
     if not isinstance(runtime, RuntimeType):
@@ -110,78 +100,104 @@ def create_sandbox(
     if policy is None:
         policy = ExecutionPolicy()
 
-    if workspace_root is None:
-        workspace_root = Path("workspace")
+    # Create storage adapter if not provided
+    if storage_adapter is None:
+        if workspace_root is None:
+            workspace_root = Path("workspace")
+        else:
+            workspace_root = Path(workspace_root)
+        workspace_root = workspace_root.resolve()
+        storage_adapter = DiskStorageAdapter(workspace_root)
     else:
-        workspace_root = Path(workspace_root)
-
-    workspace_root = workspace_root.resolve()
+        # If storage_adapter provided, use its workspace_root
+        # (only for DiskStorageAdapter backward compatibility)
+        if hasattr(storage_adapter, 'workspace_root') and isinstance(
+            storage_adapter.workspace_root, Path
+        ):
+            workspace_root = storage_adapter.workspace_root
+        elif workspace_root is None:
+            workspace_root = Path("workspace")
+        else:
+            workspace_root = Path(workspace_root)
 
     # Auto-generate session_id if not provided
     if session_id is None:
         session_id = str(uuid.uuid4())
 
-    # Validate workspace path and ensure it remains under workspace_root
-    session_workspace = _validate_session_workspace(
-        session_id=session_id,
-        workspace_root=workspace_root,
-        allow_non_uuid=allow_non_uuid
-    )
-    session_id = session_workspace.name
-    session_workspace.mkdir(parents=True, exist_ok=True)
+    # Validate workspace path (for DiskStorageAdapter only)
+    if isinstance(storage_adapter, DiskStorageAdapter):
+        session_workspace = _validate_session_workspace(
+            session_id=session_id,
+            workspace_root=storage_adapter.workspace_root,
+            allow_non_uuid=allow_non_uuid
+        )
+        session_id = session_workspace.name
 
-    # Copy shared packages into the session workspace to isolate mutations
-    _hydrate_session_site_packages(session_workspace, workspace_root)
+    # Create session via storage adapter
+    if not storage_adapter.session_exists(session_id):
+        storage_adapter.create_session(session_id)
 
-    # Create or update session metadata
-    metadata_path = session_workspace / ".metadata.json"
-    metadata_existed = metadata_path.exists()
-    now_utc = datetime.now(UTC).isoformat()
+        # Copy shared packages into session (if using DiskStorageAdapter)
+        if isinstance(storage_adapter, DiskStorageAdapter):
+            try:
+                # Try multiple vendor locations in order of preference
+                vendor_candidates = [
+                    storage_adapter.workspace_root,  # For tests that put site-packages directly in workspace_root
+                    storage_adapter.workspace_root.parent / "vendor",  # Standard location
+                    Path("vendor"),  # Fallback to project root
+                ]
+                vendor_path = None
+                for candidate in vendor_candidates:
+                    if (candidate / "site-packages").exists():
+                        vendor_path = candidate
+                        break
 
-    if metadata_existed:
-        # Existing session - update timestamp only
-        try:
-            data = json.loads(metadata_path.read_text())
-            data["updated_at"] = now_utc
-            metadata_path.write_text(json.dumps(data, indent=2))
-        except (json.JSONDecodeError, OSError) as e:
-            # Log warning but continue
-            import sys
-            print(
-                f"Warning: Failed to update session metadata for {session_id}: {e}",
-                file=sys.stderr
+                if vendor_path is not None:
+                    storage_adapter.copy_vendor_packages(session_id, vendor_path)
+            except (FileNotFoundError, OSError):
+                # Vendor packages not available - not an error
+                pass
+
+        # Log session creation
+        if logger is not None:
+            metadata = storage_adapter.read_metadata(session_id)
+            logger.log_session_metadata_created(
+                session_id=session_id,
+                created_at=metadata.created_at
             )
+            logger.log_session_created(session_id, str(session_id))
     else:
-        # New session - create metadata
-        metadata = {
-            "session_id": session_id,
-            "created_at": now_utc,
-            "updated_at": now_utc,
-            "version": 1
-        }
+        # Existing session - ensure metadata exists (legacy session support)
         try:
-            metadata_path.write_text(json.dumps(metadata, indent=2))
-
-            # Log structured event if logger provided
-            if logger is not None:
-                logger.log_session_metadata_created(
-                    session_id=session_id,
-                    created_at=now_utc
-                )
-        except OSError as e:
-            # Log warning but continue - metadata write failure shouldn't prevent creation
-            import sys
-            print(
-                f"Warning: Failed to write session metadata for {session_id}: {e}",
-                file=sys.stderr
+            storage_adapter.read_metadata(session_id)
+        except (FileNotFoundError, json.JSONDecodeError):
+            # Legacy session without metadata - create it now
+            from sandbox.sessions import SessionMetadata
+            from datetime import UTC, datetime
+            now = datetime.now(UTC).isoformat()
+            metadata = SessionMetadata(
+                session_id=session_id,
+                created_at=now,
+                updated_at=now,
+                version=1
             )
+            try:
+                storage_adapter.write_metadata(session_id, metadata)
+                if logger is not None:
+                    logger.log_session_metadata_created(
+                        session_id=session_id,
+                        created_at=now
+                    )
+            except OSError:
+                # If we can't write metadata, continue anyway
+                pass
 
-    # Log session creation/retrieval
-    if logger is not None:
-        if metadata_existed:
-            logger.log_session_retrieved(session_id, str(session_workspace))
-        else:
-            logger.log_session_created(session_id, str(session_workspace))
+        # Update timestamp for existing session
+        storage_adapter.update_session_timestamp(session_id)
+
+        # Log session retrieval
+        if logger is not None:
+            logger.log_session_retrieved(session_id, str(session_id))
 
     # Dispatch to runtime-specific implementation
     if runtime == RuntimeType.PYTHON:
@@ -192,7 +208,7 @@ def create_sandbox(
             wasm_binary_path=wasm_binary_path,
             policy=policy,
             session_id=session_id,
-            workspace_root=workspace_root,
+            storage_adapter=storage_adapter,
             logger=logger,
             **kwargs
         )
@@ -205,7 +221,7 @@ def create_sandbox(
             wasm_binary_path=wasm_binary_path,
             policy=policy,
             session_id=session_id,
-            workspace_root=workspace_root,
+            storage_adapter=storage_adapter,
             logger=logger,
             **kwargs
         )

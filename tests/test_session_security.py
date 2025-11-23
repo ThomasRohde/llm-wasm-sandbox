@@ -47,13 +47,13 @@ class TestPathTraversalPrevention:
         """Path validation rejects ../ traversal attempts."""
         (temp_workspace / session_id).mkdir()
 
-        with pytest.raises(ValueError, match="escapes session workspace boundary"):
+        with pytest.raises(ValueError, match="path traversal detected|escapes session workspace boundary"):
             _validate_session_path(session_id, "../etc/passwd", temp_workspace)
 
-        with pytest.raises(ValueError, match="escapes session workspace boundary"):
+        with pytest.raises(ValueError, match="path traversal detected|escapes session workspace boundary"):
             _validate_session_path(session_id, "../../etc/passwd", temp_workspace)
 
-        with pytest.raises(ValueError, match="escapes session workspace boundary"):
+        with pytest.raises(ValueError, match="path traversal detected|escapes session workspace boundary"):
             _validate_session_path(session_id, "dir/../../../etc/passwd", temp_workspace)
 
     def test_validate_session_path_rejects_absolute_paths(
@@ -63,12 +63,12 @@ class TestPathTraversalPrevention:
         (temp_workspace / session_id).mkdir()
 
         # Absolute Unix-style path
-        with pytest.raises(ValueError, match="escapes session workspace boundary|must be relative"):
+        with pytest.raises(ValueError, match="path traversal detected|escapes session workspace boundary|must be relative"):
             _validate_session_path(session_id, "/etc/passwd", temp_workspace)
 
         # Windows-style absolute path (if on Windows)
         if os.name == "nt":
-            with pytest.raises(ValueError, match="escapes session workspace boundary|must be relative"):
+            with pytest.raises(ValueError, match="path traversal detected|escapes session workspace boundary|must be relative"):
                 _validate_session_path(session_id, "C:\\Windows\\System32", temp_workspace)
 
     def test_read_session_file_rejects_traversal(
@@ -77,7 +77,7 @@ class TestPathTraversalPrevention:
         """read_session_file rejects path traversal attempts."""
         (temp_workspace / session_id).mkdir()
 
-        with pytest.raises(ValueError, match="escapes session workspace boundary"):
+        with pytest.raises(ValueError, match="escapes session workspace"):
             read_session_file(session_id, "../etc/passwd", workspace_root=temp_workspace)
 
     def test_write_session_file_rejects_traversal(
@@ -86,7 +86,7 @@ class TestPathTraversalPrevention:
         """write_session_file rejects path traversal attempts."""
         (temp_workspace / session_id).mkdir()
 
-        with pytest.raises(ValueError, match="escapes session workspace boundary"):
+        with pytest.raises(ValueError, match="escapes session workspace"):
             write_session_file(
                 session_id, "../etc/passwd", b"malicious", workspace_root=temp_workspace
             )
@@ -97,7 +97,7 @@ class TestPathTraversalPrevention:
         """delete_session_path rejects path traversal attempts."""
         (temp_workspace / session_id).mkdir()
 
-        with pytest.raises(ValueError, match="escapes session workspace boundary"):
+        with pytest.raises(ValueError, match="escapes session workspace"):
             delete_session_path(session_id, "../etc/passwd", workspace_root=temp_workspace)
 
 
@@ -271,7 +271,7 @@ class TestCrossSessions:
         workspace_a = temp_workspace / session_a
         workspace_a.mkdir()
 
-        with pytest.raises(ValueError, match="escapes session workspace boundary"):
+        with pytest.raises(ValueError, match="escapes session workspace"):
             read_session_file(
                 session_a, f"../{session_b}/secret.txt", workspace_root=temp_workspace
             )
@@ -293,7 +293,7 @@ class TestCrossSessions:
         workspace_a = temp_workspace / session_a
         workspace_a.mkdir()
 
-        with pytest.raises(ValueError, match="escapes session workspace boundary"):
+        with pytest.raises(ValueError, match="escapes session workspace"):
             delete_session_path(
                 session_a, f"../{session_b}/important.txt", workspace_root=temp_workspace
             )

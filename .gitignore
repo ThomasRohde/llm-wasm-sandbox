@@ -70,3 +70,7 @@ Thumbs.db
 wasm-python-*/
 *.db
 vendor/
+
+custom_workspace/
+integration_workspace/
+my_workspace/

@@ -9,11 +9,14 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sandbox.core.base import BaseSandbox
 from sandbox.core.models import ExecutionPolicy, SandboxResult
 from sandbox.host import run_untrusted_python
+
+if TYPE_CHECKING:
+    from sandbox.core.storage import StorageAdapter
 
 # Prepended to user code so LLM-generated code can use vendored packages
 # without needing to know about the /app/site-packages WASI mount point
@@ -39,8 +42,7 @@ class PythonSandbox(BaseSandbox):
         wasm_binary_path: Path to CPython WASM binary (WLR AIO artifact)
         policy: ExecutionPolicy with validated resource limits
         session_id: UUIDv4 session identifier for workspace isolation
-        workspace_root: Root directory containing all session workspaces
-        workspace: Path to session-specific workspace directory (workspace_root / session_id)
+        storage_adapter: StorageAdapter for workspace file operations
         logger: SandboxLogger for structured event emission
     """
 
@@ -49,7 +51,7 @@ class PythonSandbox(BaseSandbox):
         wasm_binary_path: str,
         policy: ExecutionPolicy,
         session_id: str,
-        workspace_root: Path,
+        storage_adapter: StorageAdapter,
         logger: Any = None
     ) -> None:
         """Initialize PythonSandbox with WASM binary path and session config.
@@ -58,10 +60,10 @@ class PythonSandbox(BaseSandbox):
             wasm_binary_path: Path to python.wasm binary (e.g., "bin/python.wasm")
             policy: ExecutionPolicy with validated limits
             session_id: UUIDv4 string identifying the session
-            workspace_root: Root directory for all session workspaces
+            storage_adapter: StorageAdapter for workspace operations
             logger: Optional SandboxLogger (created if None)
         """
-        super().__init__(policy, session_id, workspace_root, logger)
+        super().__init__(policy, session_id, storage_adapter, logger)
         self.wasm_binary_path = wasm_binary_path
 
     def execute(self, code: str, inject_setup: bool = True, **kwargs: Any) -> SandboxResult:
@@ -177,87 +179,76 @@ class PythonSandbox(BaseSandbox):
         except SyntaxError:
             return False
 
-    def _write_untrusted_code(self, code: str, inject_setup: bool) -> Path:
-        """Write untrusted Python code to workspace/user_code.py.
+    def _write_untrusted_code(self, code: str, inject_setup: bool) -> str:
+        """Write untrusted Python code to workspace via storage adapter.
 
         Args:
             code: Python source code to write
             inject_setup: If True, prepend sys.path setup for vendored packages
 
         Returns:
-            Path to written user_code.py file
+            Relative path to written user_code.py file
         """
-        self.workspace.mkdir(parents=True, exist_ok=True)
-
         final_code = INJECTED_SETUP + code if inject_setup else code
 
-        user_code_path = self.workspace / "user_code.py"
-        user_code_path.write_text(final_code, encoding="utf-8")
-        return user_code_path
+        filename = self.storage_adapter.PYTHON_CODE_FILENAME
+        self.storage_adapter.write_file(
+            self.session_id,
+            filename,
+            final_code.encode("utf-8")
+        )
+        return filename
 
-    def _snapshot_workspace(self, exclude: Path) -> dict[Path, tuple[float, int]]:
+    def _snapshot_workspace(self, exclude: str) -> dict[str, float]:
         """Take snapshot of workspace files before execution.
 
-        Captures modification time and size for all files except the excluded
-        user_code.py to enable file delta detection.
+        Uses storage adapter's get_workspace_snapshot for optimal performance
+        (disk: stat all files, memory: track dict, cloud: use versioning).
 
         Args:
-            exclude: Path to user_code.py (don't track this file)
+            exclude: Relative path to user_code.py (don't track this file)
 
         Returns:
-            Dict mapping file paths to (mtime, size) tuples
+            Dict mapping relative paths to modification timestamps
         """
-        snapshot = {}
-
-        if self.workspace.exists():
-            for file_path in self.workspace.rglob('*'):
-                if file_path.is_file() and file_path != exclude:
-                    try:
-                        stat = file_path.stat()
-                        snapshot[file_path] = (stat.st_mtime, stat.st_size)
-                    except (OSError, PermissionError):
-                        pass
-
+        snapshot = self.storage_adapter.get_workspace_snapshot(self.session_id)
+        # Remove excluded file from snapshot
+        snapshot.pop(exclude, None)
         return snapshot
 
     def _detect_file_delta(
         self,
-        before_files: dict[Path, tuple[float, int]],
-        exclude: Path
+        before_files: dict[str, float],
+        exclude: str
     ) -> tuple[list[str], list[str]]:
         """Detect files created or modified during execution.
 
-        Compares post-execution filesystem state to pre-execution snapshot
-        to identify new files and modified files. Useful for LLM feedback
-        about what the code did.
+        Uses storage adapter's detect_file_changes to compare snapshots.
+        Each adapter can optimize this (disk: compare mtimes, memory: track
+        changes, cloud: use versioning).
 
         Args:
             before_files: Pre-execution snapshot from _snapshot_workspace()
-            exclude: Path to user_code.py (don't report this file)
+            exclude: Relative path to user_code.py (don't report this file)
 
         Returns:
             Tuple of (files_created, files_modified) with relative paths
         """
-        files_created = []
-        files_modified = []
-
-        if self.workspace.exists():
-            for file_path in self.workspace.rglob('*'):
-                if file_path.is_file() and file_path != exclude:
-                    try:
-                        rel_path = file_path.relative_to(self.workspace).as_posix()
-
-                        if file_path not in before_files:
-                            files_created.append(rel_path)
-                        else:
-                            old_mtime, old_size = before_files[file_path]
-                            stat = file_path.stat()
-                            if stat.st_mtime != old_mtime or stat.st_size != old_size:
-                                files_modified.append(rel_path)
-                    except (OSError, PermissionError):
-                        pass
-
-        return files_created, files_modified
+        # Get current snapshot
+        after_files = self.storage_adapter.get_workspace_snapshot(self.session_id)
+        
+        # Detect changes via adapter
+        files_created, files_modified = self.storage_adapter.detect_file_changes(
+            self.session_id,
+            before_files,
+            after_files
+        )
+        
+        # Filter out excluded file
+        files_created = [f for f in files_created if f != exclude]
+        files_modified = [f for f in files_modified if f != exclude]
+        
+        return (files_created, files_modified)
 
     def _map_to_sandbox_result(
         self,
@@ -351,31 +342,20 @@ class PythonSandbox(BaseSandbox):
     def _update_session_timestamp(self) -> None:
         """Update the updated_at timestamp in session metadata after execution.
 
-        Reads the .metadata.json file in the session workspace, updates the
-        updated_at field to current UTC time, and writes it back. This tracks
-        session activity for automated pruning. Handles missing/corrupted
-        metadata gracefully to avoid execution failures.
+        Uses storage adapter's update_session_timestamp method to refresh the
+        updated_at field to current UTC time. This tracks session activity for
+        automated pruning. Handles missing/corrupted metadata gracefully.
         """
-        import json
-        from datetime import UTC, datetime
-
-        metadata_path = self.workspace / ".metadata.json"
-
-        if not metadata_path.exists():
-            # Legacy session without metadata - skip silently
-            return
-
         try:
-            data = json.loads(metadata_path.read_text())
-            data["updated_at"] = datetime.now(UTC).isoformat()
-            metadata_path.write_text(json.dumps(data, indent=2))
-
+            self.storage_adapter.update_session_timestamp(self.session_id)
+            
             # Log structured event
+            metadata = self.storage_adapter.read_metadata(self.session_id)
             self.logger.log_session_metadata_updated(
                 session_id=self.session_id,
-                timestamp=data["updated_at"]
+                timestamp=metadata.updated_at
             )
-        except (json.JSONDecodeError, OSError) as e:
+        except Exception as e:
             # Log warning but don't fail execution
             import sys
             print(

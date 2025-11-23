@@ -15,6 +15,7 @@ import pytest
 from sandbox.core.base import BaseSandbox
 from sandbox.core.logging import SandboxLogger
 from sandbox.core.models import ExecutionPolicy, SandboxResult
+from sandbox.core.storage import DiskStorageAdapter
 
 
 @pytest.fixture
@@ -44,10 +45,10 @@ class TestBaseSandboxInstantiation:
         """BaseSandbox is abstract and cannot be instantiated."""
         policy = ExecutionPolicy()
         session_id = "test-session"
-        workspace_root = Path("workspace")
+        storage_adapter = DiskStorageAdapter(Path("workspace"))
 
         with pytest.raises(TypeError) as exc_info:
-            BaseSandbox(policy, session_id, workspace_root)  # type: ignore
+            BaseSandbox(policy, session_id, storage_adapter)  # type: ignore
 
         assert "Can't instantiate abstract class" in str(exc_info.value)
         assert "execute" in str(exc_info.value) or "validate_code" in str(exc_info.value)
@@ -65,10 +66,10 @@ class TestBaseSandboxSubclassing:
 
         policy = ExecutionPolicy()
         session_id = "test-session"
-        workspace_root = Path("workspace")
+        storage_adapter = DiskStorageAdapter(Path("workspace"))
 
         with pytest.raises(TypeError) as exc_info:
-            IncompleteRuntime(policy, session_id, workspace_root)  # type: ignore
+            IncompleteRuntime(policy, session_id, storage_adapter)  # type: ignore
 
         assert "Can't instantiate abstract class" in str(exc_info.value)
         assert "execute" in str(exc_info.value)
@@ -94,10 +95,10 @@ class TestBaseSandboxSubclassing:
 
         policy = ExecutionPolicy()
         session_id = "test-session"
-        workspace_root = Path("workspace")
+        storage_adapter = DiskStorageAdapter(Path("workspace"))
 
         with pytest.raises(TypeError) as exc_info:
-            IncompleteRuntime(policy, session_id, workspace_root)  # type: ignore
+            IncompleteRuntime(policy, session_id, storage_adapter)  # type: ignore
 
         assert "Can't instantiate abstract class" in str(exc_info.value)
         assert "validate_code" in str(exc_info.value)
@@ -126,15 +127,15 @@ class TestBaseSandboxSubclassing:
 
         policy = ExecutionPolicy()
         session_id = "test-session"
-        workspace_root = Path("workspace")
+        storage_adapter = DiskStorageAdapter(Path("workspace"))
 
-        runtime = CompleteRuntime(policy, session_id, workspace_root)
+        runtime = CompleteRuntime(policy, session_id, storage_adapter)
 
         assert isinstance(runtime, BaseSandbox)
         assert runtime.policy == policy
         assert runtime.session_id == session_id
-        assert runtime.workspace_root == workspace_root
-        assert runtime.workspace == workspace_root / session_id
+        assert runtime.workspace_root == Path("workspace")
+        assert runtime.workspace == Path("workspace") / session_id
         assert isinstance(runtime.logger, SandboxLogger)
 
 
@@ -157,9 +158,9 @@ class TestBaseSandboxInitialization:
 
         policy = ExecutionPolicy()
         session_id = "test-session"
-        workspace_root = Path("workspace")
+        storage_adapter = DiskStorageAdapter(Path("workspace"))
 
-        runtime = TestRuntime(policy, session_id, workspace_root)
+        runtime = TestRuntime(policy, session_id, storage_adapter)
 
         assert runtime.logger is not None
         assert isinstance(runtime.logger, SandboxLogger)
@@ -180,10 +181,10 @@ class TestBaseSandboxInitialization:
 
         policy = ExecutionPolicy()
         session_id = "test-session"
-        workspace_root = Path("workspace")
+        storage_adapter = DiskStorageAdapter(Path("workspace"))
         custom_logger = SandboxLogger()
 
-        runtime = TestRuntime(policy, session_id, workspace_root, custom_logger)
+        runtime = TestRuntime(policy, session_id, storage_adapter, custom_logger)
 
         assert runtime.logger is custom_logger
 
@@ -203,9 +204,9 @@ class TestBaseSandboxInitialization:
 
         policy = ExecutionPolicy(fuel_budget=1_000_000, memory_bytes=64_000_000)
         session_id = "test-session"
-        workspace_root = Path("workspace")
+        storage_adapter = DiskStorageAdapter(Path("workspace"))
 
-        runtime = TestRuntime(policy, session_id, workspace_root)
+        runtime = TestRuntime(policy, session_id, storage_adapter)
 
         assert runtime.policy is policy
         assert runtime.policy.fuel_budget == 1_000_000
@@ -227,13 +228,13 @@ class TestBaseSandboxInitialization:
 
         policy = ExecutionPolicy()
         session_id = "test-session-123"
-        workspace_root = Path("custom/workspace")
+        storage_adapter = DiskStorageAdapter(Path("custom/workspace"))
 
-        runtime = TestRuntime(policy, session_id, workspace_root)
+        runtime = TestRuntime(policy, session_id, storage_adapter)
 
-        assert runtime.workspace_root == workspace_root
+        assert runtime.workspace_root == Path("custom/workspace")
         assert runtime.session_id == session_id
-        assert runtime.workspace == workspace_root / session_id
+        assert runtime.workspace == Path("custom/workspace") / session_id
         assert runtime.workspace.parts[-1] == "test-session-123"
 
 
@@ -245,7 +246,7 @@ class TestBaseSandboxHelperMethods:
         sandbox = CompleteSandbox(
             policy=ExecutionPolicy(),
             session_id="test-session",
-            workspace_root=Path("/tmp"),
+            storage_adapter=DiskStorageAdapter(Path("/tmp")),
             logger=SandboxLogger(mock_logger)
         )
 

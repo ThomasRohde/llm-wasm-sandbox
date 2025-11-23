@@ -15,6 +15,7 @@ import pytest
 
 from sandbox.core.logging import SandboxLogger
 from sandbox.core.models import ExecutionPolicy, SandboxResult
+from sandbox.core.storage import DiskStorageAdapter
 from sandbox.runtimes.python import PythonSandbox
 
 
@@ -36,11 +37,17 @@ def python_sandbox(temp_workspace, default_policy):
     """Create PythonSandbox instance with test configuration."""
     import uuid
     session_id = str(uuid.uuid4())
+    storage_adapter = DiskStorageAdapter(temp_workspace)
+    
+    # Create session workspace and metadata
+    if not storage_adapter.session_exists(session_id):
+        storage_adapter.create_session(session_id)
+    
     return PythonSandbox(
         wasm_binary_path="bin/python.wasm",
         policy=default_policy,
         session_id=session_id,
-        workspace_root=temp_workspace
+        storage_adapter=storage_adapter
     )
 
 
@@ -68,15 +75,16 @@ class TestPythonSandboxBasics:
     """Test basic PythonSandbox initialization and configuration."""
 
     def test_init_sets_attributes(self, temp_workspace, default_policy):
-        """Test that __init__ sets wasm_binary_path, policy, session_id, workspace_root, logger."""
+        """Test that __init__ sets wasm_binary_path, policy, session_id, storage_adapter, logger."""
         import uuid
         session_id = str(uuid.uuid4())
+        storage_adapter = DiskStorageAdapter(temp_workspace)
 
         sandbox = PythonSandbox(
             wasm_binary_path="bin/python.wasm",
             policy=default_policy,
             session_id=session_id,
-            workspace_root=temp_workspace
+            storage_adapter=storage_adapter
         )
 
         assert sandbox.wasm_binary_path == "bin/python.wasm"
@@ -90,12 +98,13 @@ class TestPythonSandboxBasics:
         """Test that __init__ accepts custom logger."""
         import uuid
         session_id = str(uuid.uuid4())
+        storage_adapter = DiskStorageAdapter(temp_workspace)
 
         sandbox = PythonSandbox(
             wasm_binary_path="bin/python.wasm",
             policy=default_policy,
             session_id=session_id,
-            workspace_root=temp_workspace,
+            storage_adapter=storage_adapter,
             logger=capture_logger
         )
 
@@ -189,12 +198,13 @@ raise ValueError("Intentional error from guest")
     def test_missing_wasm_binary_raises_file_not_found(self, temp_workspace, default_policy):
         """Missing WASM binaries should raise instead of returning a result."""
         import uuid
+        storage_adapter = DiskStorageAdapter(temp_workspace)
 
         sandbox = PythonSandbox(
             wasm_binary_path="bin/missing-python.wasm",
             policy=default_policy,
             session_id=str(uuid.uuid4()),
-            workspace_root=temp_workspace
+            storage_adapter=storage_adapter
         )
 
         with pytest.raises(FileNotFoundError):
@@ -328,12 +338,13 @@ class TestPythonSandboxSecurityBoundaries:
         import uuid
         policy = ExecutionPolicy(fuel_budget=100_000)
         session_id = str(uuid.uuid4())
+        storage_adapter = DiskStorageAdapter(temp_workspace)
 
         sandbox = PythonSandbox(
             wasm_binary_path="bin/python.wasm",
             policy=policy,
             session_id=session_id,
-            workspace_root=temp_workspace
+            storage_adapter=storage_adapter
         )
 
         code = """
@@ -372,12 +383,13 @@ except Exception as e:
         import uuid
         policy = ExecutionPolicy(memory_bytes=10_000_000)  # 10 MB
         session_id = str(uuid.uuid4())
+        storage_adapter = DiskStorageAdapter(temp_workspace)
 
         sandbox = PythonSandbox(
             wasm_binary_path="bin/python.wasm",
             policy=policy,
             session_id=session_id,
-            workspace_root=temp_workspace
+            storage_adapter=storage_adapter
         )
 
         code = """
@@ -403,12 +415,13 @@ class TestPythonSandboxLogging:
         """Test that log_execution_start is called during execute()."""
         import uuid
         session_id = str(uuid.uuid4())
+        storage_adapter = DiskStorageAdapter(temp_workspace)
 
         sandbox = PythonSandbox(
             wasm_binary_path="bin/python.wasm",
             policy=default_policy,
             session_id=session_id,
-            workspace_root=temp_workspace,
+            storage_adapter=storage_adapter,
             logger=capture_logger
         )
 
@@ -424,12 +437,13 @@ class TestPythonSandboxLogging:
         """Test that log_execution_complete is called after execute()."""
         import uuid
         session_id = str(uuid.uuid4())
+        storage_adapter = DiskStorageAdapter(temp_workspace)
 
         sandbox = PythonSandbox(
             wasm_binary_path="bin/python.wasm",
             policy=default_policy,
             session_id=session_id,
-            workspace_root=temp_workspace,
+            storage_adapter=storage_adapter,
             logger=capture_logger
         )
 
@@ -470,11 +484,12 @@ class TestPythonSandboxWorkspace:
 
         session_id = str(uuid.uuid4())
         policy = ExecutionPolicy(preserve_logs=True)
+        storage_adapter = DiskStorageAdapter(temp_workspace)
         sandbox = PythonSandbox(
             wasm_binary_path="bin/python.wasm",
             policy=policy,
             session_id=session_id,
-            workspace_root=temp_workspace,
+            storage_adapter=storage_adapter,
         )
 
         result = sandbox.execute("print('Test')")
@@ -494,11 +509,12 @@ class TestPythonSandboxTruncation:
 
         policy = ExecutionPolicy(stdout_max_bytes=50, stderr_max_bytes=50)
         session_id = str(uuid.uuid4())
+        storage_adapter = DiskStorageAdapter(temp_workspace)
         sandbox = PythonSandbox(
             wasm_binary_path="bin/python.wasm",
             policy=policy,
             session_id=session_id,
-            workspace_root=temp_workspace
+            storage_adapter=storage_adapter
         )
 
         code = """

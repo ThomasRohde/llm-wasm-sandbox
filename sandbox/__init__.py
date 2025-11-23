@@ -87,6 +87,9 @@ from .core.factory import create_sandbox
 from .core.logging import SandboxLogger
 from .core.models import ExecutionPolicy, RuntimeType, SandboxResult
 
+# Storage adapters
+from .core.storage import DiskStorageAdapter, StorageAdapter, StorageBackend
+
 # Runtime implementations
 from .runtimes.python.sandbox import PythonSandbox
 
@@ -104,6 +107,7 @@ from .sessions import (
 
 __all__ = [
     "BaseSandbox",
+    "DiskStorageAdapter",
     # Models and types
     "ExecutionPolicy",
     # Exceptions
@@ -116,6 +120,9 @@ __all__ = [
     "SandboxLogger",
     "SandboxResult",
     "SessionMetadata",
+    # Storage adapters
+    "StorageAdapter",
+    "StorageBackend",
     # Factory and base
     "create_sandbox",
     # Session management (file operations and pruning)

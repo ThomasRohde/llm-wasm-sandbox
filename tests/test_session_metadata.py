@@ -289,7 +289,7 @@ def test_update_session_timestamp_legacy_session(tmp_path: Path) -> None:
     # Should not raise error
     _update_session_timestamp(session_id, tmp_path)
 
-    # Verify no metadata file created
+    # Verify no metadata file created (skipped silently)
     metadata_path = workspace / ".metadata.json"
     assert not metadata_path.exists()
 
@@ -489,7 +489,7 @@ def test_legacy_session_without_metadata_executes(tmp_path: Path) -> None:
     assert result.success
     assert "legacy session works" in result.stdout
 
-    # With new greenfield architecture, metadata is auto-created on session access
+    # With greenfield StorageAdapter, metadata is auto-created on session creation
     metadata_path = workspace / ".metadata.json"
     assert metadata_path.exists()  # Metadata is now created automatically
 
@@ -519,7 +519,7 @@ def test_metadata_write_failure_does_not_prevent_session_creation(
 
     # Verify warning was logged
     captured = capsys.readouterr()
-    assert "Warning: Failed to write session metadata" in captured.err
+    assert "Warning: Failed to write metadata for session" in captured.err
 
 
 def test_metadata_visible_to_guest_but_readonly(tmp_path: Path) -> None:

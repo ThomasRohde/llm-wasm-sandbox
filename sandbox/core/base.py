@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from sandbox.core.logging import SandboxLogger
     from sandbox.core.models import ExecutionPolicy, SandboxResult
+    from sandbox.core.storage import StorageAdapter
 
 
 class BaseSandbox(ABC):
@@ -26,8 +27,7 @@ class BaseSandbox(ABC):
     Attributes:
         policy: ExecutionPolicy containing resource limits and configuration
         session_id: UUIDv4 session identifier for workspace isolation
-        workspace_root: Root directory containing all session workspaces
-        workspace: Path to session-specific workspace directory (workspace_root / session_id)
+        storage_adapter: StorageAdapter for workspace file operations
         logger: SandboxLogger for structured event logging
     """
 
@@ -35,22 +35,21 @@ class BaseSandbox(ABC):
         self,
         policy: ExecutionPolicy,
         session_id: str,
-        workspace_root: Path,
+        storage_adapter: StorageAdapter,
         logger: SandboxLogger | None = None
     ) -> None:
-        """Initialize BaseSandbox with policy, session, and logger.
+        """Initialize BaseSandbox with policy, session, storage, and logger.
 
         Args:
             policy: ExecutionPolicy with validated resource limits
             session_id: UUIDv4 string identifying the session
-            workspace_root: Root directory for all session workspaces
+            storage_adapter: StorageAdapter for workspace operations
             logger: Optional SandboxLogger for structured events.
                     If None, creates default logger named 'sandbox'.
         """
         self.policy = policy
         self.session_id = session_id
-        self.workspace_root = workspace_root
-        self.workspace = workspace_root / session_id
+        self.storage_adapter = storage_adapter
 
         if logger is None:
             # Import here to avoid circular dependency
@@ -58,6 +57,48 @@ class BaseSandbox(ABC):
             self.logger = SandboxLogger()
         else:
             self.logger = logger
+
+    @property
+    def workspace_root(self) -> Path:
+        """Get workspace root from storage adapter.
+
+        For backward compatibility with code expecting Path object.
+        Only works with DiskStorageAdapter.
+
+        Returns:
+            Path to workspace root directory
+
+        Raises:
+            AttributeError: If storage adapter doesn't have workspace_root Path
+        """
+        if hasattr(self.storage_adapter, 'workspace_root') and isinstance(
+            self.storage_adapter.workspace_root, Path
+        ):
+            return self.storage_adapter.workspace_root
+        raise AttributeError(
+            "workspace_root property only available with DiskStorageAdapter"
+        )
+
+    @property
+    def workspace(self) -> Path:
+        """Get session workspace path from storage adapter.
+
+        For backward compatibility with code expecting Path object.
+        Only works with DiskStorageAdapter.
+
+        Returns:
+            Path to session workspace directory
+
+        Raises:
+            AttributeError: If storage adapter doesn't support Path-based access
+        """
+        if hasattr(self.storage_adapter, 'workspace_root') and isinstance(
+            self.storage_adapter.workspace_root, Path
+        ):
+            return self.storage_adapter.workspace_root / self.session_id
+        raise AttributeError(
+            "workspace property only available with DiskStorageAdapter"
+        )
 
     @abstractmethod
     def execute(self, code: str, **kwargs: Any) -> SandboxResult:

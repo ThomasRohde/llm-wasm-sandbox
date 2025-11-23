@@ -75,22 +75,25 @@ class TestPruningE2E:
         assert session_dir.exists()
         assert result.reclaimed_bytes == 0
 
-        # 4. Prune old sessions (should delete)
-        # We'll mock the current time to be 2 hours in the future
-        future_now = datetime.now(UTC) + timedelta(hours=2)
+        # 4. Prune old sessions (make session appear old by modifying metadata)
+        # Manually update the metadata to have old timestamps
+        metadata_file = session_dir / ".metadata.json"
+        with open(metadata_file) as f:
+            metadata = json.load(f)
+        
+        # Set timestamps to 2 hours in the past
+        old_time = (datetime.now(UTC) - timedelta(hours=2)).isoformat()
+        metadata["updated_at"] = old_time
+        metadata["created_at"] = old_time
+        
+        with open(metadata_file, "w") as f:
+            json.dump(metadata, f)
 
-        with mock.patch("sandbox.sessions.datetime") as mock_datetime:
-            mock_datetime.now.return_value = future_now
-            mock_datetime.fromisoformat = datetime.fromisoformat # Keep original method
-
-            # Also need to patch timezone.utc if it's used directly, but datetime.now(timezone.utc) is what we usually call
-            # The implementation uses datetime.now(timezone.utc)
-
-            result = prune_sessions(
-                older_than_hours=1.0,
-                workspace_root=workspace_root,
-                dry_run=False
-            )
+        result = prune_sessions(
+            older_than_hours=1.0,
+            workspace_root=workspace_root,
+            dry_run=False
+        )
 
         assert session_id in result.deleted_sessions
         assert not session_dir.exists()
@@ -128,22 +131,28 @@ class TestPruningE2E:
         assert result.stdout.strip() == "still working"
 
         # Verify metadata file was created by create_sandbox (greenfield auto-creates metadata)
-        # In the greenfield refactor, metadata is always created when sandbox is instantiated
+        # In the greenfield refactor, metadata is always created when sandbox is instantiated via StorageAdapter
         assert (legacy_dir / ".metadata.json").exists()
 
-        # 3. Prune should delete the session (because it now has metadata)
-        # Mock time to be far in future to ensure it would be deleted
-        future_now = datetime.now(UTC) + timedelta(hours=24)
+        # 3. Prune should delete the session (make it appear old)
+        # Manually update metadata to have old timestamps
+        metadata_file = legacy_dir / ".metadata.json"
+        with open(metadata_file) as f:
+            metadata = json.load(f)
+        
+        # Set timestamps to 25 hours in the past
+        old_time = (datetime.now(UTC) - timedelta(hours=25)).isoformat()
+        metadata["updated_at"] = old_time
+        metadata["created_at"] = old_time
+        
+        with open(metadata_file, "w") as f:
+            json.dump(metadata, f)
 
-        with mock.patch("sandbox.sessions.datetime") as mock_datetime:
-            mock_datetime.now.return_value = future_now
-            mock_datetime.fromisoformat = datetime.fromisoformat
-
-            result = prune_sessions(
-                older_than_hours=1.0,
-                workspace_root=workspace_root,
-                dry_run=False
-            )
+        result = prune_sessions(
+            older_than_hours=24.0,
+            workspace_root=workspace_root,
+            dry_run=False
+        )
 
         # In greenfield refactor, metadata was auto-created, so session is eligible for deletion
         assert legacy_id in result.deleted_sessions
@@ -162,7 +171,7 @@ class TestPruningE2E:
             session_id=old_id,
             created_at=old_time.isoformat(),
             updated_at=old_time.isoformat(),
-            version="1.0"
+            version=1
         )
         with open(old_dir / ".metadata.json", "w") as f:
             json.dump(old_meta.to_dict(), f)
@@ -177,7 +186,7 @@ class TestPruningE2E:
             session_id=new_id,
             created_at=new_time.isoformat(),
             updated_at=new_time.isoformat(),
-            version="1.0"
+            version=1
         )
         with open(new_dir / ".metadata.json", "w") as f:
             json.dump(new_meta.to_dict(), f)
@@ -214,7 +223,7 @@ class TestPruningE2E:
             session_id=session_id,
             created_at=stale_time.isoformat(),
             updated_at=stale_time.isoformat(),
-            version="1.0",
+            version=1,
         )
         (session_dir / ".metadata.json").write_text(json.dumps(meta.to_dict()))
 

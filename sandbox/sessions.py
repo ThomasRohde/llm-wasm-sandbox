@@ -46,7 +46,7 @@ File Operations from Host:
     >>> from sandbox import create_sandbox, list_session_files, read_session_file
     >>> sandbox = create_sandbox()
     >>> session_id = sandbox.session_id
-    >>> 
+    >>>
     >>> # List all files in session
     >>> files = list_session_files(session_id)
     >>> print(files)
@@ -124,10 +124,8 @@ Session Isolation:
 
 from __future__ import annotations
 
-import contextlib
 import json
 import os
-import shutil
 import uuid
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
@@ -136,6 +134,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from sandbox.core.logging import SandboxLogger
+    from sandbox.core.storage import StorageAdapter
 
 
 @dataclass
@@ -403,7 +402,7 @@ def _update_session_timestamp(
     metadata_path = workspace_root / session_id / ".metadata.json"
 
     if not metadata_path.exists():
-        # Session created before metadata feature - skip silently
+        # Session created before metadata feature - skip silently (pruning will handle)
         return
 
     try:
@@ -656,7 +655,7 @@ def _enumerate_sessions(workspace_root: Path) -> list[str]:
     reserved = {"site-packages"}
     root = workspace_root.resolve()
     sessions = []
-    
+
     for item in root.iterdir():
         if not item.is_dir():
             continue
@@ -764,232 +763,10 @@ def _calculate_workspace_size(workspace_path: Path) -> int:
     return total_size
 
 
-def delete_session_workspace(
-    session_id: str,
-    workspace_root: Path | None = None
-) -> None:
-    """Delete session workspace and all contained files.
-
-    Permanently removes the session's workspace directory and all files within it.
-    This is the cleanup operation for ending a session. Operation is idempotent -
-    deleting a nonexistent workspace succeeds silently.
-
-    Args:
-        session_id: UUIDv4 string identifying the session
-        workspace_root: Root directory for session workspaces. Default: Path("workspace")
-
-    Raises:
-        ValueError: If session_id contains path separators (security validation)
-        PermissionError: If filesystem permissions prevent deletion
-        OSError: If deletion fails for other filesystem reasons
-
-    Examples:
-        >>> # Clean up session after completion
-        >>> from sandbox import delete_session_workspace
-        >>> session_id = "550e8400-e29b-41d4-a716-446655440000"
-        >>> delete_session_workspace(session_id)
-
-        >>> # Idempotent: deleting again is safe
-        >>> delete_session_workspace(session_id)  # No error
-
-        >>> # Workspace directory is removed
-        >>> from pathlib import Path
-        >>> workspace_path = Path("workspace") / session_id
-        >>> workspace_path.exists()
-        False
-
-    Safety Notes:
-        - Path validation prevents traversal attacks (e.g., session_id="../etc")
-        - Uses shutil.rmtree with ignore_errors=False to surface permission issues
-        - FileNotFoundError is caught for idempotent behavior
-        - Applications should delete sessions after use to prevent disk growth
-    """
-    if workspace_root is None:
-        workspace_root = Path("workspace")
-    else:
-        workspace_root = Path(workspace_root)
-
-    workspace = _validate_session_workspace(session_id, workspace_root)
-
-    # Delete workspace directory recursively
-    with contextlib.suppress(FileNotFoundError):
-        shutil.rmtree(workspace, ignore_errors=False)
-
-
-def prune_sessions(
-    older_than_hours: float = 24.0,
-    workspace_root: Path | None = None,
-    dry_run: bool = False,
-    logger: SandboxLogger | None = None
-) -> PruneResult:
-    """Delete session workspaces inactive for specified duration.
-
-    Enumerates all session workspaces and deletes those whose updated_at
-    timestamp exceeds the age threshold. Sessions without metadata are skipped
-    (logged as warnings). Provides dry-run mode to preview deletions without
-    actually removing files.
-
-    This function is not concurrency-safe - it should run during maintenance
-    windows when no other processes are accessing session workspaces.
-
-    Args:
-        older_than_hours: Age threshold in hours (based on updated_at). Default: 24.0
-        workspace_root: Root directory for sessions. Default: Path("workspace")
-        dry_run: If True, list candidates without deleting. Default: False
-        logger: Optional structured logger for audit trail
-
-    Returns:
-        PruneResult: Statistics about pruning operation (deleted, skipped, reclaimed bytes, errors)
-
-    Examples:
-        >>> # Prune sessions older than 24 hours (default)
-        >>> from sandbox import prune_sessions
-        >>> result = prune_sessions()
-        >>> print(result)
-        Pruned 5 sessions (2 skipped), reclaimed 12.3 MB
-
-        >>> # Dry-run to preview deletions
-        >>> result = prune_sessions(older_than_hours=48.0, dry_run=True)
-        >>> print(result.deleted_sessions)
-        ['session-1', 'session-2', 'session-3']
-        >>> print(result)
-        Would prune 3 sessions, reclaimed 0 B
-
-        >>> # Aggressive cleanup (1 hour threshold)
-        >>> result = prune_sessions(older_than_hours=1.0)
-
-        >>> # Custom workspace location
-        >>> from pathlib import Path
-        >>> result = prune_sessions(
-        ...     older_than_hours=72.0,
-        ...     workspace_root=Path("/var/lib/sandbox/workspaces")
-        ... )
-
-    Notes:
-        - Sessions without .metadata.json are skipped (not deleted)
-        - Corrupted metadata files are logged as warnings and skipped
-        - Permission errors during deletion are captured in result.errors
-        - In dry-run mode, reclaimed_bytes is always 0
-        - Uses updated_at timestamp (not created_at) for age calculation
-    """
-    if workspace_root is None:
-        workspace_root = Path("workspace")
-    else:
-        workspace_root = Path(workspace_root)
-
-    workspace_root = workspace_root.resolve()
-
-    # Initialize result tracking
-    deleted_sessions: list[str] = []
-    skipped_sessions: list[str] = []
-    reclaimed_bytes = 0
-    errors: dict[str, str] = {}
-
-    # Log pruning start
-    if logger is not None:
-        logger.log_prune_started(
-            threshold_hours=older_than_hours,
-            workspace_root=str(workspace_root),
-            dry_run=dry_run
-        )
-
-    # Enumerate all session directories
-    session_ids = _enumerate_sessions(workspace_root)
-
-    for session_id in session_ids:
-        workspace_path = workspace_root / session_id
-
-        # Read session metadata
-        metadata = _read_session_metadata(session_id, workspace_root)
-
-        if metadata is None:
-            # Missing or corrupted metadata - skip session
-            skipped_sessions.append(session_id)
-
-            if logger is not None:
-                logger.log_prune_skipped(
-                    session_id=session_id,
-                    reason="missing_metadata"
-                )
-            continue
-
-        # Calculate session age
-        try:
-            age_hours = _calculate_session_age(metadata)
-        except (ValueError, TypeError) as e:
-            # Corrupted timestamp - skip session
-            skipped_sessions.append(session_id)
-
-            if logger is not None:
-                logger.log_prune_skipped(
-                    session_id=session_id,
-                    reason=f"corrupted_timestamp: {e}"
-                )
-            continue
-
-        # Check if session meets age threshold
-        if age_hours >= older_than_hours:
-            # Log candidate
-            if logger is not None:
-                logger.log_prune_candidate(
-                    session_id=session_id,
-                    age_hours=age_hours,
-                    threshold_hours=older_than_hours
-                )
-
-            # Calculate workspace size before deletion
-            if not dry_run:
-                workspace_size = _calculate_workspace_size(workspace_path)
-                reclaimed_bytes += workspace_size
-
-            # Delete workspace (if not dry-run)
-            if not dry_run:
-                try:
-                    shutil.rmtree(workspace_path, ignore_errors=False)
-                    deleted_sessions.append(session_id)
-
-                    if logger is not None:
-                        logger.log_prune_deleted(
-                            session_id=session_id,
-                            age_hours=age_hours,
-                            reclaimed_bytes=workspace_size
-                        )
-                except (OSError, PermissionError) as e:
-                    # Capture deletion error
-                    errors[session_id] = str(e)
-
-                    if logger is not None:
-                        logger.log_prune_error(
-                            session_id=session_id,
-                            error=str(e)
-                        )
-            else:
-                # Dry-run: add to deleted list without actually deleting
-                deleted_sessions.append(session_id)
-
-    # Log completion
-    if logger is not None:
-        logger.log_prune_completed(
-            deleted_count=len(deleted_sessions),
-            skipped_count=len(skipped_sessions),
-            error_count=len(errors),
-            reclaimed_bytes=reclaimed_bytes,
-            dry_run=dry_run
-        )
-
-    # Return result
-    return PruneResult(
-        deleted_sessions=deleted_sessions,
-        skipped_sessions=skipped_sessions,
-        reclaimed_bytes=reclaimed_bytes,
-        errors=errors,
-        dry_run=dry_run
-    )
-
-
 def list_session_files(
     session_id: str,
     workspace_root: Path | None = None,
+    storage_adapter: StorageAdapter | None = None,
     pattern: str | None = None,
     logger: SandboxLogger | None = None
 ) -> list[str]:
@@ -1002,7 +779,11 @@ def list_session_files(
     Args:
         session_id: UUIDv4 string identifying the session
         workspace_root: Root directory for session workspaces. Default: Path("workspace")
+                       Ignored if storage_adapter is provided.
+        storage_adapter: Optional StorageAdapter for workspace operations.
+                        If None, creates DiskStorageAdapter with workspace_root.
         pattern: Optional glob pattern (e.g., "*.txt", "**/*.py"). Default: "*" (all files)
+        logger: Optional SandboxLogger for structured logging
 
     Returns:
         list[str]: Sorted list of relative file paths (POSIX-style, no leading slash)
@@ -1036,24 +817,16 @@ def list_session_files(
         - Returns POSIX-style paths with forward slashes on all platforms
         - Empty workspace returns empty list (not an error)
     """
-    if workspace_root is None:
-        workspace_root = Path("workspace")
+    # Create storage adapter if not provided
+    if storage_adapter is None:
+        from sandbox.core.storage import DiskStorageAdapter
+        if workspace_root is None:
+            workspace_root = Path("workspace")
+        storage_adapter = DiskStorageAdapter(workspace_root)
 
-    # Resolve and validate workspace path
-    workspace = _ensure_session_workspace(session_id, workspace_root)
-
-    # List files matching pattern
+    # List files via adapter
     search_pattern = pattern or "*"
-    all_paths = workspace.rglob(search_pattern)
-
-    # Filter to files only (exclude directories)
-    files = [p for p in all_paths if p.is_file()]
-
-    # Convert to relative paths (POSIX-style)
-    relative_paths = [p.relative_to(workspace).as_posix() for p in files]
-
-    # Sort results
-    sorted_paths = sorted(relative_paths)
+    sorted_paths = storage_adapter.list_files(session_id, search_pattern)
 
     # Log file operation
     if logger is not None:
@@ -1071,6 +844,7 @@ def read_session_file(
     session_id: str,
     relative_path: str,
     workspace_root: Path | None = None,
+    storage_adapter: StorageAdapter | None = None,
     logger: SandboxLogger | None = None
 ) -> bytes:
     """Read file from session workspace as bytes.
@@ -1083,6 +857,10 @@ def read_session_file(
         session_id: UUIDv4 string identifying the session
         relative_path: Relative path within session workspace (e.g., "data.txt", "dir/output.json")
         workspace_root: Root directory for session workspaces. Default: Path("workspace")
+                       Ignored if storage_adapter is provided.
+        storage_adapter: Optional StorageAdapter for workspace operations.
+                        If None, creates DiskStorageAdapter with workspace_root.
+        logger: Optional SandboxLogger for structured logging
 
     Returns:
         bytes: Raw file contents
@@ -1090,8 +868,6 @@ def read_session_file(
     Raises:
         ValueError: If relative_path attempts path traversal or is absolute
         FileNotFoundError: If file does not exist
-        IsADirectoryError: If path points to a directory
-        PermissionError: If file cannot be read due to permissions
 
     Examples:
         >>> # Read text file
@@ -1106,33 +882,20 @@ def read_session_file(
         >>> print(len(image_data))
         4567
 
-        >>> # Path traversal rejected
-        >>> try:
-        ...     read_session_file(session_id, "../etc/passwd")
-        ... except ValueError as e:
-        ...     print(f"Blocked: {e}")
-        Blocked: Path '../etc/passwd' escapes session workspace boundary
-
-        >>> # Missing file raises error
-        >>> try:
-        ...     read_session_file(session_id, "nonexistent.txt")
-        ... except FileNotFoundError:
-        ...     print("File not found")
-        File not found
-
     Security Notes:
-        - All paths validated via _validate_session_path()
+        - All paths validated by storage adapter
         - Symlink escapes prevented by path resolution
         - Returns bytes to avoid encoding assumptions
     """
-    if workspace_root is None:
-        workspace_root = Path("workspace")
+    # Create storage adapter if not provided
+    if storage_adapter is None:
+        from sandbox.core.storage import DiskStorageAdapter
+        if workspace_root is None:
+            workspace_root = Path("workspace")
+        storage_adapter = DiskStorageAdapter(workspace_root)
 
-    # Resolve and validate path (prevents traversal)
-    full_path = _validate_session_path(session_id, relative_path, workspace_root)
-
-    # Read file contents (let FileNotFoundError propagate)
-    data = full_path.read_bytes()
+    # Read file via adapter
+    data = storage_adapter.read_file(session_id, relative_path)
 
     # Log file operation
     if logger is not None:
@@ -1151,6 +914,7 @@ def write_session_file(
     relative_path: str,
     data: bytes | str,
     workspace_root: Path | None = None,
+    storage_adapter: StorageAdapter | None = None,
     overwrite: bool = True,
     logger: SandboxLogger | None = None
 ) -> None:
@@ -1165,13 +929,15 @@ def write_session_file(
         relative_path: Relative path within session workspace (e.g., "input.txt", "data/config.json")
         data: File content as bytes or str (str is UTF-8 encoded)
         workspace_root: Root directory for session workspaces. Default: Path("workspace")
+                       Ignored if storage_adapter is provided.
+        storage_adapter: Optional StorageAdapter for workspace operations.
+                        If None, creates DiskStorageAdapter with workspace_root.
         overwrite: If False, raises FileExistsError when file exists. Default: True
+        logger: Optional SandboxLogger for structured logging
 
     Raises:
         ValueError: If relative_path attempts path traversal or is absolute
         FileExistsError: If file exists and overwrite=False
-        PermissionError: If file cannot be written due to permissions
-        OSError: If write fails for other filesystem reasons
 
     Examples:
         >>> # Write text file
@@ -1180,54 +946,39 @@ def write_session_file(
         >>> write_session_file(session_id, "input.txt", "Hello from host")
 
         >>> # Write binary data
-        >>> binary_data = b'\x89PNG\r\n\x1a\n...'
+        >>> binary_data = b'\\x89PNG\\r\\n\\x1a\\n...'
         >>> write_session_file(session_id, "image.png", binary_data)
 
-        >>> # Create nested directory structure
-        >>> write_session_file(session_id, "data/config.json", '{"key": "value"}')
-
-        >>> # Prevent overwrite
-        >>> try:
-        ...     write_session_file(session_id, "input.txt", "new data", overwrite=False)
-        ... except FileExistsError:
-        ...     print("File already exists")
-        File already exists
-
-        >>> # Path traversal rejected
-        >>> try:
-        ...     write_session_file(session_id, "../etc/evil", "data")
-        ... except ValueError as e:
-        ...     print(f"Blocked: {e}")
-        Blocked: Path '../etc/evil' escapes session workspace boundary
-
     Notes:
-        - Parent directories created automatically (mkdir parents=True)
+        - Parent directories created automatically
         - String data is UTF-8 encoded before writing
-        - overwrite=True is default for convenience (matches typical usage)
-        - Use overwrite=False to ensure files aren't accidentally replaced
+        - overwrite=True is default for convenience
     """
-    if workspace_root is None:
-        workspace_root = Path("workspace")
-
-    # Resolve and validate path (prevents traversal)
-    full_path = _validate_session_path(session_id, relative_path, workspace_root)
-
-    # Check overwrite flag
-    if not overwrite and full_path.exists():
-        raise FileExistsError(
-            f"File '{relative_path}' already exists in session '{session_id}'. "
-            f"Set overwrite=True to replace."
-        )
-
-    # Create parent directories
-    full_path.parent.mkdir(parents=True, exist_ok=True)
+    # Create storage adapter if not provided
+    if storage_adapter is None:
+        from sandbox.core.storage import DiskStorageAdapter
+        if workspace_root is None:
+            workspace_root = Path("workspace")
+        storage_adapter = DiskStorageAdapter(workspace_root)
 
     # Convert str to bytes if needed
     if isinstance(data, str):
         data = data.encode('utf-8')
 
-    # Write data
-    full_path.write_bytes(data)
+    # Check overwrite flag (only for DiskStorageAdapter)
+    if not overwrite and hasattr(storage_adapter, '_validate_session_path'):
+        try:
+            existing_data = storage_adapter.read_file(session_id, relative_path)
+            if existing_data:
+                raise FileExistsError(
+                    f"File '{relative_path}' already exists in session '{session_id}'. "
+                    f"Set overwrite=True to replace."
+                )
+        except FileNotFoundError:
+            pass  # File doesn't exist, OK to write
+
+    # Write via adapter
+    storage_adapter.write_file(session_id, relative_path, data)
 
     # Log file operation
     if logger is not None:
@@ -1239,10 +990,12 @@ def write_session_file(
         )
 
 
+
 def delete_session_path(
     session_id: str,
     relative_path: str,
     workspace_root: Path | None = None,
+    storage_adapter: StorageAdapter | None = None,
     recursive: bool = False,
     logger: SandboxLogger | None = None
 ) -> None:
@@ -1256,14 +1009,16 @@ def delete_session_path(
         session_id: UUIDv4 string identifying the session
         relative_path: Relative path within session workspace (e.g., "temp.txt", "cache/")
         workspace_root: Root directory for session workspaces. Default: Path("workspace")
+                       Ignored if storage_adapter is provided.
+        storage_adapter: Optional StorageAdapter for workspace operations.
+                        If None, creates DiskStorageAdapter with workspace_root.
         recursive: If True, delete directories recursively. Default: False (safety)
+        logger: Optional SandboxLogger for structured logging
 
     Raises:
         ValueError: If relative_path attempts path traversal or is absolute,
                    or if path is a directory and recursive=False
-        FileNotFoundError: If path does not exist (explicit errors, not silent)
-        PermissionError: If path cannot be deleted due to permissions
-        OSError: If deletion fails for other filesystem reasons
+        FileNotFoundError: If path does not exist
 
     Examples:
         >>> # Delete single file
@@ -1274,51 +1029,19 @@ def delete_session_path(
         >>> # Delete directory (requires recursive=True)
         >>> delete_session_path(session_id, "cache", recursive=True)
 
-        >>> # Error if recursive not set for directory
-        >>> try:
-        ...     delete_session_path(session_id, "data")
-        ... except ValueError as e:
-        ...     print(f"Error: {e}")
-        Error: Cannot delete directory 'data' without recursive=True
-
-        >>> # Missing path raises error (not silent)
-        >>> try:
-        ...     delete_session_path(session_id, "nonexistent.txt")
-        ... except FileNotFoundError:
-        ...     print("File not found")
-        File not found
-
-        >>> # Path traversal rejected
-        >>> try:
-        ...     delete_session_path(session_id, "../etc/passwd")
-        ... except ValueError as e:
-        ...     print(f"Blocked: {e}")
-        Blocked: Path '../etc/passwd' escapes session workspace boundary
-
     Safety Notes:
         - recursive=False by default prevents accidental tree deletion
-        - FileNotFoundError is NOT caught - caller must handle missing paths
         - Use delete_session_workspace() to delete entire session
-        - Path validation prevents escapes and symlink attacks
     """
-    if workspace_root is None:
-        workspace_root = Path("workspace")
+    # Create storage adapter if not provided
+    if storage_adapter is None:
+        from sandbox.core.storage import DiskStorageAdapter
+        if workspace_root is None:
+            workspace_root = Path("workspace")
+        storage_adapter = DiskStorageAdapter(workspace_root)
 
-    # Resolve and validate path (prevents traversal)
-    full_path = _validate_session_path(session_id, relative_path, workspace_root)
-
-    # Check if path is directory
-    if full_path.is_dir():
-        if not recursive:
-            raise ValueError(
-                f"Cannot delete directory '{relative_path}' without recursive=True. "
-                f"Set recursive=True to delete directory and all contents."
-            )
-        # Delete directory recursively
-        shutil.rmtree(full_path)
-    else:
-        # Delete file (let FileNotFoundError propagate)
-        full_path.unlink()
+    # Delete via adapter (validates paths internally)
+    storage_adapter.delete_path(session_id, relative_path, recursive=recursive)
 
     # Log file operation
     if logger is not None:
@@ -1328,3 +1051,165 @@ def delete_session_path(
             path=relative_path,
             recursive=recursive
         )
+
+
+def delete_session_workspace(
+    session_id: str,
+    workspace_root: Path | None = None,
+    storage_adapter: StorageAdapter | None = None,
+    logger: SandboxLogger | None = None
+) -> None:
+    """Delete entire session workspace directory.
+
+    Removes the session workspace and all its contents. This is a destructive
+    operation that cannot be undone. Commonly used for cleanup after session
+    completion or pruning old sessions.
+
+    Args:
+        session_id: UUIDv4 string identifying the session
+        workspace_root: Root directory for session workspaces. Default: Path("workspace")
+                       Ignored if storage_adapter is provided.
+        storage_adapter: Optional StorageAdapter for workspace operations.
+                        If None, creates DiskStorageAdapter with workspace_root.
+        logger: Optional SandboxLogger for structured logging
+
+    Examples:
+        >>> from sandbox import delete_session_workspace
+        >>> session_id = "550e8400-e29b-41d4-a716-446655440000"
+        >>> delete_session_workspace(session_id)
+
+    Safety Notes:
+        - This deletes the ENTIRE session workspace
+        - Cannot be undone - use with caution
+        - Consider using prune_sessions() for automated cleanup
+    """
+    # Create storage adapter if not provided
+    if storage_adapter is None:
+        from sandbox.core.storage import DiskStorageAdapter
+        if workspace_root is None:
+            workspace_root = Path("workspace")
+        storage_adapter = DiskStorageAdapter(workspace_root)
+
+    # Delete via adapter
+    storage_adapter.delete_session(session_id)
+
+    # Log operation
+    if logger is not None:
+        logger.log_session_deleted(session_id)
+
+
+def prune_sessions(
+    older_than_hours: float = 24.0,
+    workspace_root: Path | None = None,
+    storage_adapter: StorageAdapter | None = None,
+    dry_run: bool = False,
+    logger: SandboxLogger | None = None
+) -> PruneResult:
+    """Delete session workspaces inactive for specified duration.
+
+    Args:
+        older_than_hours: Age threshold in hours
+        workspace_root: Root directory. Default: Path("workspace"). Ignored if storage_adapter provided.
+        storage_adapter: Optional StorageAdapter. If None, creates DiskStorageAdapter.
+        dry_run: If True, report what would be deleted without deleting
+        logger: Optional SandboxLogger
+
+    Returns:
+        PruneResult with deleted/skipped sessions and metrics
+    """
+    from datetime import UTC, datetime, timedelta
+
+    # Create storage adapter if not provided
+    if storage_adapter is None:
+        from sandbox.core.storage import DiskStorageAdapter
+        if workspace_root is None:
+            workspace_root = Path("workspace")
+        storage_adapter = DiskStorageAdapter(workspace_root)
+
+    deleted_sessions = []
+    skipped_sessions = []
+    reclaimed_bytes = 0
+    errors = {}
+
+    # Calculate cutoff timestamp
+    cutoff = datetime.now(UTC) - timedelta(hours=older_than_hours)
+
+    # Log start of pruning
+    if logger is not None:
+        logger.log_prune_started(
+            older_than_hours=older_than_hours,
+            cutoff_time=cutoff.isoformat()
+        )
+
+    # Enumerate all sessions
+    for session_id in storage_adapter.enumerate_sessions():
+        try:
+            # Read metadata to check age
+            metadata = storage_adapter.read_metadata(session_id)
+            updated_at = datetime.fromisoformat(metadata.updated_at)
+
+            if updated_at < cutoff:
+                # Session is old enough to prune
+                if logger is not None:
+                    logger.log_prune_candidate(
+                        session_id=session_id,
+                        updated_at=metadata.updated_at,
+                        age_hours=(datetime.now(UTC) - updated_at).total_seconds() / 3600
+                    )
+
+                if not dry_run:
+                    session_size = storage_adapter.get_session_size(session_id)
+                    storage_adapter.delete_session(session_id)
+                    reclaimed_bytes += session_size
+
+                    if logger is not None:
+                        logger.log_prune_deleted(
+                            session_id=session_id,
+                            size_bytes=session_size
+                        )
+
+                deleted_sessions.append(session_id)
+        except FileNotFoundError:
+            # No metadata file - legacy session or incomplete session
+            skipped_sessions.append(session_id)
+            if logger is not None:
+                logger.log_prune_skipped(
+                    session_id=session_id,
+                    reason="missing_metadata"
+                )
+        except (json.JSONDecodeError, ValueError) as e:
+            # Corrupted metadata or invalid timestamp format
+            skipped_sessions.append(session_id)
+            reason = "corrupted_metadata"
+            if "isoformat" in str(e).lower() or "invalid" in str(e).lower():
+                reason = "corrupted_timestamp"
+            if logger is not None:
+                logger.log_prune_skipped(
+                    session_id=session_id,
+                    reason=reason
+                )
+        except Exception as e:
+            errors[session_id] = str(e)
+            if logger is not None:
+                logger.log_prune_error(
+                    session_id=session_id,
+                    error=str(e)
+                )
+
+    # Log pruning operation
+    if logger is not None:
+        logger.log_prune_completed(
+            deleted_count=len(deleted_sessions),
+            skipped_count=len(skipped_sessions),
+            error_count=len(errors),
+            reclaimed_bytes=reclaimed_bytes,
+            dry_run=dry_run
+        )
+
+    return PruneResult(
+        deleted_sessions=deleted_sessions,
+        skipped_sessions=skipped_sessions,
+        reclaimed_bytes=reclaimed_bytes,
+        errors=errors,
+        dry_run=dry_run
+    )

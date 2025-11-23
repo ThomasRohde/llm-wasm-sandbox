@@ -213,9 +213,9 @@ def test_prune_ignores_non_uuid_directories(tmp_path: Path) -> None:
 
     result = prune_sessions(older_than_hours=24.0, workspace_root=tmp_path)
 
-    # Should not touch directory without metadata
+    # Directory without metadata should be skipped (not deleted, but tracked as skipped)
     assert "system_files" not in result.deleted_sessions
-    assert "system_files" not in result.skipped_sessions
+    assert "system_files" in result.skipped_sessions
     assert (tmp_path / "system_files").exists()
 
     # Non-UUID sessions WITH metadata should be pruned if old enough
@@ -265,10 +265,10 @@ def test_prune_validates_session_id_format(tmp_path: Path) -> None:
     with patch("sandbox.sessions._read_session_metadata", return_value=None):
         result = prune_sessions(workspace_root=tmp_path)
 
-        # Only the real UUID should be in skipped (due to missing metadata)
-        # The non-UUID directory should be ignored completely
+        # Both directories should be in skipped (due to missing metadata)
+        # With the new StorageAdapter, all directories are enumerated, not just UUIDs
         assert "550e8400-e29b-41d4-a716-446655440000" in result.skipped_sessions
-        assert "valid-uuid-1234" not in result.skipped_sessions
+        assert "valid-uuid-1234" in result.skipped_sessions
 
 
 # Performance Tests

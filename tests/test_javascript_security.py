@@ -19,6 +19,7 @@ import pytest
 
 from sandbox.core.models import ExecutionPolicy, SandboxResult
 from sandbox.runtimes.javascript import JavaScriptSandbox
+from sandbox.core.storage import DiskStorageAdapter
 
 
 @pytest.fixture
@@ -42,7 +43,7 @@ class TestJavaScriptFuelExhaustion:
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            workspace_root=temp_workspace
+            storage_adapter=DiskStorageAdapter(temp_workspace)
         )
 
         code = """
@@ -71,7 +72,7 @@ while (true) {
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            workspace_root=temp_workspace
+            storage_adapter=DiskStorageAdapter(temp_workspace)
         )
 
         code = """
@@ -97,7 +98,7 @@ for (let i = 0; i < 10000000; i++) {
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            workspace_root=temp_workspace
+            storage_adapter=DiskStorageAdapter(temp_workspace)
         )
 
         code = """
@@ -126,7 +127,7 @@ class TestJavaScriptMemoryLimits:
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            workspace_root=temp_workspace
+            storage_adapter=DiskStorageAdapter(temp_workspace)
         )
 
         code = """
@@ -155,7 +156,7 @@ try {
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            workspace_root=temp_workspace
+            storage_adapter=DiskStorageAdapter(temp_workspace)
         )
 
         code = "const arr = new Array(1000).fill(42);"
@@ -184,7 +185,7 @@ class TestJavaScriptFilesystemIsolation:
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            workspace_root=temp_workspace
+            storage_adapter=DiskStorageAdapter(temp_workspace)
         )
 
         code = """
@@ -213,7 +214,7 @@ try {
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            workspace_root=temp_workspace
+            storage_adapter=DiskStorageAdapter(temp_workspace)
         )
 
         code = """
@@ -241,7 +242,7 @@ try {
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            workspace_root=temp_workspace
+            storage_adapter=DiskStorageAdapter(temp_workspace)
         )
 
         code = """
@@ -284,7 +285,7 @@ class TestJavaScriptFilesystemEscapePrevention:
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            workspace_root=temp_workspace
+            storage_adapter=DiskStorageAdapter(temp_workspace)
         )
 
         code = f"""
@@ -312,7 +313,7 @@ try {{
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            workspace_root=temp_workspace
+            storage_adapter=DiskStorageAdapter(temp_workspace)
         )
 
         code = """
@@ -344,7 +345,7 @@ class TestJavaScriptOutputCapping:
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            workspace_root=temp_workspace
+            storage_adapter=DiskStorageAdapter(temp_workspace)
         )
 
         code = """
@@ -368,7 +369,7 @@ for (let i = 0; i < 100; i++) {
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            workspace_root=temp_workspace
+            storage_adapter=DiskStorageAdapter(temp_workspace)
         )
 
         # Use syntax errors to generate stderr output since console.error is not available
@@ -397,7 +398,7 @@ const e = 'missing quote
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            workspace_root=temp_workspace
+            storage_adapter=DiskStorageAdapter(temp_workspace)
         )
 
         code = """
@@ -424,7 +425,7 @@ class TestJavaScriptEnvironmentVariableIsolation:
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            workspace_root=temp_workspace
+            storage_adapter=DiskStorageAdapter(temp_workspace)
         )
 
         # Note: QuickJS WASI may not have env access like Node.js
@@ -455,7 +456,7 @@ console.log('Env configured');
                 wasm_binary_path="bin/quickjs.wasm",
                 policy=policy,
                 session_id=session_id,
-                workspace_root=temp_workspace
+                storage_adapter=DiskStorageAdapter(temp_workspace)
             )
 
             # Note: QuickJS may not have env access, but policy should isolate anyway
@@ -489,7 +490,7 @@ class TestJavaScriptNoNetworkAccess:
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            workspace_root=temp_workspace
+            storage_adapter=DiskStorageAdapter(temp_workspace)
         )
 
         # QuickJS in WASI mode should not have network capabilities
@@ -518,7 +519,7 @@ class TestJavaScriptSecurityMetadata:
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            workspace_root=temp_workspace
+            storage_adapter=DiskStorageAdapter(temp_workspace)
         )
 
         code = "while (true) {}"
@@ -537,7 +538,7 @@ class TestJavaScriptSecurityMetadata:
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            workspace_root=temp_workspace
+            storage_adapter=DiskStorageAdapter(temp_workspace)
         )
 
         code = "const x = 42;"
@@ -559,7 +560,7 @@ class TestJavaScriptSecurityMetadata:
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            workspace_root=temp_workspace
+            storage_adapter=DiskStorageAdapter(temp_workspace)
         )
 
         code = "console.log('test');"

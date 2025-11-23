@@ -15,6 +15,7 @@ import pytest
 
 from sandbox.core.logging import SandboxLogger
 from sandbox.core.models import ExecutionPolicy, SandboxResult
+from sandbox.core.storage import DiskStorageAdapter
 from sandbox.runtimes.javascript import JavaScriptSandbox
 
 
@@ -36,11 +37,17 @@ def javascript_sandbox(temp_workspace, default_policy):
     """Create JavaScriptSandbox instance with test configuration."""
     import uuid
     session_id = str(uuid.uuid4())
+    storage_adapter = DiskStorageAdapter(temp_workspace)
+    
+    # Create session workspace and metadata
+    if not storage_adapter.session_exists(session_id):
+        storage_adapter.create_session(session_id)
+    
     return JavaScriptSandbox(
         wasm_binary_path="bin/quickjs.wasm",
         policy=default_policy,
         session_id=session_id,
-        workspace_root=temp_workspace
+        storage_adapter=storage_adapter
     )
 
 
@@ -68,15 +75,16 @@ class TestJavaScriptSandboxBasics:
     """Test basic JavaScriptSandbox initialization and configuration."""
 
     def test_init_sets_attributes(self, temp_workspace, default_policy):
-        """Test that __init__ sets wasm_binary_path, policy, session_id, workspace_root, logger."""
+        """Test that __init__ sets wasm_binary_path, policy, session_id, storage_adapter, logger."""
         import uuid
         session_id = str(uuid.uuid4())
+        storage_adapter = DiskStorageAdapter(temp_workspace)
 
         sandbox = JavaScriptSandbox(
             wasm_binary_path="bin/quickjs.wasm",
             policy=default_policy,
             session_id=session_id,
-            workspace_root=temp_workspace
+            storage_adapter=storage_adapter
         )
 
         assert sandbox.wasm_binary_path == "bin/quickjs.wasm"
@@ -90,12 +98,13 @@ class TestJavaScriptSandboxBasics:
         """Test that __init__ accepts custom logger."""
         import uuid
         session_id = str(uuid.uuid4())
+        storage_adapter = DiskStorageAdapter(temp_workspace)
 
         sandbox = JavaScriptSandbox(
             wasm_binary_path="bin/quickjs.wasm",
             policy=default_policy,
             session_id=session_id,
-            workspace_root=temp_workspace,
+            storage_adapter=storage_adapter,
             logger=capture_logger
         )
 
@@ -226,12 +235,13 @@ console.log(doubled.join(", "));
     def test_missing_wasm_binary_raises_file_not_found(self, temp_workspace, default_policy):
         """Missing WASM binaries should raise instead of returning a result."""
         import uuid
+        storage_adapter = DiskStorageAdapter(temp_workspace)
 
         sandbox = JavaScriptSandbox(
             wasm_binary_path="bin/missing-quickjs.wasm",
             policy=default_policy,
             session_id=str(uuid.uuid4()),
-            workspace_root=temp_workspace
+            storage_adapter=storage_adapter
         )
 
         with pytest.raises(FileNotFoundError):
@@ -407,12 +417,13 @@ class TestJavaScriptSandboxLogging:
         """Test that log_execution_start is called during execute()."""
         import uuid
         session_id = str(uuid.uuid4())
+        storage_adapter = DiskStorageAdapter(temp_workspace)
 
         sandbox = JavaScriptSandbox(
             wasm_binary_path="bin/quickjs.wasm",
             policy=default_policy,
             session_id=session_id,
-            workspace_root=temp_workspace,
+            storage_adapter=storage_adapter,
             logger=capture_logger
         )
 
@@ -428,12 +439,13 @@ class TestJavaScriptSandboxLogging:
         """Test that log_execution_complete is called after execute()."""
         import uuid
         session_id = str(uuid.uuid4())
+        storage_adapter = DiskStorageAdapter(temp_workspace)
 
         sandbox = JavaScriptSandbox(
             wasm_binary_path="bin/quickjs.wasm",
             policy=default_policy,
             session_id=session_id,
-            workspace_root=temp_workspace,
+            storage_adapter=storage_adapter,
             logger=capture_logger
         )
 
@@ -474,11 +486,12 @@ class TestJavaScriptSandboxWorkspace:
 
         session_id = str(uuid.uuid4())
         policy = ExecutionPolicy(preserve_logs=True)
+        storage_adapter = DiskStorageAdapter(temp_workspace)
         sandbox = JavaScriptSandbox(
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            workspace_root=temp_workspace,
+            storage_adapter=storage_adapter,
         )
 
         result = sandbox.execute("console.log('Test');")
@@ -497,11 +510,12 @@ class TestJavaScriptSandboxTruncation:
 
         policy = ExecutionPolicy(stdout_max_bytes=50, stderr_max_bytes=50)
         session_id = str(uuid.uuid4())
+        storage_adapter = DiskStorageAdapter(temp_workspace)
         sandbox = JavaScriptSandbox(
             wasm_binary_path="bin/quickjs.wasm",
             policy=policy,
             session_id=session_id,
-            workspace_root=temp_workspace
+            storage_adapter=storage_adapter
         )
 
         code = """
