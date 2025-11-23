@@ -22,9 +22,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic session pruning with configurable retention policies
 - Pluggable storage adapter interface for custom backends
 - Python vendoring support for pure-Python packages
+- **NEW: `sandbox_utils` library** - Shell-like utilities for LLM-generated code:
+  - File operations: `find()`, `tree()`, `walk()`, `copy_tree()`, `remove_tree()`
+  - Text processing: `grep()`, `sed()`, `head()`, `tail()`, `wc()`, `diff()`
+  - Data manipulation: `group_by()`, `filter_by()`, `map_items()`, `sort_by()`, `unique()`, `chunk()`
+  - Format conversions: `csv_to_json()`, `json_to_csv()`, `xml_to_dict()`
+  - Shell emulation: `ls()`, `cat()`, `touch()`, `mkdir()`, `rm()`, `cp()`, `mv()`, `echo()`
+  - 30+ functions with comprehensive docstrings and examples
+  - All operations enforce strict `/app` sandbox boundaries
+- **NEW: Vendored pure-Python packages** for enhanced capabilities:
+  - `python-dateutil` - Advanced date/time parsing
+  - `tabulate` - Pretty-printing tables
+  - `jinja2` + `MarkupSafe` - Template rendering (requires 5B fuel budget for first import)
+  - `markdown` - Markdown to HTML conversion
+  - `tomli` - TOML parsing (Python <3.11 only)
+  - `six` - Python 2/3 compatibility utilities
+  - `attrs` - Data modeling and validation
 - Structured logging with `SandboxLogger` for observability
 - Rich metrics collection (fuel consumption, memory usage, execution time)
-- Comprehensive test suite with 370+ tests
+- Comprehensive test suite with 425+ tests (55 new tests for `sandbox_utils`)
 - Demo scripts showcasing all major features
 - Full type hints support (PEP 561 compliant with `py.typed` marker)
 
@@ -39,6 +55,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 - Comprehensive README with architecture overview
+- **NEW: `docs/PYTHON_CAPABILITIES.md`** - Detailed reference for Python runtime capabilities:
+  - Complete stdlib module categorization
+  - Vendored package documentation with examples
+  - Common LLM code patterns and recipes
+  - Performance considerations and fuel budget guidance
+  - Package compatibility matrix
+  - Troubleshooting guide for common issues
+- **NEW: `docs/LLM_PROMPT_TEMPLATES.md`** - Templates and best practices for effective LLM prompting:
+  - Templates for file processing, data analysis, text processing
+  - Multi-step workflow patterns
+  - Fuel budget quick reference
 - LLM integration examples and best practices
 - Security model documentation
 - Troubleshooting guide

@@ -89,6 +89,23 @@ python stateful_agent.py
 - ✅ Error recovery (syntax errors, fuel exhaustion)
 - ✅ Automatic debugging and retry logic
 
+### Shell Utils Agent (NEW: Advanced Features)
+
+Execute data processing and file operations using shell-like utilities:
+
+```powershell
+cd examples/openai_agents
+python shell_utils_agent.py
+```
+
+**What it demonstrates:**
+- ✅ Shell-like file operations (find, tree, grep, ls, cat, etc.)
+- ✅ Data manipulation (group_by, filter_by, sort_by, unique)
+- ✅ Format conversions (CSV ↔ JSON, XML → dict)
+- ✅ Text processing (sed, diff, head, tail, wc)
+- ✅ Vendored packages (tabulate, python-dateutil, markdown)
+- ✅ Complete workflows (log analysis, report generation, data transformation)
+
 ## How It Works
 
 ### Function Tool Pattern
@@ -212,6 +229,34 @@ For production deployments, combine with OS-level security:
 - **Rate Limiting**: Throttle agent requests to prevent abuse
 
 ## Example Workflows
+
+### Shell-Like File Operations (NEW)
+
+```python
+# Agent explores project structure
+user: "Show me the directory tree and find all Python files"
+agent: [uses tree() and find("*.py") from sandbox_utils]
+agent: "Found 5 Python files in /app/src and /app/tests directories"
+
+# Agent analyzes log files
+user: "Search for ERROR entries in app.log and count them"
+agent: [uses grep(r'ERROR', files) and wc(file)]
+agent: "Found 12 ERROR entries. Total log size: 1,234 lines"
+```
+
+### Data Processing with Vendored Packages (NEW)
+
+```python
+# Agent processes CSV data
+user: "Load sales.csv, group by product, and show totals in a table"
+agent: [uses csv_to_json(), group_by(), and tabulate package]
+agent: [displays formatted table with product sales]
+
+# Agent generates reports
+user: "Create a Markdown report and convert to HTML"
+agent: [uses markdown package to render HTML from Markdown]
+agent: [saves report.md and report.html to /app]
+```
 
 ### Data Processing Pipeline
 

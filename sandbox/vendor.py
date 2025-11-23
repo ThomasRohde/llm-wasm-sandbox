@@ -206,6 +206,21 @@ RECOMMENDED_PACKAGES = [
     # Document processing - Other formats
     "odfpy",  # Read/write OpenDocument Format (.odf, .ods, .odp)
     "mammoth",  # Convert Word .docx to HTML/markdown
+    # Python 2/3 compatibility utilities
+    "six",  # Required by python-dateutil and other packages
+    # Date/Time utilities
+    "python-dateutil",  # Advanced date/time parsing and manipulation
+    # Text and data presentation
+    "tabulate",  # Pretty-print tabular data (ASCII, Markdown, HTML tables)
+    # Template rendering
+    "jinja2",  # Template engine for generating text/HTML/code
+    "MarkupSafe",  # HTML/XML escaping (required by jinja2)
+    # Markdown processing
+    "markdown",  # Convert Markdown to HTML
+    # Structured data with validation
+    "attrs",  # Classes without boilerplate (useful for data modeling)
+    # TOML parsing (Python <3.11 compatibility)
+    "tomli ; python_version < '3.11'",  # TOML parser for older Python versions
 ]
 """Curated list of pure-Python packages compatible with WASM sandbox.
 
@@ -221,10 +236,44 @@ commonly useful for LLM-generated code.
 - Enable reading/writing Excel, PDF, and OpenDocument formats
 - mammoth provides Word .docx to HTML/markdown conversion
 
+**Python 2/3 compatibility** (six):
+- Required dependency for python-dateutil and other legacy packages
+- Pure-Python utilities for writing code compatible with both Python 2 and 3
+
+**Date/Time utilities** (python-dateutil):
+- Advanced date parsing, timezone support, and date arithmetic
+- Commonly used in data analysis and processing workflows
+- Requires `six` package
+
+**Text and data presentation** (tabulate):
+- Pretty-print tables in multiple formats (ASCII, Markdown, HTML, LaTeX)
+- Lightweight and pure-Python (no dependencies)
+
+**Template rendering** (jinja2, MarkupSafe):
+- Industry-standard template engine for generating text, HTML, or code
+- MarkupSafe is a required dependency providing HTML/XML escaping
+- Useful for report generation and code generation workflows
+- **Important**: jinja2 requires ~4-5B fuel budget for initial import (first execution)
+
+**Markdown processing** (markdown):
+- Convert Markdown to HTML with extension support
+- Pure-Python implementation (no C extensions)
+
+**Structured data** (attrs):
+- Create classes without boilerplate using decorators
+- Useful for data modeling and configuration objects
+- Pure-Python package with no dependencies
+
+**TOML parsing** (tomli):
+- Backport of Python 3.11+ tomllib for older Python versions
+- Conditionally installed only for Python <3.11
+- stdlib tomllib preferred when available
+
 **Known incompatible packages** (have native dependencies):
 - python-docx: Requires lxml native extensions (use mammoth for .docx parsing instead)
 - pdfminer.six: Requires cryptography native extensions (use PyPDF2 instead)
-- Any package requiring lxml, cryptography, or other compiled extensions
+- jsonschema: Requires rpds-py native extensions (use manual JSON validation or alternative libraries)
+- Any package requiring lxml, cryptography, rpds-py, or other compiled extensions
 
 **Installation notes**:
 - Packages may include optional native extensions (.pyd, .so) that are safely ignored

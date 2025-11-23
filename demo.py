@@ -620,8 +620,130 @@ print("✓ All encodings handled correctly")
     console.print()
 
 
+def demo_shell_utilities():
+    """Demo 9: Shell utilities from sandbox_utils library."""
+    console.print(
+        Panel("[bold]Demo 9:[/bold] Shell Utilities (sandbox_utils)", style="blue", expand=False)
+    )
+
+    code = """
+from sandbox_utils import ls, find, tree, grep, cat, mkdir, touch, echo
+
+# Create test directory structure
+mkdir("/app/logs", parents=True)
+mkdir("/app/data", parents=True)
+
+# Create test files
+echo("ERROR: Failed to connect", "/app/logs/error.log")
+echo("INFO: Server started", "/app/logs/info.log")
+echo("WARNING: High memory usage", "/app/logs/warning.log")
+
+touch("/app/data/results.txt")
+echo("test,value\\n1,100\\n2,200\\n3,300", "/app/data/data.csv")
+
+print("📂 Directory Tree:")
+print(tree("/app", max_depth=2))
+
+print("\\n🔍 Find all .log files:")
+log_files = find("*.log", "/app", recursive=True)
+for f in log_files:
+    print(f"  • {f}")
+
+print("\\n🔎 Search for 'ERROR' in log files:")
+matches = grep(r"ERROR", log_files)
+for file, line_num, line in matches:
+    print(f"  {file}:{line_num}: {line.strip()}")
+
+print("\\n📋 List /app/logs directory (long format):")
+items = ls("/app/logs", long=True)
+for item in items:
+    print(f"  {item}")
+
+print("\\n📄 Read error.log:")
+print(cat("/app/logs/error.log"))
+"""
+
+    console.print("\n[dim]Demonstrating shell-like file operations...[/dim]")
+    _, result = execute_in_session(code, session_id="demo-9-shell")
+
+    console.print("\n[bold]Output:[/bold]")
+    console.print(result["stdout"].strip())
+    console.print(f"\n[dim]Fuel: {result['fuel_consumed']:,} instructions[/dim]")
+    console.print()
+
+
+def demo_data_processing():
+    """Demo 10: Data processing with sandbox_utils."""
+    console.print(
+        Panel(
+            "[bold]Demo 10:[/bold] Data Processing (sandbox_utils)", style="magenta", expand=False
+        )
+    )
+
+    code = """
+from sandbox_utils import csv_to_json, group_by, filter_by, sort_by, unique
+import json
+
+# Create sample CSV data
+csv_data = '''name,department,salary,years
+Alice,Engineering,95000,5
+Bob,Engineering,87000,3
+Charlie,Sales,92000,7
+Diana,Engineering,105000,8
+Eve,Sales,78000,2
+Frank,HR,65000,4'''
+
+# Write CSV file
+with open('/app/employees.csv', 'w') as f:
+    f.write(csv_data)
+
+# Convert CSV to JSON
+json_str = csv_to_json('/app/employees.csv')
+employees = json.loads(json_str)
+
+print("📊 Employee Data Processing")
+print("=" * 50)
+
+# Group by department
+by_dept = group_by(employees, lambda e: e['department'])
+print("\\n👥 Employees by Department:")
+for dept, emps in by_dept.items():
+    print(f"  {dept}: {len(emps)} employees")
+
+# Filter high earners (salary > 90k)
+high_earners = filter_by(employees, lambda e: int(e['salary']) > 90000)
+print(f"\\n💰 High Earners (>$90k): {len(high_earners)}")
+for emp in high_earners:
+    print(f"  • {emp['name']}: ${emp['salary']}")
+
+# Sort by years of experience
+by_experience = sort_by(employees, lambda e: int(e['years']), reverse=True)
+print("\\n⭐ Most Experienced:")
+for emp in by_experience[:3]:
+    print(f"  {emp['name']}: {emp['years']} years")
+
+# Get unique departments
+departments = unique([e['department'] for e in employees])
+print(f"\\n🏢 Departments: {', '.join(departments)}")
+
+# Calculate average salary by department
+print("\\n💵 Average Salary by Department:")
+for dept, emps in by_dept.items():
+    avg = sum(int(e['salary']) for e in emps) / len(emps)
+    print(f"  {dept}: ${avg:,.0f}")
+"""
+
+    console.print("\n[dim]Processing employee data with functional utilities...[/dim]")
+    _, result = execute_in_session(code, session_id="demo-10-data")
+
+    console.print("\n[bold]Output:[/bold]")
+    console.print(result["stdout"].strip())
+    console.print(f"\n[dim]Fuel: {result['fuel_consumed']:,} instructions[/dim]")
+    console.print()
+
+
 def demo_llm_integration():
-    """Demo 9: LLM integration pattern.
+    """Demo 11: LLM integration pattern.
 
     This demonstrates the complete flow for integrating with an LLM:
 
@@ -643,7 +765,7 @@ def demo_llm_integration():
        - Error messages for debugging
     """
     console.print(
-        Panel("[bold]Demo 9:[/bold] LLM Integration Pattern", style="green", expand=False)
+        Panel("[bold]Demo 11:[/bold] LLM Integration Pattern", style="green", expand=False)
     )
 
     # Simulated LLM-generated code
@@ -795,6 +917,8 @@ def main():
         ("SQLite Database", demo_sqlite),
         ("Vendored Packages", demo_vendored_packages),
         ("Unicode Support", demo_unicode),
+        ("Shell Utilities", demo_shell_utilities),
+        ("Data Processing", demo_data_processing),
         ("LLM Integration", demo_llm_integration),
     ]
 

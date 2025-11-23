@@ -366,7 +366,223 @@ See the [OpenAI Agents integration README](examples/openai_agents/README.md) for
 
 ---
 
-## 🔒 Security Model
+## � Available Python Capabilities
+
+### Python Standard Library
+
+The WASM sandbox includes CPython 3.11+ with extensive standard library support:
+
+**File & I/O Operations**
+- `pathlib`, `os.path` - Path manipulation (within `/app` only)
+- `shutil` - File copying and directory operations
+- `glob` - Pattern matching for file search
+- `tempfile` - Temporary file creation (within `/app`)
+
+**Text & Data Processing**
+- `re` - Regular expressions
+- `json` - JSON encoding/decoding
+- `csv` - CSV file reading/writing
+- `xml.etree.ElementTree` - XML parsing
+- `tomllib` (3.11+) or `tomli` - TOML parsing
+- `base64`, `binascii` - Binary encoding
+- `hashlib` - Cryptographic hashing (SHA, MD5, etc.)
+
+**Data Structures & Utilities**
+- `collections` - deque, Counter, defaultdict, etc.
+- `itertools` - Iterator utilities
+- `functools` - Functional programming tools
+- `typing` - Type hints and annotations
+
+**Date & Time**
+- `datetime` - Date/time manipulation
+- `time` - Time operations
+- `calendar` - Calendar utilities
+
+**Math & Statistics**
+- `math` - Mathematical functions
+- `statistics` - Statistical functions
+- `random` - Random number generation
+- `decimal`, `fractions` - Precise numeric types
+
+**Text & Strings**
+- `string` - String constants and utilities
+- `textwrap` - Text wrapping and formatting
+- `difflib` - Text comparison
+
+**Data Compression**
+- `zipfile` - ZIP archive handling
+- `gzip`, `bz2`, `lzma` - Compression formats
+
+### Vendored Pure-Python Packages
+
+Pre-installed packages available via `sys.path.insert(0, '/app/site-packages')`:
+
+**Document Processing**
+- `openpyxl` - Read/write Excel (.xlsx) files
+- `XlsxWriter` - Write Excel files (lighter alternative)
+- `PyPDF2` - Read/write/merge PDF files
+- `odfpy` - OpenDocument Format (.odf, .ods, .odp)
+- `mammoth` - Convert Word (.docx) to HTML/Markdown
+
+**HTTP & Encoding** (Note: networking disabled in baseline WASI)
+- `certifi`, `charset-normalizer`, `idna`, `urllib3`
+- Useful for data encoding/decoding even without network access
+
+**Date/Time Extensions**
+- `python-dateutil` - Advanced date parsing and arithmetic
+
+**Text Processing**
+- `tabulate` - Pretty-print tables (ASCII, Markdown, HTML)
+- `jinja2` + `MarkupSafe` - Template rendering (⚠️ requires 5B fuel budget)
+- `markdown` - Markdown to HTML conversion
+
+**Data Modeling**
+- `attrs` - Classes without boilerplate
+
+**Compatibility**
+- `six` - Python 2/3 compatibility utilities
+- `tomli` - TOML parser (Python <3.11)
+
+### `sandbox_utils` Library
+
+Shell-like utilities purpose-built for LLM code generation:
+
+**File Operations**
+```python
+from sandbox_utils import find, tree, walk, copy_tree, remove_tree
+
+# Find files matching pattern
+files = find("*.py", "/app", recursive=True)
+
+# Display directory tree
+print(tree("/app", max_depth=3))
+
+# Filtered directory traversal
+for path in walk("/app", filter_func=lambda p: p.suffix == ".json"):
+    print(path)
+```
+
+**Text Processing**
+```python
+from sandbox_utils import grep, sed, head, tail, wc, diff
+
+# Search for pattern in files
+matches = grep(r"ERROR", files, regex=True)
+
+# Regex replacement
+text = sed(r"foo(\d+)", r"bar\1", "foo123 foo456")
+
+# Read first/last lines
+content = head("/app/log.txt", lines=10)
+```
+
+**Data Manipulation**
+```python
+from sandbox_utils import group_by, filter_by, sort_by, unique, chunk
+
+# Group items by key
+groups = group_by(users, lambda u: u["country"])
+
+# Filter and sort
+active = filter_by(users, lambda u: u["active"])
+sorted_users = sort_by(active, lambda u: u["created_at"], reverse=True)
+```
+
+**Format Conversions**
+```python
+from sandbox_utils import csv_to_json, json_to_csv, xml_to_dict
+
+# Convert CSV to JSON
+json_str = csv_to_json("/app/data.csv", output="/app/data.json")
+
+# Parse XML to dict
+data = xml_to_dict('<root><item id="1">value</item></root>')
+```
+
+**Shell Emulation**
+```python
+from sandbox_utils import ls, cat, touch, mkdir, rm, cp, mv, echo
+
+# List directory
+items = ls("/app", long=True)  # Returns list of dicts with metadata
+
+# Concatenate files
+content = cat("/app/file1.txt", "/app/file2.txt")
+
+# Create/copy/move files
+touch("/app/newfile.txt")
+cp("/app/source.txt", "/app/dest.txt")
+mv("/app/old.txt", "/app/new.txt")
+```
+
+**Security Note**: All `sandbox_utils` functions enforce `/app` path validation and reject `..` traversal attempts.
+
+### Usage Examples
+
+**Basic Import Pattern**
+```python
+# Make vendored packages available
+import sys
+sys.path.insert(0, '/app/site-packages')
+
+# Now import vendored packages
+import openpyxl
+from tabulate import tabulate
+from sandbox_utils import find, grep
+```
+
+**Complete Workflow Example**
+```python
+import sys
+sys.path.insert(0, '/app/site-packages')
+
+from sandbox_utils import find, grep, csv_to_json
+from tabulate import tabulate
+import json
+
+# Find all CSV files
+csv_files = find("*.csv", "/app")
+
+# Search for errors in log files
+log_files = find("*.log", "/app")
+errors = grep(r"ERROR.*timeout", log_files)
+
+# Convert CSV to JSON and process
+for csv_file in csv_files:
+    json_file = str(csv_file).replace('.csv', '.json')
+    csv_to_json(str(csv_file), output=json_file)
+    
+# Load and display data
+with open('/app/data.json') as f:
+    data = json.load(f)
+    
+table = tabulate(data, headers="keys", tablefmt="markdown")
+print(table)
+```
+
+### Performance Considerations
+
+**Fuel Budget Guidelines** (default: 2B instructions)
+
+| Operation | Typical Fuel | Notes |
+|-----------|--------------|-------|
+| `find()` 100 files | ~5M | Linear in file count |
+| `grep()` 1MB text | ~20M | Depends on regex complexity |
+| `csv_to_json()` 10K rows | ~50M | Depends on row size |
+| `tree()` 500 dirs | ~10M | Linear in directory count |
+| First `import jinja2` | ~4B | ⚠️ Requires 5B fuel budget |
+| Import openpyxl | ~3-5B | First import only |
+| Import PyPDF2 | ~3B | First import only |
+
+**Tips for Efficient Code**:
+- Cached imports: After first execution, imports in same session use cached modules
+- Use `chunk()` for large datasets to process in batches
+- Prefer `walk()` iterator over `find()` for very large directories
+- Set higher fuel budgets for document processing: `ExecutionPolicy(fuel_budget=5_000_000_000)`
+
+---
+
+## �🔒 Security Model
 
 ### Multi-Layered Defense
 
@@ -521,17 +737,119 @@ open('/app/data.txt', 'r')
 
 **Cause:** Package not vendored or not in sys.path
 
-**Solution:** Vendor pure-Python package
+**Solution 1: Use pre-vendored packages**
+
+Check if the package is already vendored (see [Available Python Capabilities](#-available-python-capabilities)):
+```python
+import sys
+sys.path.insert(0, '/app/site-packages')
+import openpyxl  # or any other vendored package
+```
+
+**Solution 2: Vendor a new pure-Python package**
 ```powershell
+# Install to vendor directory
 uv run python scripts/manage_vendor.py install <package-name>
+
+# Copy to workspace
 uv run python scripts/manage_vendor.py copy
 ```
 
-Then in sandboxed code:
+Then use in sandboxed code:
 ```python
 import sys
 sys.path.insert(0, '/app/site-packages')
 import <package-name>
+```
+
+**Note:** Only pure-Python packages work in WASM. Packages with C/Rust extensions will fail.
+
+</details>
+
+<details>
+<summary><b>🚨 <code>ImportError</code> from vendored package</b></summary>
+
+**Cause:** Package has native dependencies or missing dependencies
+
+**Solution:** Check if package is pure-Python
+```powershell
+# Test package compatibility
+uv run python -c "
+from sandbox import create_sandbox, RuntimeType
+sandbox = create_sandbox(runtime=RuntimeType.PYTHON)
+result = sandbox.execute('''
+import sys
+sys.path.insert(0, \"/app/site-packages\")
+import <package-name>
+print(\"Package loaded successfully\")
+''')
+print(result.stdout if result.success else result.stderr)
+"
+```
+
+**Known incompatible packages:**
+- `jsonschema` (requires `rpds-py` Rust extension)
+- `python-docx` (requires `lxml` C extension)
+- `pdfminer.six` (requires `cryptography` C extension)
+
+**Alternatives:**
+- For JSON validation: Use manual validation or simpler libraries
+- For .docx: Use `mammoth` (vendored, pure-Python)
+- For PDF: Use `PyPDF2` (vendored, pure-Python)
+
+</details>
+
+<details>
+<summary><b>🚨 High fuel consumption with `jinja2` or document packages</b></summary>
+
+**Cause:** Large packages consume significant fuel on first import
+
+**Solution:** Increase fuel budget for document processing
+```python
+from sandbox import create_sandbox, ExecutionPolicy, RuntimeType
+
+policy = ExecutionPolicy(
+    fuel_budget=5_000_000_000  # 5B for jinja2, openpyxl, PyPDF2
+)
+sandbox = create_sandbox(runtime=RuntimeType.PYTHON, policy=policy)
+```
+
+**Fuel requirements:**
+- `jinja2`: ~4B instructions (first import)
+- `openpyxl`: ~3-5B instructions (first import)
+- `PyPDF2`: ~3B instructions (first import)
+- `tabulate`, `markdown`: <2B (works with default)
+
+**Note:** Subsequent executions in the same session use cached imports (lower fuel).
+
+</details>
+
+<details>
+<summary><b>🚨 <code>sandbox_utils</code> path validation errors</b></summary>
+
+**Cause:** Attempting to access files outside `/app` or using `..` traversal
+
+**Examples of errors:**
+```
+ValueError: Path must be within /app: /etc/passwd
+ValueError: Path must be within /app: /app/../etc
+```
+
+**Solution:** Always use absolute paths within `/app` or relative paths
+```python
+from sandbox_utils import find, ls
+
+# ✅ Correct - absolute path in /app
+files = find("*.txt", "/app/data")
+
+# ✅ Correct - relative path (becomes /app/data)
+files = find("*.txt", "data")
+
+# ❌ Wrong - outside /app
+files = find("*.txt", "/etc")  # Raises ValueError
+
+# ❌ Wrong - traversal attempt
+files = find("*.txt", "/app/../etc")  # Raises ValueError
 ```
 
 </details>

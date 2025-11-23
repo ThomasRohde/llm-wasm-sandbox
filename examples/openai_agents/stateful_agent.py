@@ -49,13 +49,14 @@ from sandbox import (
 class SandboxState:
     """
     Local context for managing WASM sandbox session state.
-    
+
     This is NOT sent to the LLM - it's Python-side state that persists
     across tool calls within the same Runner.run() execution and can be
     reused across multiple turns by passing the same instance.
     """
 
     wasm_session_id: str | None = None
+
 
 # Load environment variables
 load_dotenv()
@@ -78,13 +79,13 @@ async def run_python_in_wasm(
 ) -> dict[str, Any]:
     """
     Execute Python code in the WASM sandbox.
-    
+
     When persistent=True (default), the same workspace is automatically
     reused across all calls in this conversation, allowing files written
     to /app to persist between executions.
-    
+
     When persistent=False, a fresh workspace is created for this execution.
-    
+
     Returns:
         Dict with execution results:
             - success: bool - Whether execution completed without errors
@@ -301,7 +302,9 @@ async def demo_error_recovery_fuel():
         )
     )
 
-    console.print("\n[bold cyan]Scenario: Agent simplifies code when fuel is exhausted[/bold cyan]\n")
+    console.print(
+        "\n[bold cyan]Scenario: Agent simplifies code when fuel is exhausted[/bold cyan]\n"
+    )
 
     agent_session = SQLiteSession("demo3_fuel_recovery")
     sandbox_state = SandboxState()

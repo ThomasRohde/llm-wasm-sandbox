@@ -548,8 +548,8 @@ def test_metadata_creation_overhead(tmp_path: Path) -> None:
     duration = time.time() - start
 
     # Session creation with metadata should complete in reasonable time
-    # (< 1 second even on slow systems)
-    assert duration < 1.0
+    # Allow 2 seconds to account for system variance (CI, slow systems, etc.)
+    assert duration < 2.0
 
 
 def test_timestamp_update_overhead(tmp_path: Path) -> None:

@@ -235,8 +235,7 @@ async def main():
     """Run all demos."""
     console.print(
         Panel.fit(
-            "[bold]OpenAI Agents SDK + LLM WASM Sandbox[/bold]\n"
-            "Basic Function Calling Integration",
+            "[bold]OpenAI Agents SDK + LLM WASM Sandbox[/bold]\nBasic Function Calling Integration",
             style="bold white on blue",
         )
     )
