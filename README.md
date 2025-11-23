@@ -42,10 +42,12 @@ Execute untrusted code safely using WebAssembly sandboxing with multi-layered se
 - **📜 JavaScript Runtime**: QuickJS-NG WASM for secure JavaScript execution
 - **⚡ Deterministic Execution**: Fuel-based instruction counting prevents runaway code
 - **📦 Package Vendoring**: Pure-Python packages available in sandbox via `vendor/` directory
-- **💾 Persistent Sessions**: Multi-turn LLM interactions with stateful file operations
+- **💾 Persistent Sessions**: UUID-based session IDs with automatic workspace isolation
+- **🗂️ Pluggable Storage**: Storage adapter interface with disk and custom backend support
 - **📊 Rich Metrics**: Fuel consumption, memory usage, execution time tracking
 - **🎯 Type-Safe API**: Pydantic models for policies and results
 - **🔍 Structured Logging**: Observable execution events for monitoring
+- **🧹 Session Pruning**: Automatic cleanup of old sessions with configurable retention policies
 
 ---
 
@@ -100,10 +102,13 @@ print(result.stdout)  # "Hello from QuickJS!"
 # Python demo with comprehensive examples
 uv run python demo.py
 
-# JavaScript demo
+# JavaScript demo (single execution)
 uv run python demo_javascript.py
 
-# Session workflow demo (stateful execution)
+# JavaScript session demo (stateful execution)
+uv run python demo_javascript_session.py
+
+# Session workflow demo (file operations)
 uv run python demo_session_workflow.py
 ```
 
@@ -122,11 +127,12 @@ llm-wasm-sandbox/
 │   └── policy.toml               # Execution policy configuration
 ├── sandbox/
 │   ├── core/                     # Type-safe foundation
-│   │   ├── models.py             # ExecutionPolicy, SandboxResult
+│   │   ├── models.py             # ExecutionPolicy, SandboxResult, RuntimeType
 │   │   ├── base.py               # BaseSandbox ABC
 │   │   ├── errors.py             # Custom exceptions
 │   │   ├── logging.py            # Structured logging
-│   │   └── factory.py            # create_sandbox() factory
+│   │   ├── factory.py            # create_sandbox() factory
+│   │   └── storage.py            # Storage adapter interface
 │   ├── runtimes/                 # Runtime implementations
 │   │   ├── python/
 │   │   │   └── sandbox.py        # PythonSandbox
@@ -134,8 +140,9 @@ llm-wasm-sandbox/
 │   │       └── sandbox.py        # JavaScriptSandbox
 │   ├── host.py                   # Wasmtime/WASI wrapper
 │   ├── policies.py               # Policy loading
-│   ├── sessions.py               # Session management
-│   └── utils.py                  # Utilities
+│   ├── sessions.py               # Session file operations & pruning
+│   ├── utils.py                  # Utilities
+│   └── vendor.py                 # Package vendoring
 ├── workspace/                   # Isolated filesystem (mounted as /app)
 │   └── <session-id>/            # Per-session workspaces
 ├── vendor/                      # Vendored pure-Python packages
@@ -253,6 +260,71 @@ IDs) and you can enforce UUID-only IDs via `allow_non_uuid=False`. Vendored
 packages are copied per-session so one guest cannot poison another, optional
 `mount_data_dir` mounts are read-only, and host-side logs are cleaned up unless
 you opt in with `ExecutionPolicy(preserve_logs=True)`.
+
+### Session Management API
+
+Direct session file operations and pruning:
+
+```python
+from sandbox import (
+    create_sandbox, RuntimeType,
+    write_session_file, read_session_file, list_session_files,
+    prune_sessions, delete_session_workspace
+)
+
+# Create sandbox and write files
+sandbox = create_sandbox(runtime=RuntimeType.PYTHON)
+write_session_file(sandbox.session_id, "data.json", '{"key": "value"}')
+
+# List all files in session
+files = list_session_files(sandbox.session_id)
+print(files)  # ['data.json', 'user_code.py']
+
+# Read file content
+content = read_session_file(sandbox.session_id, "data.json")
+
+# Prune old sessions (e.g., older than 7 days)
+result = prune_sessions(max_age_days=7)
+print(f"Deleted {result.deleted_count} sessions, freed {result.bytes_freed} bytes")
+
+# Delete specific session
+delete_session_workspace(sandbox.session_id)
+```
+
+### Pluggable Storage Adapters
+
+Customize storage backend for sessions:
+
+```python
+from sandbox import create_sandbox, RuntimeType, StorageAdapter
+from pathlib import Path
+
+class CustomStorage(StorageAdapter):
+    """Custom storage backend (e.g., S3, Azure Blob)."""
+    
+    def read(self, path: Path) -> bytes:
+        # Implement custom read logic
+        pass
+    
+    def write(self, path: Path, content: bytes) -> None:
+        # Implement custom write logic
+        pass
+    
+    def delete(self, path: Path) -> None:
+        # Implement custom delete logic
+        pass
+    
+    def exists(self, path: Path) -> bool:
+        # Implement custom exists check
+        pass
+
+# Use custom storage
+storage = CustomStorage()
+sandbox = create_sandbox(
+    runtime=RuntimeType.PYTHON,
+    storage_adapter=storage
+)
+```
 
 ---
 
@@ -428,9 +500,9 @@ import <package-name>
 
 ### Getting Help
 
-- 🐞 **Report bugs**: [GitHub Issues](https://github.danskenet.net/e29667/llm-wasm-sandbox/issues)
+- 🐞 **Report bugs**: [GitHub Issues](https://github.com/yourusername/llm-wasm-sandbox/issues)
 - 📖 **Documentation**: See inline code comments and docstrings
-- 💡 **Examples**: Check `demo.py` and `tests/` directory
+- 💡 **Examples**: Check `demo*.py` files and `tests/` directory
 
 ---
 
@@ -486,11 +558,15 @@ Contributions are welcome! Please follow these guidelines:
 
 ```powershell
 # Clone your fork
-git clone https://github.danskenet.net/YOUR-USERNAME/llm-wasm-sandbox.git
+git clone https://github.com/YOUR-USERNAME/llm-wasm-sandbox.git
 cd llm-wasm-sandbox
 
 # Install dev dependencies
 uv sync
+
+# Fetch WASM binaries
+.\scripts\fetch_wlr_python.ps1
+.\scripts\fetch_quickjs.ps1
 
 # Run tests to verify setup
 uv run pytest tests/ -v
@@ -517,11 +593,13 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🚀 Roadmap
 
 - [x] JavaScript runtime support (QuickJS WASM)
+- [x] Pluggable storage adapter interface
+- [x] Session pruning and lifecycle management
 - [ ] Improved async execution support
 - [ ] Network sandboxing with explicit socket grants
 - [ ] Enhanced metrics and profiling
-- [ ] Plugin system for custom runtimes
 - [ ] Web-based demo interface
+- [ ] Additional runtime support (Ruby, Lua)
 
 ---
 
@@ -535,8 +613,8 @@ If you find this project useful, please consider giving it a star on GitHub!
 
 **Built with ❤️ for secure LLM code execution**
 
-[Report Bug](https://github.danskenet.net/e29667/llm-wasm-sandbox/issues) •
-[Request Feature](https://github.danskenet.net/e29667/llm-wasm-sandbox/issues) •
-[Documentation](https://github.danskenet.net/e29667/llm-wasm-sandbox)
+[Report Bug](https://github.com/yourusername/llm-wasm-sandbox/issues) •
+[Request Feature](https://github.com/yourusername/llm-wasm-sandbox/issues) •
+[Documentation](https://github.com/yourusername/llm-wasm-sandbox)
 
 </div>
