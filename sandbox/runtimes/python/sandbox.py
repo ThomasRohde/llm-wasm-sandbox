@@ -338,61 +338,80 @@ class PythonSandbox(BaseSandbox):
     @staticmethod
     def _enhance_package_error_message(stderr: str) -> str:
         """Enhance ModuleNotFoundError messages with helpful vendor package guidance.
-        
+
         Detects import errors for packages that exist in vendor/site-packages and
         provides actionable feedback about correct sys.path setup.
-        
+
         Args:
             stderr: Original stderr output from code execution
-            
+
         Returns:
             Enhanced stderr with helpful hints appended (or original if no relevant errors)
         """
         if not stderr or "ModuleNotFoundError" not in stderr:
             return stderr
-        
+
         # List of vendored packages (matches what's in vendor/site-packages)
         vendored_packages = {
-            "openpyxl", "xlsxwriter", "pypdf2", "pdfminer", "odfpy", "mammoth",
-            "tabulate", "jinja2", "markupsafe", "markdown", "dateutil", "attr", "attrs",
-            "certifi", "charset_normalizer", "idna", "urllib3", "six", "tomli"
+            "openpyxl",
+            "xlsxwriter",
+            "pypdf2",
+            "pdfminer",
+            "odfpy",
+            "mammoth",
+            "tabulate",
+            "jinja2",
+            "markupsafe",
+            "markdown",
+            "dateutil",
+            "attr",
+            "attrs",
+            "certifi",
+            "charset_normalizer",
+            "idna",
+            "urllib3",
+            "six",
+            "tomli",
         }
-        
+
         # Extract module name from error message
         # Pattern: "ModuleNotFoundError: No module named 'package_name'"
         import re
+
         match = re.search(r"No module named '([^']+)'", stderr)
         if not match:
             return stderr
-        
+
         module_name = match.group(1).split(".")[0].lower()  # Get base package name
-        
+
         # Check if this is a vendored package
         if module_name not in vendored_packages:
             return stderr
-        
+
         # Check if user tried the wrong path
-        wrong_path_used = "/app/site-packages" in stderr or "sys.path.insert(0, '/app/site-packages')" in stderr
-        
+        wrong_path_used = (
+            "/app/site-packages" in stderr or "sys.path.insert(0, '/app/site-packages')" in stderr
+        )
+
         # Build helpful message
         hint = "\n\n" + "=" * 70 + "\n"
         hint += "📦 PACKAGE IMPORT HELP\n"
         hint += "=" * 70 + "\n"
         hint += f"The package '{module_name}' IS available in the sandbox!\n\n"
-        
+
         if wrong_path_used:
             hint += "❌ ERROR: You used the WRONG path: /app/site-packages\n\n"
             hint += "✅ SOLUTION: Use the CORRECT path: /data/site-packages\n\n"
         else:
             hint += "It looks like you forgot to add vendored packages to sys.path.\n\n"
-        
+
         hint += "Add this at the START of your code:\n"
         hint += "    import sys\n"
         hint += "    sys.path.insert(0, '/data/site-packages')\n\n"
         hint += "Then your import will work:\n"
         hint += f"    import {module_name}\n"
         hint += "=" * 70 + "\n"
-        
+
         return stderr + hint
 
     def _update_session_timestamp(self) -> None:

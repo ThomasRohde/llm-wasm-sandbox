@@ -326,29 +326,28 @@ class MCPServer:
 
         @self.app.tool(
             name="list_available_packages",
-            description="List pre-installed packages available in Python sessions (no installation required)",
+            description="List pre-installed packages available in Python sessions (no installation required). Includes fuel budget requirements for import operations.",
         )
         async def list_available_packages() -> MCPToolResult:
-            """List pre-installed packages."""
+            """List pre-installed packages with fuel requirements."""
             with self.metrics.time_tool_execution("list_available_packages"):
                 try:
                     packages = {
                         "document_processing": [
-                            "openpyxl - Read/write Excel .xlsx files",
-                            "XlsxWriter - Write Excel .xlsx files (write-only, lighter)",
-                            "PyPDF2 - Read/write/merge PDF files",
+                            "openpyxl - Read/write Excel .xlsx files (⚠️ REQUIRES 10B fuel budget for first import)",
+                            "XlsxWriter - Write Excel .xlsx files, write-only, lighter alternative",
+                            "PyPDF2 - Read/write/merge PDF files (⚠️ REQUIRES 10B fuel budget for first import)",
                             "pdfminer.six - PDF text extraction (pure-Python mode)",
                             "odfpy - Read/write OpenDocument Format (.odf, .ods, .odp)",
                             "mammoth - Convert Word .docx to HTML/Markdown",
                         ],
                         "text_data": [
-                            "tabulate - Pretty-print tabular data (ASCII, Markdown, HTML)",
-                            "jinja2 - Template rendering engine",
+                            "tabulate - Pretty-print tables (ASCII, Markdown, HTML) [~1.4B fuel for first import]",
+                            "jinja2 - Template rendering (⚠️ REQUIRES 5-10B fuel budget for first import)",
                             "MarkupSafe - HTML/XML escaping (required by jinja2)",
-                            "markdown - Convert Markdown to HTML",
-                            "python-dateutil - Advanced date/time parsing",
+                            "markdown - Convert Markdown to HTML [~1.8B fuel for first import]",
+                            "python-dateutil - Advanced date/time parsing [~1.6B fuel for first import]",
                             "attrs - Classes without boilerplate",
-
                         ],
                         "utilities": [
                             "certifi - Mozilla's CA bundle",
@@ -360,7 +359,7 @@ class MCPServer:
                             "cffi - Foreign function interface (limited WASM support)",
                         ],
                         "stdlib_highlights": [
-                            "json, csv, xml - Data formats",
+                            "json, csv, xml - Data formats [lightweight, <500M fuel]",
                             "re - Regular expressions",
                             "pathlib, os, shutil - File operations",
                             "math, statistics, decimal - Mathematics",
@@ -370,30 +369,50 @@ class MCPServer:
                             "zipfile, tarfile, gzip - Compression",
                             "sqlite3 - In-memory SQL database",
                         ],
+                        "fuel_requirements": [
+                            "📊 FUEL BUDGET REQUIREMENTS (first import only):",
+                            "  • Standard packages (tabulate, markdown, dateutil): 2-5B fuel (default budget OK)",
+                            "  • Heavy packages (openpyxl, PyPDF2, jinja2): 5-10B fuel (increase budget!)",
+                            "  • Stdlib modules: <500M fuel each",
+                            "",
+                            "⚡ PERFORMANCE TIPS:",
+                            "  • First import is expensive, subsequent imports use cached modules",
+                            "  • Sessions persist imports across executions",
+                            "  • Set ExecutionPolicy(fuel_budget=10_000_000_000) for document processing",
+                            "  • Use auto_persist_globals=True to cache imports automatically",
+                        ],
                         "incompatible_c_extensions": [
                             "❌ python-pptx - Requires lxml.etree (C extension not available in WASM)",
                             "❌ python-docx - Requires lxml.etree (C extension not available in WASM)",
                             "❌ Pillow/PIL - Image processing (C extension not available in WASM)",
-                            "❌ lxml.etree - XML processing C extension (base lxml package imports but etree doesn't work)",
+                            "❌ lxml.etree - XML processing C extension (base lxml imports but etree doesn't work)",
                             "Note: Use mammoth for Word .docx reading, PyPDF2 for PDFs, openpyxl for Excel",
                         ],
                     }
 
                     usage_note = (
-                        "\nUsage: Add this at the start of your Python code:\n"
-                        "import sys\n"
-                        "sys.path.insert(0, '/data/site-packages')\n\n"
-                        "Note: pip install is NOT supported (WASI limitation). "
-                        "Use pre-installed packages or pure Python implementations.\n\n"
-                        "⚠ IMPORTANT: PowerPoint (.pptx) creation/editing is NOT supported because:\n"
-                        "  - python-pptx requires lxml.etree (C extension)\n"
-                        "  - Pillow/PIL required for images (C extension)\n"
-                        "  - These C extensions cannot run in the WASM sandbox\n\n"
-                        "For document processing, use:\n"
-                        "  - Excel: openpyxl, XlsxWriter\n"
-                        "  - PDF: PyPDF2, pdfminer.six\n"
-                        "  - Word: mammoth (read-only, converts to HTML/Markdown)\n"
-                        "  - OpenDocument: odfpy (.odt, .ods, .odp)"
+                        "\n✅ USAGE INSTRUCTIONS:\n"
+                        "1. Packages are automatically available via /data/site-packages\n"
+                        "2. No need to add sys.path.insert() - it's done automatically!\n"
+                        "3. Just import directly: import openpyxl, from tabulate import tabulate\n\n"
+                        "⚠️ FUEL BUDGET REQUIREMENTS:\n"
+                        "- DEFAULT budget (5B): Works for tabulate, markdown, dateutil, stdlib\n"
+                        "- INCREASE to 10B for: openpyxl, PyPDF2, jinja2 (first import only)\n"
+                        "- Subsequent imports in same session use cached modules (<100M fuel)\n\n"
+                        "💡 BEST PRACTICES:\n"
+                        "- Use auto_persist_globals=True when creating sessions\n"
+                        "- Import heavy packages once at session start\n"
+                        "- Reuse sessions to benefit from cached imports\n\n"
+                        "🚫 NOT SUPPORTED:\n"
+                        "- pip install (WASI limitation - use pre-installed packages only)\n"
+                        "- PowerPoint .pptx editing (requires C extensions: python-pptx, Pillow)\n"
+                        "- Image processing (Pillow/PIL requires C extensions)\n"
+                        "- Full lxml.etree (C extension not available, use xml.etree.ElementTree instead)\n\n"
+                        "📦 DOCUMENT PROCESSING ALTERNATIVES:\n"
+                        "  Excel: openpyxl (read/write), XlsxWriter (write-only)\n"
+                        "  PDF: PyPDF2 (read/write/merge), pdfminer.six (text extraction)\n"
+                        "  Word: mammoth (read-only, converts to HTML/Markdown)\n"
+                        "  OpenDocument: odfpy (.odt, .ods, .odp)"
                     )
 
                     content_lines = []

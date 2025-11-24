@@ -109,11 +109,11 @@ result = sandbox.execute("console.log('Hello from QuickJS!')")
 print(result.stdout)  # "Hello from QuickJS!"
 ```
 
-**Stateful Sessions with Automatic Variable Persistence:**
+**Stateful Sessions with Automatic Variable Persistence (Python only):**
 ```python
 from sandbox import create_sandbox, RuntimeType
 
-# Create session with auto-persist enabled
+# Create session with auto-persist enabled (Python runtime only)
 sandbox = create_sandbox(runtime=RuntimeType.PYTHON, auto_persist_globals=True)
 
 # First execution - set variables
@@ -122,6 +122,9 @@ sandbox.execute("counter = 100; data = [1, 2, 3]")
 # Second execution - variables automatically restored!
 sandbox.execute("print(f'counter={counter}, data={data}')")
 # Output: counter=100, data=[1, 2, 3]
+
+# ⚠️ Note: auto_persist_globals is not yet supported for JavaScript runtime
+# due to QuickJS-WASI lacking file I/O APIs. Use Python runtime for this feature.
 ```
 
 ### Run Demo
@@ -795,7 +798,30 @@ print(table)
 
 ### Performance Considerations
 
-**Fuel Budget Guidelines** (default: 2B instructions)
+**Fuel Budget Guidelines** (default: 2B instructions for library, 10B for MCP server)
+
+#### Package Import Fuel Requirements
+
+| Package | First Import Fuel | Subsequent Imports | Notes |
+|---------|------------------|-------------------|-------|
+| **Standard Library** | | | |
+| `json`, `csv`, `os` | <10M | <1M | ✅ Works with default budget |
+| `pathlib`, `re`, `datetime` | <10M | <1M | ✅ Works with default budget |
+| `hashlib`, `base64` | <10M | <1M | ✅ Works with default budget |
+| **Lightweight Packages** | | | |
+| `tabulate` | ~1.4B | <100M | ✅ Works with default budget |
+| `markdown` | ~1.8B | <100M | ✅ Works with default budget |
+| `python-dateutil` | ~800M | <50M | ✅ Works with default budget |
+| `attrs` | ~500M | <50M | ✅ Works with default budget |
+| **Heavy Packages** | | | |
+| `jinja2` + `MarkupSafe` | ~4-5B | <100M | ⚠️ Requires 5B+ fuel budget |
+| `openpyxl` | ~5-7B | <100M | ⚠️ Requires 5B+ fuel budget |
+| `PyPDF2` | ~5-6B | <100M | ⚠️ Requires 5B+ fuel budget |
+| `XlsxWriter` | ~3-4B | <100M | ⚠️ Requires 5B+ fuel budget |
+| `mammoth` | ~2-3B | <100M | ✅ Works with default budget |
+| `odfpy` | ~2-3B | <100M | ✅ Works with default budget |
+
+#### `sandbox_utils` Operations
 
 | Operation | Typical Fuel | Notes |
 |-----------|--------------|-------|
@@ -803,9 +829,14 @@ print(table)
 | `grep()` 1MB text | ~20M | Depends on regex complexity |
 | `csv_to_json()` 10K rows | ~50M | Depends on row size |
 | `tree()` 500 dirs | ~10M | Linear in directory count |
-| First `import jinja2` | ~4B | ⚠️ Requires 5B fuel budget |
-| Import openpyxl | ~3-5B | First import only |
-| Import PyPDF2 | ~3B | First import only |
+| `ls()`, `cat()`, `cp()` | <5M | Per operation |
+
+#### Fuel Budget Recommendations
+
+- **Default (2B)**: Standard library + lightweight packages
+- **Medium (5B)**: Document processing with openpyxl/PyPDF2
+- **High (10B)**: Multiple heavy packages or complex workflows
+- **MCP Server**: Uses 10B default for better package compatibility
 
 **Tips for Efficient Code**:
 - Cached imports: After first execution, imports in same session use cached modules

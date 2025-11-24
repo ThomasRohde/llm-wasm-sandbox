@@ -97,6 +97,7 @@ class JavaScriptSandbox(BaseSandbox):
         session_id: str,
         storage_adapter: StorageAdapter,
         logger: Any = None,
+        auto_persist_globals: bool = False,
     ) -> None:
         """Initialize JavaScriptSandbox with WASM binary path and session config.
 
@@ -106,9 +107,11 @@ class JavaScriptSandbox(BaseSandbox):
             session_id: UUIDv4 string identifying the session
             storage_adapter: StorageAdapter for workspace operations
             logger: Optional SandboxLogger (created if None)
+            auto_persist_globals: If True, automatically wrap code with state save/restore
         """
         super().__init__(policy, session_id, storage_adapter, logger)
         self.wasm_binary_path = wasm_binary_path
+        self.auto_persist_globals = auto_persist_globals
 
     def execute(self, code: str, **kwargs: Any) -> SandboxResult:
         """Execute untrusted JavaScript code in WASM sandbox with resource limits and session tracking.
@@ -180,6 +183,12 @@ class JavaScriptSandbox(BaseSandbox):
         self.logger.log_execution_start(
             runtime="javascript", policy=self.policy, session_id=self.session_id
         )
+
+        # Auto-wrap code with state persistence if enabled
+        if self.auto_persist_globals:
+            from sandbox.state_js import wrap_stateful_code
+
+            code = wrap_stateful_code(code)
 
         # Write code to workspace
         user_code_path = self._write_untrusted_code(code)

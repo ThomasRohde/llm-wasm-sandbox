@@ -441,7 +441,7 @@ class TestMCPToolListAvailablePackages:
 
     @pytest.mark.asyncio
     async def test_list_available_packages_returns_correct_path(self):
-        """Test that list_available_packages returns correct /data/site-packages path."""
+        """Test that list_available_packages indicates packages are automatically available."""
         server = create_mcp_server()
 
         # Call the tool
@@ -452,9 +452,9 @@ class TestMCPToolListAvailablePackages:
         # Verify the tool returns success
         assert parsed["success"] is True
         
-        # Verify the usage instructions contain the correct path
+        # Verify the usage instructions indicate automatic availability
         assert "/data/site-packages" in parsed["content"]
-        assert "sys.path.insert(0, '/data/site-packages')" in parsed["content"]
+        assert "automatically available" in parsed["content"] or "done automatically" in parsed["content"]
         
         # Verify the WRONG path is NOT in the response
         assert "/app/site-packages" not in parsed["content"]

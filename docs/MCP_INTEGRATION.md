@@ -516,15 +516,30 @@ policy = ExecutionPolicy(
 - Restart Claude Desktop after configuration changes
 
 **Package import errors (ModuleNotFoundError)**
-- **CRITICAL**: Vendored packages are mounted at `/data/site-packages`, NOT `/app/site-packages`
-- Add this at the start of your Python code:
+- **CRITICAL**: Vendored packages are now automatically available - no manual `sys.path.insert()` needed!
+- MCP server automatically configures `/data/site-packages` in Python path
+- Just import packages directly:
   ```python
-  import sys
-  sys.path.insert(0, '/data/site-packages')
+  from openpyxl import Workbook  # Works automatically!
+  import tabulate
+  import PyPDF2
   ```
-- Use `list_available_packages` tool to see all pre-installed packages
+- Use `list_available_packages` tool to see all 50+ pre-installed packages
 - Available packages include: openpyxl, XlsxWriter, PyPDF2, tabulate, jinja2, markdown, python-dateutil, and more
 - Note: Only pure-Python packages work in WASM (no C/Rust extensions)
+
+**Fuel budget errors (OutOfFuel) when importing packages**
+- **MCP server uses 10B default fuel budget** (10x higher than library default of 2B)
+- Heavy packages require more fuel for first import:
+  - `openpyxl`: ~5-7B fuel (first import only)
+  - `PyPDF2`: ~5-6B fuel (first import only)
+  - `jinja2`: ~4-5B fuel (first import only)
+  - `tabulate`, `markdown`: <2B (work with any budget)
+- Subsequent imports in same session use cached modules (<100M fuel)
+- For custom policies, use 10B+ for heavy packages:
+  ```python
+  policy = ExecutionPolicy(fuel_budget=10_000_000_000)
+  ```
 
 **Path confusion (/app vs /data)**
 - `/app` = Your session workspace (read/write files here)

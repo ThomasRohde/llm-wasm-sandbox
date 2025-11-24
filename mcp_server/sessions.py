@@ -17,7 +17,7 @@ from typing import Any
 
 from sandbox import RuntimeType, create_sandbox
 from sandbox.core.logging import SandboxLogger
-from sandbox.core.models import SandboxResult
+from sandbox.core.models import ExecutionPolicy, SandboxResult
 
 
 @dataclass
@@ -42,10 +42,19 @@ class WorkspaceSession:
     def get_sandbox(self) -> Any:
         """Get the sandbox instance for this session."""
         runtime = RuntimeType.PYTHON if self.language == "python" else RuntimeType.JAVASCRIPT
+        
+        # Use higher fuel budget for MCP sessions to support package imports
+        # openpyxl, PyPDF2, jinja2 require 5-10B fuel for first import
+        policy = ExecutionPolicy(
+            fuel_budget=10_000_000_000,  # 10B fuel for document processing packages
+            memory_bytes=256 * 1024 * 1024,  # 256 MB
+        )
+        
         return create_sandbox(
             runtime=runtime,
             session_id=self.sandbox_session_id,
             auto_persist_globals=self.auto_persist_globals,
+            policy=policy,
         )
 
     async def execute_code(self, code: str, timeout: int | None = None) -> SandboxResult:
@@ -86,9 +95,20 @@ class WorkspaceSessionManager:
             if not session.is_expired:
                 return session
 
-        # Create new sandbox session
+        # Create new sandbox session with higher fuel budget for package imports
         runtime = RuntimeType.PYTHON if language == "python" else RuntimeType.JAVASCRIPT
-        sandbox = create_sandbox(runtime=runtime, auto_persist_globals=auto_persist_globals)
+        
+        # Use 10B fuel budget to support openpyxl, PyPDF2, jinja2 imports
+        policy = ExecutionPolicy(
+            fuel_budget=10_000_000_000,  # 10B fuel for document processing
+            memory_bytes=256 * 1024 * 1024,  # 256 MB
+        )
+        
+        sandbox = create_sandbox(
+            runtime=runtime,
+            auto_persist_globals=auto_persist_globals,
+            policy=policy,
+        )
         sandbox_session_id = sandbox.session_id
 
         # Create workspace session
@@ -115,9 +135,20 @@ class WorkspaceSessionManager:
         self, language: str, session_id: str | None = None, auto_persist_globals: bool = False
     ) -> WorkspaceSession:
         """Create a new workspace session explicitly."""
-        # Create new sandbox session
+        # Create new sandbox session with higher fuel budget for package imports
         runtime = RuntimeType.PYTHON if language == "python" else RuntimeType.JAVASCRIPT
-        sandbox = create_sandbox(runtime=runtime, auto_persist_globals=auto_persist_globals)
+        
+        # Use 10B fuel budget to support openpyxl, PyPDF2, jinja2 imports
+        policy = ExecutionPolicy(
+            fuel_budget=10_000_000_000,  # 10B fuel for document processing
+            memory_bytes=256 * 1024 * 1024,  # 256 MB
+        )
+        
+        sandbox = create_sandbox(
+            runtime=runtime,
+            auto_persist_globals=auto_persist_globals,
+            policy=policy,
+        )
         sandbox_session_id = sandbox.session_id
 
         # Create workspace session

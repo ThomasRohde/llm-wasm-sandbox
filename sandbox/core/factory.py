@@ -50,10 +50,12 @@ def create_sandbox(
                         If None, creates DiskStorageAdapter with workspace_root.
         logger: Optional SandboxLogger. If None, runtime creates default logger.
         allow_non_uuid: If False, session_id must be a valid UUID string.
-        auto_persist_globals: If True, automatically save/restore Python globals between
-                             executions using JSON serialization. Only serializable types
-                             (int, str, list, dict, bool, float, None) are persisted.
+        auto_persist_globals: If True, automatically save/restore globals between executions
+                             using JSON serialization. Only serializable types are persisted.
                              Functions, modules, and classes are filtered out.
+                             ⚠️ PYTHON ONLY: Not yet supported for JavaScript runtime due to
+                             QuickJS-WASI lacking file I/O APIs. JavaScript will accept the
+                             parameter but feature will not work until runtime adds file support.
         **kwargs: Additional runtime-specific arguments passed to constructor.
                   For PythonSandbox: wasm_binary_path (default: auto-detected bundled binary)
                   For JavaScriptSandbox: wasm_binary_path (default: auto-detected bundled binary)
@@ -231,6 +233,7 @@ def create_sandbox(
             session_id=session_id,
             storage_adapter=storage_adapter,
             logger=logger,
+            auto_persist_globals=auto_persist_globals,
             **kwargs,
         )
 
