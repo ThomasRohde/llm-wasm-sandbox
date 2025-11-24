@@ -138,7 +138,7 @@ class TestPythonSandboxExecution:
 
     def test_execute_with_inject_setup_true(self, python_sandbox):
         """Test execute with inject_setup=True adds sys.path for vendored packages."""
-        code = "import sys; print('/app/site-packages' in sys.path)"
+        code = "import sys; print('/data/site-packages' in sys.path)"
         result = python_sandbox.execute(code, inject_setup=True)
 
         assert isinstance(result, SandboxResult)
@@ -146,7 +146,7 @@ class TestPythonSandboxExecution:
 
     def test_execute_with_inject_setup_false(self, python_sandbox):
         """Test execute with inject_setup=False skips sys.path setup."""
-        code = "import sys; print('/app/site-packages' in sys.path)"
+        code = "import sys; print('/data/site-packages' in sys.path)"
         result = python_sandbox.execute(code, inject_setup=False)
 
         assert isinstance(result, SandboxResult)

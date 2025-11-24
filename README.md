@@ -322,9 +322,9 @@ print(result2.stdout)  # "Updated: {'users': ['Alice', 'Bob', 'Charlie'], 'count
 
 Session workspaces are canonicalized before creation (no `/`, `\\`, or `..` in
 IDs) and you can enforce UUID-only IDs via `allow_non_uuid=False`. Vendored
-packages are copied per-session so one guest cannot poison another, optional
-`mount_data_dir` mounts are read-only, and host-side logs are cleaned up unless
-you opt in with `ExecutionPolicy(preserve_logs=True)`.
+packages are mounted read-only at `/data/site-packages` (shared across all sessions
+for efficiency), optional `mount_data_dir` mounts are also read-only, and host-side
+logs are cleaned up unless you opt in with `ExecutionPolicy(preserve_logs=True)`.
 
 ### Session Management API
 
@@ -757,11 +757,10 @@ mv("/app/old.txt", "/app/new.txt")
 
 **Basic Import Pattern**
 ```python
-# Make vendored packages available
-import sys
-sys.path.insert(0, '/app/site-packages')
+# Vendored packages are automatically available via read-only mount at /data/site-packages
+# The sandbox injects sys.path.insert(0, '/data/site-packages') automatically
 
-# Now import vendored packages
+# Now import vendored packages directly
 import openpyxl
 from tabulate import tabulate
 from sandbox_utils import find, grep
@@ -769,9 +768,7 @@ from sandbox_utils import find, grep
 
 **Complete Workflow Example**
 ```python
-import sys
-sys.path.insert(0, '/app/site-packages')
-
+# Vendored packages are automatically available
 from sandbox_utils import find, grep, csv_to_json
 from tabulate import tabulate
 import json

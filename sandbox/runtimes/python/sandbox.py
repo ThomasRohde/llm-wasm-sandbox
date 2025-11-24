@@ -19,10 +19,10 @@ if TYPE_CHECKING:
     from sandbox.core.storage import StorageAdapter
 
 # Prepended to user code so LLM-generated code can use vendored packages
-# without needing to know about the /app/site-packages WASI mount point
+# without needing to know about the /data/site-packages read-only WASI mount point
 INJECTED_SETUP = """import sys
-if '/app/site-packages' not in sys.path:
-    sys.path.insert(0, '/app/site-packages')
+if '/data/site-packages' not in sys.path:
+    sys.path.insert(0, '/data/site-packages')
 
 """
 

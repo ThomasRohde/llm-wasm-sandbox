@@ -267,6 +267,55 @@ uv run python -c "from sandbox import create_sandbox, RuntimeType; sandbox = cre
 - **uv installation**: Install via `powershell -c "irm https://astral.sh/uv/install.ps1 | iex"` or `pip install uv`
 - Use `uv run` prefix for all Python commands to ensure correct environment activation
 
+### PowerShell Command Execution Rules
+
+**CRITICAL**: PowerShell has complex quoting rules that break when embedding Python code with nested quotes.
+
+**❌ NEVER DO THIS** (will fail with SyntaxError):
+```powershell
+# BAD: Trying to pass complex Python code with nested quotes directly
+uv run python -c "from sandbox import create_sandbox; result = sandbox.execute('print(\"hello\")')"
+# FAILS: Unterminated string literal due to quote escaping issues
+```
+
+**✅ ALWAYS DO THIS INSTEAD**:
+
+**Option 1: Create a temporary Python script** (PREFERRED for complex code):
+```powershell
+# Create a .py file with the code
+@'
+from sandbox import create_sandbox, RuntimeType
+sandbox = create_sandbox(runtime=RuntimeType.PYTHON)
+result = sandbox.execute('print("hello")')
+print(result.stdout)
+'@ | Out-File -FilePath temp_test.py -Encoding utf8
+
+# Run it
+uv run python temp_test.py
+
+# Clean up
+Remove-Item temp_test.py
+```
+
+**Option 2: Use simple, single-quoted Python strings only**:
+```powershell
+# OK: Simple code with only single quotes
+uv run python -c "from sandbox import create_sandbox, RuntimeType; print(create_sandbox().execute('print(42)').stdout)"
+```
+
+**Option 3: Use Python's triple-quoted strings for complex cases**:
+```powershell
+# OK: Use triple quotes in Python to avoid nested quote issues
+uv run python -c "from sandbox import create_sandbox; code = '''print(\"hello\")'''; print(create_sandbox().execute(code).stdout)"
+```
+
+**When in doubt**: Always use Option 1 (create a temporary .py file) for any Python code containing:
+- Double quotes
+- Single quotes inside strings
+- Multiple statements
+- Complex expressions
+- Any code longer than ~80 characters
+
 ## Security Considerations for AI Agents
 
 When modifying this codebase:

@@ -144,14 +144,14 @@ The CPython WASM runtime includes the full standard library, organized by catego
 
 ### Installation & Usage
 
-All vendored packages are pre-installed in `vendor/site-packages/` and copied to each session workspace.
+All vendored packages are pre-installed in `vendor/site-packages/` and mounted read-only at `/data/site-packages` (shared across all sessions for efficiency).
 
-**Standard import pattern**:
+**Standard import pattern** (automatically injected by sandbox):
 ```python
-import sys
-sys.path.insert(0, '/app/site-packages')
+# The sandbox automatically injects this at the start of your code:
+# sys.path.insert(0, '/data/site-packages')
 
-# Now import vendored packages
+# You can import vendored packages directly:
 from tabulate import tabulate
 import openpyxl
 ```
@@ -1228,7 +1228,7 @@ Results are saved to `benchmark_results_sandbox_utils.json` with detailed metric
 
 **Q: `ModuleNotFoundError` for vendored package**
 
-A: Ensure `sys.path.insert(0, '/app/site-packages')` is at the top of your code.
+A: Ensure the sandbox's automatic injection is enabled (default). The sandbox adds `/data/site-packages` to `sys.path` automatically.
 
 **Q: `ImportError` from vendored package**
 

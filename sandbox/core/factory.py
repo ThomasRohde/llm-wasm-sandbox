@@ -134,30 +134,23 @@ def create_sandbox(
         )
         session_id = session_workspace.name
 
+    # Detect vendor path for read-only mounting (if policy doesn't already specify mount_data_dir)
+    if policy.mount_data_dir is None and isinstance(storage_adapter, DiskStorageAdapter):
+        vendor_candidates = [
+            storage_adapter.workspace_root,  # For tests that put site-packages directly in workspace_root
+            storage_adapter.workspace_root.parent / "vendor",  # Standard location
+            Path("vendor"),  # Fallback to project root
+        ]
+        for candidate in vendor_candidates:
+            if (candidate / "site-packages").exists():
+                # Configure policy to mount vendor as read-only at /data
+                policy.mount_data_dir = str(candidate.resolve())
+                policy.guest_data_path = "/data"
+                break
+
     # Create session via storage adapter
     if not storage_adapter.session_exists(session_id):
         storage_adapter.create_session(session_id)
-
-        # Copy shared packages into session (if using DiskStorageAdapter)
-        if isinstance(storage_adapter, DiskStorageAdapter):
-            try:
-                # Try multiple vendor locations in order of preference
-                vendor_candidates = [
-                    storage_adapter.workspace_root,  # For tests that put site-packages directly in workspace_root
-                    storage_adapter.workspace_root.parent / "vendor",  # Standard location
-                    Path("vendor"),  # Fallback to project root
-                ]
-                vendor_path = None
-                for candidate in vendor_candidates:
-                    if (candidate / "site-packages").exists():
-                        vendor_path = candidate
-                        break
-
-                if vendor_path is not None:
-                    storage_adapter.copy_vendor_packages(session_id, vendor_path)
-            except (FileNotFoundError, OSError):
-                # Vendor packages not available - not an error
-                pass
 
         # Log session creation
         if logger is not None:
