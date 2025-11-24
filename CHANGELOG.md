@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2025-11-24
+
+### Fixed
+- **Critical**: WASM runtime binaries now properly included in PyPI package distribution
+  - Fixed hatchling configuration to bundle `bin/python.wasm` and `bin/quickjs.wasm`
+  - Users no longer need to manually download WASM binaries after `pip install`
+  - Package size increased to ~12MB to include both runtimes
+  - Both wheel and source distributions now contain all required binaries
+
+### Changed
+- Updated build configuration to use `force-include` for binary artifacts
+- Package now works out-of-the-box after installation from PyPI
+
 ## [0.1.0] - 2025-01-XX
 
 ### Added
@@ -80,4 +93,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Code coverage reporting
 - Performance benchmarking tools
 
+[0.2.0]: https://github.com/ThomasRohde/llm-wasm-sandbox/releases/tag/v0.2.0
 [0.1.0]: https://github.com/ThomasRohde/llm-wasm-sandbox/releases/tag/v0.1.0
