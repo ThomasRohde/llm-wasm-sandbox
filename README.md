@@ -49,7 +49,7 @@ Execute untrusted code safely using WebAssembly sandboxing with multi-layered se
 - **🔍 Structured Logging**: Observable execution events for monitoring
 - **🧹 Session Pruning**: Automatic cleanup of old sessions with configurable retention policies
 
-![LLM WASM Sandbox Architecture](llm-wasm-sandbox.jpeg)
+![LLM WASM Sandbox Architecture](https://raw.githubusercontent.com/ThomasRohde/llm-wasm-sandbox/main/llm-wasm-sandbox.jpeg)
 
 ---
 

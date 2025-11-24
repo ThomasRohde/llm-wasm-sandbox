@@ -175,12 +175,12 @@ class SecurityValidator:
         return sanitized.strip()
 
     @classmethod
-    def validate_timeout(cls, timeout: int | None) -> tuple[bool, int]:
+    def validate_timeout(cls, timeout: int | float | None) -> tuple[bool, int]:
         """Validate and normalize timeout value."""
         if timeout is None:
             return True, 30  # Default timeout
 
-        if not isinstance(timeout, int) or timeout < 1 or timeout > 300:
+        if not isinstance(timeout, (int, float)) or timeout < 1 or timeout > 300:
             return False, 30
 
-        return True, timeout
+        return True, int(timeout)

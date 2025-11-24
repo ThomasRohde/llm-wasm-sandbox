@@ -348,7 +348,7 @@ class MCPServer:
                             "markdown - Convert Markdown to HTML",
                             "python-dateutil - Advanced date/time parsing",
                             "attrs - Classes without boilerplate",
-                            "jsonschema - JSON schema validation",
+
                         ],
                         "utilities": [
                             "certifi - Mozilla's CA bundle",

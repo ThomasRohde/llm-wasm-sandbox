@@ -219,7 +219,6 @@ RECOMMENDED_PACKAGES = [
     "markdown",  # Convert Markdown to HTML
     # Structured data with validation
     "attrs",  # Classes without boilerplate (useful for data modeling)
-    "jsonschema",  # JSON schema validation (pure-Python fallback mode)
     # XML processing
     "defusedxml",  # Secure XML processing wrapper around stdlib
     # TOML parsing (Python <3.11 compatibility)

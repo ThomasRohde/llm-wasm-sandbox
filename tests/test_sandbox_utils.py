@@ -11,10 +11,8 @@ from pathlib import Path
 
 import pytest
 
+from sandbox import create_sandbox, RuntimeType
 from sandbox.core.models import ExecutionPolicy
-from sandbox.core.storage import DiskStorageAdapter
-from sandbox.runtimes.python import PythonSandbox
-from sandbox.vendor import copy_vendor_to_workspace
 
 
 @pytest.fixture
@@ -28,25 +26,12 @@ def temp_workspace():
 
 @pytest.fixture
 def python_sandbox(temp_workspace):
-    """Create PythonSandbox with vendored packages for testing."""
-    import uuid
-
-    session_id = str(uuid.uuid4())
-    storage_adapter = DiskStorageAdapter(temp_workspace)
-
-    if not storage_adapter.session_exists(session_id):
-        storage_adapter.create_session(session_id)
-
-    # Copy vendor packages to session workspace
-    session_workspace = temp_workspace / session_id
-    copy_vendor_to_workspace(workspace_dir=session_workspace)
-
+    """Create PythonSandbox with vendored packages via read-only /data mount."""
     policy = ExecutionPolicy()
-    sandbox = PythonSandbox(
-        wasm_binary_path="bin/python.wasm",
+    sandbox = create_sandbox(
+        runtime=RuntimeType.PYTHON,
+        workspace_root=temp_workspace,
         policy=policy,
-        session_id=session_id,
-        storage_adapter=storage_adapter,
     )
 
     return sandbox
@@ -59,7 +44,7 @@ class TestFilesModule:
         """Test find() with basic glob pattern."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import find, mkdir, touch
 
@@ -85,7 +70,7 @@ for f in sorted(py_files):
         """Test find() without recursion."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import find, mkdir, touch
 
@@ -106,7 +91,7 @@ print(f"Found {len(files)} files (non-recursive)")
         """Test tree() directory visualization."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import tree, mkdir, touch
 
@@ -131,7 +116,7 @@ print(tree_output)
         """Test tree() with depth limit."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import tree, mkdir, touch
 
@@ -157,7 +142,7 @@ else:
         """Test walk() directory traversal."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import walk, mkdir, touch
 
@@ -180,7 +165,7 @@ for f in sorted(files):
         """Test walk() with filter function."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import walk, mkdir, touch
 
@@ -201,7 +186,7 @@ print(f"Found {len(py_files)} Python files")
         """Test copy_tree() recursive copy."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import copy_tree, mkdir, touch, find
 
@@ -225,7 +210,7 @@ print(f"Copied {len(files)} files")
         """Test remove_tree() recursive deletion."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import remove_tree, mkdir, touch, ls
 from pathlib import Path
@@ -256,7 +241,7 @@ class TestTextModule:
         """Test grep() pattern search."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import grep, echo, touch
 
@@ -282,7 +267,7 @@ for file, line_num, line_text in matches:
         """Test grep() with literal string search."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import grep, echo
 
@@ -301,7 +286,7 @@ print(f"Found {len(matches)} matches (literal)")
         """Test sed() regex replacement."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import sed
 
@@ -319,7 +304,7 @@ print(result)
         """Test head() first N lines."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import head, echo
 
@@ -341,7 +326,7 @@ print(first_lines)
         """Test tail() last N lines."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import tail, echo
 
@@ -364,7 +349,7 @@ print(last_lines)
         """Test wc() word/line/char count."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import wc, echo
 
@@ -385,7 +370,7 @@ print(f"Chars: {stats['chars']}")
         """Test diff() file comparison."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import diff, echo
 
@@ -408,7 +393,7 @@ class TestDataModule:
         """Test group_by() grouping by key function."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import group_by
 
@@ -427,7 +412,7 @@ for length, items in sorted(grouped.items()):
         """Test filter_by() filtering with predicate."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import filter_by
 
@@ -443,7 +428,7 @@ print(f"Evens: {evens}")
         """Test map_items() transformation."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import map_items
 
@@ -459,7 +444,7 @@ print(f"Squared: {squared}")
         """Test sort_by() custom sorting."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import sort_by
 
@@ -480,7 +465,7 @@ print(f"By length (desc): {by_length_desc}")
         """Test unique() deduplication."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import unique
 
@@ -496,7 +481,7 @@ print(f"Unique: {uniq}")
         """Test unique() with custom key function."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import unique
 
@@ -514,7 +499,7 @@ print(f"Unique (case-insensitive): {uniq}")
         """Test chunk() splitting into chunks."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import chunk
 
@@ -536,7 +521,7 @@ class TestFormatsModule:
         """Test csv_to_json() conversion."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import csv_to_json, echo
 
@@ -558,7 +543,7 @@ print(json_str)
         """Test csv_to_json() with output file."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import csv_to_json, echo, cat
 
@@ -581,7 +566,7 @@ print(result)
         """Test json_to_csv() conversion."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import json_to_csv, echo
 import json
@@ -605,7 +590,7 @@ print(csv_str)
         """Test xml_to_dict() parsing."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import xml_to_dict
 import json
@@ -627,7 +612,7 @@ class TestShellModule:
         """Test ls() directory listing."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import ls, mkdir, touch
 
@@ -647,7 +632,7 @@ print(f"Files: {sorted(files)}")
         """Test ls() with long format."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import ls, mkdir, touch
 
@@ -668,7 +653,7 @@ for entry in entries:
         """Test cat() reading single file."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import cat, echo
 
@@ -684,7 +669,7 @@ print(content)
         """Test cat() concatenating multiple files."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import cat, echo
 
@@ -703,7 +688,7 @@ print(content)
         """Test touch() creating empty file."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import touch, ls
 from pathlib import Path
@@ -720,7 +705,7 @@ print(f"File exists: {exists}")
         """Test mkdir() creating directory."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import mkdir
 from pathlib import Path
@@ -737,7 +722,7 @@ print(f"Directory exists: {exists}")
         """Test mkdir() creating nested directories."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import mkdir
 from pathlib import Path
@@ -754,7 +739,7 @@ print(f"Nested directory exists: {exists}")
         """Test rm() removing file."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import rm, touch
 from pathlib import Path
@@ -772,7 +757,7 @@ print(f"File exists after rm: {exists}")
         """Test rm() removing directory recursively."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import rm, mkdir, touch
 from pathlib import Path
@@ -792,7 +777,7 @@ print(f"Directory exists after rm -r: {exists}")
         """Test cp() copying file."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import cp, echo, cat
 
@@ -810,7 +795,7 @@ print(content)
         """Test cp() copying directory recursively."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import cp, mkdir, touch, find
 
@@ -831,7 +816,7 @@ print(f"Copied {len(files)} files")
         """Test mv() moving/renaming file."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import mv, echo, cat
 from pathlib import Path
@@ -854,7 +839,7 @@ print(f"New file content: {content}")
         """Test echo() printing text."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import echo
 
@@ -869,7 +854,7 @@ print(result)
         """Test echo() writing to file."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import echo, cat
 
@@ -885,7 +870,7 @@ print(content)
         """Test echo() appending to file."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import echo, cat
 
@@ -908,7 +893,7 @@ class TestSecurityBoundaries:
         """Test that absolute paths outside /app are rejected."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import ls
 
@@ -926,7 +911,7 @@ except ValueError as e:
         """Test that .. traversal outside /app is rejected."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import ls
 
@@ -944,7 +929,7 @@ except ValueError as e:
         """Test that all modules validate paths."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import find, tree, cat, grep, echo
 
@@ -974,7 +959,7 @@ print(f"\\nPASS: {passed}/{len(tests)} functions validate paths")
         """Test that symlinks pointing outside /app are rejected by WASI."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import cat
 from pathlib import Path
@@ -1005,7 +990,7 @@ class TestResourceConstraints:
         """Test that basic operations complete within reasonable fuel budget."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import mkdir, touch, find, ls, cat, echo
 
@@ -1032,7 +1017,7 @@ print(f"PASS: Completed operations on {len(files)} files")
         """Test fuel consumption for large find operation."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import mkdir, touch, find
 
@@ -1055,7 +1040,7 @@ print(f"PASS: Found {len(files)} files")
         """Test fuel consumption for grep on moderately sized text."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import grep, echo
 
@@ -1082,7 +1067,7 @@ class TestVendoredPackages:
         """Test tabulate package for pretty-printing tables."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from tabulate import tabulate
 
@@ -1105,7 +1090,7 @@ print(table)
         """Test python-dateutil for date parsing."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from dateutil import parser
 
@@ -1123,7 +1108,7 @@ print(f"Year: {parsed.year}, Month: {parsed.month}")
         """Test markdown package for Markdown conversion."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 import markdown
 
@@ -1140,7 +1125,7 @@ print(html)
         """Test attrs package for data classes."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 import attrs
 
@@ -1164,7 +1149,7 @@ class TestIntegrationWorkflows:
         """Test realistic log analysis workflow."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import echo, grep, group_by, wc
 
@@ -1197,7 +1182,7 @@ for error_type, instances in grouped.items():
         """Test data transformation workflow."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import echo, csv_to_json, json_to_csv
 from tabulate import tabulate
@@ -1232,7 +1217,7 @@ print(table)
         """Test file organization workflow."""
         code = """
 import sys
-sys.path.insert(0, '/app/site-packages')
+sys.path.insert(0, '/data/site-packages')
 
 from sandbox_utils import touch, mkdir, find, mv, tree
 
