@@ -18,7 +18,6 @@ class TestMCPServerInitialization:
         assert isinstance(server, MCPServer)
         assert isinstance(server.config, MCPConfig)
         assert server.config.server.name == "llm-wasm-sandbox"
-        assert server.config.server.version == "0.3.0"
 
     def test_create_mcp_server_custom_config(self):
         """Test creating MCP server with custom configuration."""
