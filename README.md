@@ -15,8 +15,6 @@ Execute untrusted code safely using WebAssembly sandboxing with multi-layered se
 ⏱️ **Deterministic Limits** - Fuel metering & resource caps  
 🐍 **Python & JavaScript** - CPython WASM + QuickJS runtimes
 
-![LLM WASM Sandbox Architecture](llm-wasm-sandbox.jpeg)
-
 </div>
 
 ---
@@ -50,6 +48,8 @@ Execute untrusted code safely using WebAssembly sandboxing with multi-layered se
 - **🔍 Structured Logging**: Observable execution events for monitoring
 - **🧹 Session Pruning**: Automatic cleanup of old sessions with configurable retention policies
 
+![LLM WASM Sandbox Architecture](llm-wasm-sandbox.jpeg)
+
 ---
 
 ## 🚀 Quick Start
@@ -77,9 +77,8 @@ Invoke-WebRequest -Uri "https://github.com/ThomasRohde/llm-wasm-sandbox/raw/main
 .\fetch_quickjs.ps1
 
 # On Linux/macOS
-curl -O https://github.com/ThomasRohde/llm-wasm-sandbox/raw/main/scripts/fetch_wlr_python.sh
-chmod +x fetch_wlr_python.sh
-./fetch_wlr_python.sh
+curl -L -o bin/python.wasm "https://github.com/vmware-labs/webassembly-language-runtimes/releases/download/python/3.12.0+20231211-040d5a6/python-3.12.0.wasm"
+curl -L -o bin/quickjs.wasm "https://github.com/quickjs-ng/quickjs/releases/download/v0.11.0/quickjs-v0.11.0-x86_64-linux.wasm"
 ```
 
 #### From Source
@@ -123,16 +122,16 @@ print(result.stdout)  # "Hello from QuickJS!"
 
 ```powershell
 # Python demo with comprehensive examples
-uv run python demo.py
+uv run python examples/demo.py
 
 # JavaScript demo (single execution)
-uv run python demo_javascript.py
+uv run python examples/demo_javascript.py
 
 # JavaScript session demo (stateful execution)
-uv run python demo_javascript_session.py
+uv run python examples/demo_javascript_session.py
 
 # Session workflow demo (file operations)
-uv run python demo_session_workflow.py
+uv run python examples/demo_session_workflow.py
 ```
 
 ---
@@ -166,11 +165,22 @@ llm-wasm-sandbox/
 │   ├── sessions.py               # Session file operations & pruning
 │   ├── utils.py                  # Utilities
 │   └── vendor.py                 # Package vendoring
+├── mcp_server/                  # MCP server implementation
+│   ├── server.py                 # FastMCP server
+│   ├── sessions.py               # Workspace session manager
+│   ├── tools.py                  # MCP tool definitions
+│   ├── transports.py             # Stdio/HTTP transports
+│   └── config.py                 # MCP configuration
 ├── workspace/                   # Isolated filesystem (mounted as /app)
 │   └── <session-id>/            # Per-session workspaces
 ├── vendor/                      # Vendored pure-Python packages
 │   └── site-packages/
-├── demo.py                      # Comprehensive feature demo
+├── examples/                    # Demo scripts and examples
+│   ├── demo.py                  # Comprehensive feature demo
+│   ├── demo_javascript.py       # JavaScript runtime demo
+│   ├── demo_javascript_session.py # JavaScript session demo
+│   ├── demo_session_workflow.py # Session workflow demo
+│   └── openai_agents/           # OpenAI Agents SDK integrations
 ├── pyproject.toml               # Project metadata & dependencies
 └── README.md                    # This file
 ```
@@ -375,7 +385,7 @@ The sandbox now includes **Model Context Protocol (MCP) server support** for sta
 
 **Install MCP dependencies:**
 ```bash
-pip install llm-wasm-sandbox[mcp]
+pip install llm-wasm-sandbox
 # OR from source
 uv sync
 ```
@@ -1041,6 +1051,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] JavaScript runtime support (QuickJS WASM)
 - [x] Pluggable storage adapter interface
 - [x] Session pruning and lifecycle management
+- [x] MCP server integration
 - [ ] Improved async execution support
 - [ ] Network sandboxing with explicit socket grants
 - [ ] Enhanced metrics and profiling

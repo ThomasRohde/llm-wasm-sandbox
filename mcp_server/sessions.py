@@ -45,7 +45,8 @@ class WorkspaceSession:
     async def execute_code(self, code: str, timeout: int | None = None) -> SandboxResult:
         """Execute code in this workspace session."""
         sandbox = self.get_sandbox()
-        result = await sandbox.execute(code, timeout=timeout)
+        # Note: sandbox.execute is synchronous, not async
+        result = sandbox.execute(code, timeout=timeout)
 
         self.last_used_at = time.time()
         self.execution_count += 1

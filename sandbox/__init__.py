@@ -105,6 +105,16 @@ from .sessions import (
     write_session_file,
 )
 
+# State persistence utilities
+from .state import (
+    create_state_helpers,
+    filter_serializable_globals,
+    is_serializable,
+    load_state_code,
+    save_state_code,
+    wrap_stateful_code,
+)
+
 __all__ = [
     "BaseSandbox",
     "DiskStorageAdapter",
@@ -125,11 +135,18 @@ __all__ = [
     "StorageBackend",
     # Factory and base
     "create_sandbox",
+    # State persistence utilities
+    "create_state_helpers",
     # Session management (file operations and pruning)
     "delete_session_path",
     "delete_session_workspace",
+    "filter_serializable_globals",
+    "is_serializable",
     "list_session_files",
+    "load_state_code",
     "prune_sessions",
     "read_session_file",
+    "save_state_code",
+    "wrap_stateful_code",
     "write_session_file",
 ]

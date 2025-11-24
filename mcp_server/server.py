@@ -151,7 +151,7 @@ class MCPServer:
 
                     # Record resource usage
                     self.metrics.record_resource_usage(
-                        result.fuel_consumed, result.duration_seconds, result.memory_used_bytes
+                        result.fuel_consumed, result.duration_ms / 1000, result.memory_used_bytes
                     )
 
                     # Audit log successful execution
@@ -160,7 +160,7 @@ class MCPServer:
                         client_id=session_id or "anonymous",
                         session_id=session_id,
                         success=result.success,
-                        execution_time_ms=result.duration_seconds * 1000,
+                        execution_time_ms=result.duration_ms,
                         fuel_consumed=result.fuel_consumed,
                         language=language,
                     )
@@ -171,11 +171,11 @@ class MCPServer:
                             "stdout": result.stdout,
                             "stderr": result.stderr,
                             "exit_code": result.exit_code,
-                            "execution_time_ms": result.duration_seconds * 1000,
+                            "execution_time_ms": result.duration_ms,
                             "fuel_consumed": result.fuel_consumed,
                             "success": result.success,
                         },
-                        execution_time_ms=result.duration_seconds * 1000,
+                        execution_time_ms=result.duration_ms,
                         success=result.success,
                     )
 
@@ -366,7 +366,7 @@ if result.stderr:
 
                     # Record resource usage
                     self.metrics.record_resource_usage(
-                        result.fuel_consumed, result.duration_seconds, result.memory_used_bytes
+                        result.fuel_consumed, result.duration_ms / 1000, result.memory_used_bytes
                     )
 
                     success = result.success and result.exit_code == 0
@@ -516,10 +516,17 @@ if result.stderr:
 
         # Note: HTTP timing would need to be integrated at the FastMCP level
         # For now, we rely on the tool-level timing
+        
+        # Get uvicorn config but extract host/port separately
+        # to avoid duplicate parameter error in FastMCP
+        uvicorn_config = http_config.get_uvicorn_config()
+        host = uvicorn_config.pop("host")
+        port = uvicorn_config.pop("port")
+        
         await self.app.run_http_async(
-            host=http_config.host,
-            port=http_config.port,
-            uvicorn_config=http_config.get_uvicorn_config(),
+            host=host,
+            port=port,
+            uvicorn_config=uvicorn_config,
         )
 
     async def shutdown(self) -> None:

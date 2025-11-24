@@ -24,8 +24,8 @@ class SecurityValidator:
 
     # Dangerous patterns in code
     DANGEROUS_CODE_PATTERNS = [
-        # File system access
-        r'\b(open|file|os\.|pathlib|shutil)\b',
+        # File system access - COMMENTED OUT to allow file operations
+        # r'\b(open|file|os\.|pathlib|shutil)\b',
         # Network access
         r'\b(socket|urllib|requests|http|ftp)\b',
         # System commands
@@ -38,7 +38,8 @@ class SecurityValidator:
 
     # Dangerous package names
     DANGEROUS_PACKAGES = {
-        'os', 'sys', 'subprocess', 'shutil', 'pathlib', 'socket', 'urllib',
+        # 'os', 'sys', 'pathlib' - REMOVED to allow basic file operations
+        'subprocess', 'shutil', 'socket', 'urllib',
         'eval', 'exec', 'compile', 'importlib',
         'psutil', 'signal', 'multiprocessing', 'threading', 'asyncio',
         'ctypes', 'mmap', 'resource', 'gc', 'inspect', 'pickle', 'shelve',
