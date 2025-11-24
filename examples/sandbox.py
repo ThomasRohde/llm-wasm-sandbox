@@ -16,6 +16,42 @@ creating an MCP server instance.
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
+
+class ProtocolFilterIO:
+    """
+    A smart wrapper for stdout that directs JSON-RPC messages to real stdout
+    and everything else (banners, logs) to stderr.
+
+    This prevents FastMCP's ASCII art banner from breaking the MCP protocol.
+    """
+
+    def __init__(self, original_stdout, stderr):
+        self.original_stdout = original_stdout
+        self.stderr = stderr
+        # Expose the underlying buffer for binary I/O operations
+        self.buffer = original_stdout.buffer if hasattr(original_stdout, 'buffer') else None
+
+    def write(self, message):
+        # Heuristic: MCP JSON-RPC messages are JSON objects starting with '{'
+        # Redirect banners and logs to stderr, JSON-RPC to stdout
+        if message.strip().startswith("{"):
+            self.original_stdout.write(message)
+            self.original_stdout.flush()
+        else:
+            self.stderr.write(message)
+            self.stderr.flush()
+
+    def flush(self):
+        self.original_stdout.flush()
+        self.stderr.flush()
+
+    def isatty(self):
+        return self.original_stdout.isatty()
+
+    def __getattr__(self, name):
+        # Proxy any other attributes to the original stdout
+        return getattr(self.original_stdout, name)
+
 # Import the security module FIRST
 from mcp_server.security import SecurityValidator  # noqa: E402
 
@@ -66,7 +102,11 @@ async def main():
     print("Security relies entirely on WASM sandbox boundaries.", file=sys.stderr)
     print("", file=sys.stderr)
 
-    # Create MCP server (will use custom security validator)
+    # Install the smart stdout filter to redirect banners to stderr
+    # while preserving JSON-RPC messages on stdout
+    original_stdout = sys.stdout
+    sys.stdout = ProtocolFilterIO(original_stdout, sys.stderr)
+
     config = MCPConfig()
     server = create_mcp_server(config)
 

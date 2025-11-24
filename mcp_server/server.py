@@ -207,7 +207,7 @@ class MCPServer:
                     runtimes = [
                         {
                             "name": "python",
-                            "version": "3.11",
+                            "version": "3.12",
                             "description": "CPython compiled to WebAssembly",
                         },
                         {
@@ -322,84 +322,81 @@ class MCPServer:
                     return MCPToolResult(content=f"Failed to destroy session: {e!s}", success=False)
 
         @self.app.tool(
-            name="install_package",
-            description="Install a Python package in the current session (Python only)",
+            name="list_available_packages",
+            description="List pre-installed packages available in Python sessions (no installation required)",
         )
-        async def install_package(
-            package_name: str, session_id: str | None = None
-        ) -> MCPToolResult:
-            """Install a Python package."""
-            # Check rate limit
-            if not await self._check_rate_limit(session_id or "anonymous"):
-                return MCPToolResult(
-                    content="Rate limit exceeded. Please try again later.",
-                    success=False,
-                )
-
-            with self.metrics.time_tool_execution("install_package"):
+        async def list_available_packages() -> MCPToolResult:
+            """List pre-installed packages."""
+            with self.metrics.time_tool_execution("list_available_packages"):
                 try:
-                    # Validate package name
-                    is_valid, error_msg = SecurityValidator.validate_package_name(package_name)
-                    if not is_valid:
-                        self.audit_logger.log_security_violation(
-                            violation_type="invalid_package_name",
-                            client_id=session_id or "anonymous",
-                            details={"package_name": package_name, "error": error_msg},
-                            severity="high",
-                        )
-                        return MCPToolResult(
-                            content=f"Package validation failed: {error_msg}",
-                            success=False,
-                        )
+                    packages = {
+                        "document_processing": [
+                            "openpyxl - Read/write Excel .xlsx files",
+                            "XlsxWriter - Write Excel .xlsx files (write-only, lighter)",
+                            "PyPDF2 - Read/write/merge PDF files",
+                            "odfpy - Read/write OpenDocument Format (.odf, .ods, .odp)",
+                            "mammoth - Convert Word .docx to HTML/Markdown",
+                        ],
+                        "text_data": [
+                            "tabulate - Pretty-print tabular data (ASCII, Markdown, HTML)",
+                            "jinja2 - Template rendering engine",
+                            "MarkupSafe - HTML/XML escaping (required by jinja2)",
+                            "markdown - Convert Markdown to HTML",
+                            "python-dateutil - Advanced date/time parsing",
+                            "attrs - Classes without boilerplate",
+                        ],
+                        "utilities": [
+                            "certifi - Mozilla's CA bundle",
+                            "charset-normalizer - Character encoding detection",
+                            "idna - Internationalized domain names",
+                            "urllib3 - HTTP client (encoding utilities only, no networking)",
+                            "six - Python 2/3 compatibility",
+                            "tomli - TOML parser (Python <3.11)",
+                        ],
+                        "stdlib_highlights": [
+                            "json, csv, xml - Data formats",
+                            "re - Regular expressions",
+                            "pathlib, os, shutil - File operations",
+                            "math, statistics, decimal - Mathematics",
+                            "datetime, time, calendar - Date/time",
+                            "collections, itertools, functools - Data structures",
+                            "base64, hashlib, hmac - Encoding/hashing",
+                            "zipfile, tarfile, gzip - Compression",
+                            "sqlite3 - In-memory SQL database",
+                        ],
+                    }
 
-                    # Get or create session (must be Python)
-                    session = await self.session_manager.get_or_create_session(
-                        language="python", session_id=session_id
+                    usage_note = (
+                        "\nUsage: Add this at the start of your Python code:\n"
+                        "import sys\n"
+                        "sys.path.insert(0, '/app/site-packages')\n\n"
+                        "Note: pip install is NOT supported (WASI limitation). "
+                        "Use pre-installed packages or pure Python implementations."
                     )
 
-                    if session.language != "python":
-                        return MCPToolResult(
-                            content="Package installation is only supported for Python sessions",
-                            success=False,
-                        )
+                    content_lines = []
+                    for category, pkgs in packages.items():
+                        content_lines.append(f"\n{category.replace('_', ' ').title()}:")
+                        for pkg in pkgs:
+                            content_lines.append(f"  - {pkg}")
 
-                    # Install package using pip
-                    install_code = f"""
-import subprocess
-import sys
-result = subprocess.run([sys.executable, '-m', 'pip', 'install', '{package_name}'],
-                       capture_output=True, text=True)
-print(f"Exit code: {{result.returncode}}")
-if result.stdout:
-    print("STDOUT:", result.stdout)
-if result.stderr:
-    print("STDERR:", result.stderr)
-"""
-
-                    result = await session.execute_code(install_code)
-
-                    # Record resource usage
-                    self.metrics.record_resource_usage(
-                        result.fuel_consumed, result.duration_ms / 1000, result.memory_used_bytes
-                    )
-
-                    success = result.success and result.exit_code == 0
+                    content = "\n".join(content_lines) + usage_note
 
                     return MCPToolResult(
-                        content=result.stdout or result.stderr,
-                        structured_content={
-                            "package": package_name,
-                            "exit_code": result.exit_code,
-                            "success": success,
-                        },
-                        success=success,
+                        content=content,
+                        structured_content={"packages": packages, "usage_note": usage_note},
                     )
 
                 except Exception as e:
                     self.logger._emit(
-                        logging.ERROR, "Tool execution failed", tool="install_package", error=str(e)
+                        logging.ERROR,
+                        "Tool execution failed",
+                        tool="list_available_packages",
+                        error=str(e),
                     )
-                    return MCPToolResult(content=f"Failed to install package: {e!s}", success=False)
+                    return MCPToolResult(
+                        content=f"Failed to list packages: {e!s}", success=False
+                    )
 
         @self.app.tool(
             name="cancel_execution",

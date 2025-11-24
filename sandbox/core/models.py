@@ -49,9 +49,9 @@ class ExecutionPolicy(BaseModel):
     """
 
     fuel_budget: int = Field(
-        default=2_000_000_000,
+        default=5_000_000_000,
         gt=0,
-        description="WASM instruction limit for deterministic interruption",
+        description="WASM instruction limit for deterministic interruption (5B supports heavy package imports)",
     )
 
     memory_bytes: int = Field(default=128_000_000, gt=0, description="Linear memory cap in bytes")

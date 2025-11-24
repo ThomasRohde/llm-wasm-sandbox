@@ -18,7 +18,22 @@ class ServerConfig(BaseModel):
     version: str = "0.1.0"
     instructions: str = (
         "This server provides secure code execution in a WebAssembly sandbox. "
-        "Use the execute_code tool to run Python or JavaScript code safely."
+        "Use the execute_code tool to run Python or JavaScript code safely.\n\n"
+        "IMPORTANT: Package installation via pip is NOT supported (WASI doesn't support subprocesses). "
+        "However, Python sessions include 30+ pre-installed packages:\n"
+        "- Document processing: openpyxl, XlsxWriter, PyPDF2, odfpy, mammoth\n"
+        "- Text/data: tabulate, jinja2, markdown, python-dateutil, attrs\n"
+        "- Utilities: certifi, charset-normalizer, idna, six, tomli\n"
+        "- Full Python standard library (pathlib, json, csv, re, etc.)\n\n"
+        "To use vendored packages in Python, add this at the start of your code:\n"
+        "import sys\n"
+        "sys.path.insert(0, '/app/site-packages')\n\n"
+        "For numerical operations, use stdlib alternatives:\n"
+        "- statistics module for mean, median, stdev\n"
+        "- math module for sqrt, log, trig functions\n"
+        "- Or implement pure Python algorithms\n\n"
+        "Performance: Default fuel budget is 5B instructions, sufficient for most imports and operations. "
+        "Use list_available_packages to see all pre-installed packages."
     )
 
 

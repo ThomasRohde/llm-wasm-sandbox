@@ -1,5 +1,5 @@
 # Execution limits - Enhanced for real-world LLM-generated code
-fuel_budget = 2_000_000_000         # deterministic instruction budget (generous for complex imports)
+fuel_budget = 5_000_000_000         # deterministic instruction budget (supports heavy imports like jinja2, openpyxl)
 memory_bytes = 128_000_000          # ~128 MiB cap for guest linear memory
 
 # IO capture & output size caps (host-side)
