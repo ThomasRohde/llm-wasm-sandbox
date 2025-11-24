@@ -437,17 +437,64 @@ uv run python examples/mcp_stdio_example.py
 ```
 
 **Configure Claude Desktop:**
+
+Choose one of these configurations based on your security requirements:
+
+**Option 1: Standard Security (Recommended)**
 ```json
 {
   "mcpServers": {
     "llm-wasm-sandbox": {
       "command": "uv",
-      "args": ["run", "python", "examples/mcp_stdio_example.py"],
-      "cwd": "/path/to/llm-wasm-sandbox"
+      "args": [
+        "--directory",
+        "/path/to/llm-wasm-sandbox",
+        "run",
+        "python",
+        "examples/mcp_stdio_example.py"
+      ]
     }
   }
 }
 ```
+
+**Option 2: Promiscuous Mode (Development/Testing)**
+```json
+{
+  "mcpServers": {
+    "sandbox": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/path/to/llm-wasm-sandbox",
+        "run",
+        "python",
+        "examples/sandbox.py"
+      ]
+    }
+  }
+}
+```
+
+**Windows Path Format:**
+```json
+{
+  "mcpServers": {
+    "sandbox": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "c:\\Users\\YourName\\Projects\\llm-wasm-sandbox",
+        "run",
+        "python",
+        "examples/sandbox.py"
+      ]
+    }
+  }
+}
+```
+
+**Note:** Use `--directory` instead of `cwd` to ensure uv resolves dependencies correctly. The `sandbox.py` example disables all security filters (use only in trusted environments), while `mcp_stdio_example.py` enables standard security validation.
 
 ### MCP Tools
 
