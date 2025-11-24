@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -151,7 +152,9 @@ class MCPServer:
 
                     # Record resource usage
                     self.metrics.record_resource_usage(
-                        result.fuel_consumed, result.duration_ms / 1000, result.memory_used_bytes
+                        result.fuel_consumed or 0,
+                        result.duration_ms / 1000,
+                        result.memory_used_bytes,
                     )
 
                     # Audit log successful execution
@@ -161,7 +164,7 @@ class MCPServer:
                         session_id=session_id,
                         success=result.success,
                         execution_time_ms=result.duration_ms,
-                        fuel_consumed=result.fuel_consumed,
+                        fuel_consumed=result.fuel_consumed or 0,
                         language=language,
                     )
 
@@ -394,9 +397,7 @@ class MCPServer:
                         tool="list_available_packages",
                         error=str(e),
                     )
-                    return MCPToolResult(
-                        content=f"Failed to list packages: {e!s}", success=False
-                    )
+                    return MCPToolResult(content=f"Failed to list packages: {e!s}", success=False)
 
         @self.app.tool(
             name="cancel_execution",
@@ -525,7 +526,7 @@ class MCPServer:
         # Add CORS middleware for web clients
         http_app = self.app.http_app()
         http_app.add_middleware(
-            http_config.get_cors_middleware_class(),
+            http_config.get_cors_middleware_class(),  # type: ignore[arg-type]
             allow_origins=http_config.cors_origins,
             allow_credentials=True,
             allow_methods=["POST", "GET", "OPTIONS"],
@@ -562,7 +563,7 @@ class MCPServer:
 
 
 @asynccontextmanager
-async def lifespan(server: MCPServer):
+async def lifespan(server: MCPServer) -> AsyncGenerator[None, None]:
     """FastMCP lifespan context manager."""
     # Start background tasks
     await server.rate_limiter.start_cleanup_task()

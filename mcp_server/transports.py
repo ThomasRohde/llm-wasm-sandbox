@@ -27,7 +27,7 @@ class TransportConfig:
 class StdioTransportConfig(TransportConfig):
     """Configuration for stdio transport."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(TransportType.STDIO)
 
 
@@ -72,7 +72,7 @@ class HTTPTransportConfig(TransportConfig):
             "limit_max_requests": self.rate_limit_requests * 10,  # Allow some burst
         }
 
-    def get_cors_middleware_class(self):
+    def get_cors_middleware_class(self) -> type:
         """Get CORS middleware class for adding to Starlette app."""
         from starlette.middleware.cors import CORSMiddleware
 

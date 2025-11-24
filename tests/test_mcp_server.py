@@ -66,10 +66,11 @@ class TestMCPServerTools:
             "list_runtimes",
             "create_session",
             "destroy_session",
-            "install_package",
+            "list_available_packages",
             "cancel_execution",
             "get_workspace_info",
             "reset_workspace",
+            "get_metrics",
         ]
 
         for tool_name in expected_tools:

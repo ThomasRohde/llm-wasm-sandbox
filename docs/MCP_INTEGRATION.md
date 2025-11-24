@@ -23,30 +23,55 @@ The sandbox provides MCP server functionality that exposes secure code execution
 
 ### Basic Setup
 
+**Production (installed package):**
 ```bash
-# Install MCP dependencies (included with sandbox)
-pip install llm-wasm-sandbox[mcp]
+# Install from PyPI with bundled WASM runtimes
+pip install llm-wasm-sandbox
 
-# Or from source
+# Start MCP server
+python -m mcp_server
+# OR use the command alias
+llm-wasm-mcp
+```
+
+**Development (from source):**
+```bash
+# Clone and setup
+git clone https://github.com/ThomasRohde/llm-wasm-sandbox.git
+cd llm-wasm-sandbox
 uv sync
+
+# Fetch WASM binaries (required)
+.\scripts\fetch_wlr_python.ps1
+.\scripts\fetch_quickjs.ps1
+
+# Run MCP server in development
+uv run python -m mcp_server
+
+# Note: 'llm-wasm-mcp' command only works after 'pip install'
 ```
 
 ### Stdio Transport (Local MCP Clients)
 
 For use with Claude Desktop or other local MCP clients:
 
-```python
-# examples/mcp_stdio_example.py
-from mcp_server import create_mcp_server
+**Production (installed package):**
+```bash
+# Using the installed command
+llm-wasm-mcp
 
-# Create and start MCP server
-server = create_mcp_server()
-await server.start_stdio()
+# Or using Python module
+python -m mcp_server
 ```
 
-Run with:
+**Development (from source):**
 ```bash
+# Option 1: Using the package directly (recommended)
+uv run python -m mcp_server
+
+# Option 2: Using example scripts
 uv run python examples/mcp_stdio_example.py
+uv run python examples/llm_wasm_mcp.py  # Promiscuous mode
 ```
 
 ### HTTP Transport (Remote/Web Clients)

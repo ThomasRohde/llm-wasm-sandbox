@@ -174,7 +174,7 @@ class TestMCPToolListRuntimes:
         python_runtime = next(r for r in runtimes if r["name"] == "python")
         js_runtime = next(r for r in runtimes if r["name"] == "javascript")
 
-        assert python_runtime["version"] == "3.11"
+        assert python_runtime["version"] == "3.12"
         assert "CPython" in python_runtime["description"]
         assert js_runtime["version"] == "ES2023"
         assert "QuickJS" in js_runtime["description"]
@@ -327,93 +327,6 @@ class TestMCPToolDestroySession:
 
         parsed = parse_tool_result(result)
         assert "Session non-existent not found" in parsed["content"]
-        assert parsed["success"] is False
-
-
-class TestMCPToolInstallPackage:
-    """Test the install_package tool functionality."""
-
-    @pytest.mark.asyncio
-    async def test_install_package_success(self):
-        """Test successful package installation."""
-        server = create_mcp_server()
-
-        # Mock the session manager and execution
-        mock_session = AsyncMock()
-        mock_session.language = "python"
-
-        mock_result = MagicMock()
-        mock_result.stdout = "Successfully installed requests-2.31.0"
-        mock_result.stderr = ""
-        mock_result.exit_code = 0
-        mock_result.success = True
-        mock_result.fuel_consumed = 1000
-        mock_result.duration_seconds = 0.1
-        mock_result.memory_used_bytes = 0
-        mock_session.execute_code = AsyncMock(return_value=mock_result)
-
-        server.session_manager.get_or_create_session = AsyncMock(return_value=mock_session)
-
-        # Call the tool
-        result = await server.app._tool_manager.call_tool(
-            "install_package", {"package_name": "requests"}
-        )
-
-        parsed = parse_tool_result(result)
-        assert "Successfully installed" in parsed["content"]
-        assert parsed["structured_content"]["package"] == "requests"
-        assert parsed["structured_content"]["success"] is True
-        assert parsed["success"] is True
-
-    @pytest.mark.asyncio
-    async def test_install_package_wrong_language(self):
-        """Test install_package on non-Python session."""
-        server = create_mcp_server()
-
-        # Mock the session manager
-        mock_session = AsyncMock()
-        mock_session.language = "javascript"
-
-        server.session_manager.get_or_create_session = AsyncMock(return_value=mock_session)
-
-        # Call the tool
-        result = await server.app._tool_manager.call_tool(
-            "install_package", {"package_name": "requests"}
-        )
-
-        parsed = parse_tool_result(result)
-        assert "only supported for Python sessions" in parsed["content"]
-        assert parsed["success"] is False
-
-    @pytest.mark.asyncio
-    async def test_install_package_failure(self):
-        """Test failed package installation."""
-        server = create_mcp_server()
-
-        # Mock the session manager and execution
-        mock_session = AsyncMock()
-        mock_session.language = "python"
-
-        mock_result = MagicMock()
-        mock_result.stdout = ""
-        mock_result.stderr = "ERROR: No matching distribution found for nonexistent-package"
-        mock_result.exit_code = 1
-        mock_result.success = False
-        mock_result.fuel_consumed = 500
-        mock_result.duration_seconds = 0.05
-        mock_result.memory_used_bytes = 0
-        mock_session.execute_code = AsyncMock(return_value=mock_result)
-
-        server.session_manager.get_or_create_session = AsyncMock(return_value=mock_session)
-
-        # Call the tool
-        result = await server.app._tool_manager.call_tool(
-            "install_package", {"package_name": "nonexistent-package"}
-        )
-
-        parsed = parse_tool_result(result)
-        assert "No matching distribution" in parsed["content"]
-        assert parsed["structured_content"]["success"] is False
         assert parsed["success"] is False
 
 

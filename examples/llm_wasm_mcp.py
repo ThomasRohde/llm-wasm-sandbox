@@ -29,7 +29,7 @@ class ProtocolFilterIO:
         self.original_stdout = original_stdout
         self.stderr = stderr
         # Expose the underlying buffer for binary I/O operations
-        self.buffer = original_stdout.buffer if hasattr(original_stdout, 'buffer') else None
+        self.buffer = original_stdout.buffer if hasattr(original_stdout, "buffer") else None
 
     def write(self, message):
         # Heuristic: MCP JSON-RPC messages are JSON objects starting with '{'
@@ -51,6 +51,7 @@ class ProtocolFilterIO:
     def __getattr__(self, name):
         # Proxy any other attributes to the original stdout
         return getattr(self.original_stdout, name)
+
 
 # Import the security module FIRST
 from mcp_server.security import SecurityValidator  # noqa: E402

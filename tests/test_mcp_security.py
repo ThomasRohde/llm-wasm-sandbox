@@ -95,25 +95,6 @@ class TestMCPSecurityBoundaries:
         assert parsed["success"] is not None  # Should have some response
 
     @pytest.mark.asyncio
-    async def test_install_package_python_only(self):
-        """Test that install_package only works for Python sessions."""
-        server = create_mcp_server()
-
-        # Mock JavaScript session
-        mock_js_session = AsyncMock()
-        mock_js_session.language = "javascript"
-        server.session_manager.get_or_create_session = AsyncMock(return_value=mock_js_session)
-
-        # Try to install package in JS session (use safe package name)
-        result = await server.app._tool_manager.call_tool(
-            "install_package", {"package_name": "numpy", "session_id": "js-session"}
-        )
-
-        parsed = parse_tool_result(result)
-        assert "only supported for Python sessions" in parsed["content"]
-        assert parsed["success"] is False
-
-    @pytest.mark.asyncio
     async def test_tool_input_validation(self):
         """Test that tools validate their inputs."""
         server = create_mcp_server()

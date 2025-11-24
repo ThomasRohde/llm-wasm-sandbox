@@ -37,7 +37,9 @@ class TestCreateSandboxDefaults:
         sandbox = create_sandbox()
 
         assert isinstance(sandbox.policy, ExecutionPolicy)
-        assert sandbox.policy.fuel_budget == 5_000_000_000  # Default from ExecutionPolicy (5B for heavy imports)
+        assert (
+            sandbox.policy.fuel_budget == 5_000_000_000
+        )  # Default from ExecutionPolicy (5B for heavy imports)
         assert sandbox.policy.memory_bytes == 128_000_000  # Default 128 million bytes
 
     def test_create_sandbox_default_uses_workspace_directory(self) -> None:

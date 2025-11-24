@@ -110,6 +110,9 @@ class MCPMetrics:
         if self._tool_execution_percentiles is None:
             self._calculate_percentiles()
 
+        if self._tool_execution_percentiles is None:
+            return {}
+
         if tool_name:
             return {tool_name: self._tool_execution_percentiles.get(tool_name, {})}
         return dict(self._tool_execution_percentiles)
@@ -195,7 +198,7 @@ class MCPMetrics:
 class MCPMetricsCollector:
     """Collector for MCP server metrics with timing utilities."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.metrics = MCPMetrics()
         self.logger = SandboxLogger("mcp-metrics")
 

@@ -1,6 +1,8 @@
 # Publishing to PyPI
 
-This document provides step-by-step instructions for publishing the `llm-wasm-sandbox` package to PyPI.
+This document provides step-by-step instructions for publishing the `llm-wasm-sandbox` package to PyPI using the **uv package manager**.
+
+> **Note**: This project uses `uv` for all packaging operations. The traditional `twine` workflow is no longer used.
 
 ## Pre-Release Checklist
 
@@ -21,8 +23,16 @@ This document provides step-by-step instructions for publishing the `llm-wasm-sa
 2. **API Tokens**: Generate API tokens for both platforms:
    - Test PyPI: https://test.pypi.org/manage/account/#api-tokens
    - PyPI: https://pypi.org/manage/account/#api-tokens
-3. **Install Tools**: Ensure you have `uv` or `build` and `twine` installed
-4. **WASM Binaries**: Ensure `bin/python.wasm` and `bin/quickjs.wasm` exist (run fetch scripts if needed)
+3. **Environment Variable**: Set `UV_PUBLISH_TOKEN` in Windows environment variables with your PyPI API token
+   ```powershell
+   # Set for current session
+   $env:UV_PUBLISH_TOKEN = "pypi-AgEIcHl..."
+   
+   # Or set permanently (requires admin)
+   [System.Environment]::SetEnvironmentVariable('UV_PUBLISH_TOKEN', 'pypi-AgEIcHl...', 'User')
+   ```
+4. **uv Package Manager**: Already installed if you've been developing this project
+5. **WASM Binaries**: Ensure `bin/python.wasm` and `bin/quickjs.wasm` exist (run fetch scripts if needed)
 
 ## Build the Package
 
@@ -38,9 +48,11 @@ if (-not (Test-Path "bin/quickjs.wasm")) {
 # Clean previous builds
 Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue
 
-# Build the package
-uv build
+# Build the package with uv (--no-sources ensures reproducible builds)
+uv build --no-sources
 ```
+
+> **Why `--no-sources`?** This flag ensures the package builds correctly without `tool.uv.sources` overrides, which is required for compatibility with other build tools and PyPI's build infrastructure.
 
 This creates:
 - `dist/llm_wasm_sandbox-0.1.0.tar.gz` (source distribution with WASM binaries)
@@ -75,16 +87,33 @@ Verify it includes:
 
 ## Test on Test PyPI (Recommended)
 
+### Quick Method: Using the Publish Script
+
 ```powershell
-# Install twine if not using uv
-pip install twine
+# Publish to Test PyPI (includes build, tests, and verification)
+.\scripts\publish.ps1 testpypi
+```
 
-# Upload to Test PyPI
-twine upload --repository testpypi dist/*
+### Manual Method: Using uv directly
 
-# When prompted, enter:
-# Username: __token__
-# Password: <your-test-pypi-token>
+First, configure Test PyPI in your `pyproject.toml` (already done):
+
+```toml
+[[tool.uv.index]]
+name = "testpypi"
+url = "https://test.pypi.org/simple/"
+publish-url = "https://test.pypi.org/legacy/"
+explicit = true
+```
+
+Then publish:
+
+```powershell
+# Publish to Test PyPI
+uv publish --index testpypi
+
+# Or with explicit token (not recommended, use UV_PUBLISH_TOKEN instead)
+uv publish --index testpypi --token pypi-AgEIcHl...
 ```
 
 ### Test Installation from Test PyPI
@@ -109,21 +138,39 @@ Remove-Item -Recurse -Force test_env
 
 **⚠️ WARNING: This is irreversible! You cannot delete or re-upload the same version.**
 
-```powershell
-# Upload to production PyPI
-twine upload dist/*
-
-# When prompted, enter:
-# Username: __token__
-# Password: <your-pypi-token>
-```
-
-### Alternative: Using uv
+### Quick Method: Using the Publish Script (Recommended)
 
 ```powershell
-# Configure PyPI credentials (one-time setup)
-uv publish --token <your-pypi-token>
+# Publish to production PyPI (with confirmation prompt)
+.\scripts\publish.ps1 pypi
+
+# Skip confirmation prompt (use with caution!)
+.\scripts\publish.ps1 pypi -Force
+
+# Dry run to see what would happen
+.\scripts\publish.ps1 pypi -DryRun
 ```
+
+The script will:
+1. Check `UV_PUBLISH_TOKEN` is set
+2. Verify WASM binaries exist
+3. Run full test suite
+4. Build package with `--no-sources`
+5. Verify package contents
+6. Prompt for confirmation (unless `-Force`)
+7. Publish to PyPI
+
+### Manual Method: Using uv directly
+
+```powershell
+# Publish to production PyPI
+uv publish
+
+# Or with explicit token (not recommended, use UV_PUBLISH_TOKEN instead)
+uv publish --token pypi-AgEIcHl...
+```
+
+> **Note**: When using `uv publish` with environment variable `UV_PUBLISH_TOKEN`, you don't need to specify the token explicitly. This is the recommended and secure approach.
 
 ## Post-Release Tasks
 
@@ -152,17 +199,43 @@ uv publish --token <your-pypi-token>
 
 ## Version Bumping for Next Release
 
-After publishing, immediately bump the version for development:
+After publishing, immediately bump the version for development using uv's built-in version management:
 
-```toml
-# In pyproject.toml
-version = "0.2.0-dev"  # or "0.1.1-dev" for patch
+```powershell
+# Bump to next minor version (e.g., 0.1.0 -> 0.2.0)
+uv version --bump minor
+
+# Bump to next patch version (e.g., 0.1.0 -> 0.1.1)
+uv version --bump patch
+
+# Bump to next major version (e.g., 0.1.0 -> 1.0.0)
+uv version --bump major
+
+# Preview changes without modifying pyproject.toml
+uv version --bump minor --dry-run
+
+# Bump without syncing dependencies (faster)
+uv version --bump minor --frozen
 ```
 
-Commit this change:
+Common version bump patterns:
+
 ```powershell
-git add pyproject.toml
-git commit -m "Bump version to 0.2.0-dev"
+# Move to pre-release
+uv version --bump patch --bump alpha   # 1.0.0 -> 1.0.1a1
+uv version --bump minor --bump beta    # 1.0.0 -> 1.1.0b1
+
+# Increment pre-release
+uv version --bump beta                 # 1.1.0b1 -> 1.1.0b2
+
+# Move from pre-release to stable
+uv version --bump stable               # 1.1.0b2 -> 1.1.0
+```
+
+Commit the version change:
+```powershell
+git add pyproject.toml uv.lock
+git commit -m "Bump version to $(uv version)"
 git push
 ```
 
@@ -172,11 +245,24 @@ git push
 - Check `pyproject.toml` syntax (especially TOML arrays and tables)
 - Ensure all referenced files exist
 - Run `uv sync` to update dependencies
+- Try `uv build --no-sources` to ensure reproducible builds
 
 ### Upload Rejected (Version Conflict)
 - You cannot reuse version numbers
-- Bump the version in `pyproject.toml` and rebuild
+- Bump the version using `uv version --bump patch` and rebuild
 - Consider using pre-release versions (e.g., `0.1.1a1`, `0.1.1rc1`)
+
+### UV_PUBLISH_TOKEN Not Found
+```powershell
+# Set for current session
+$env:UV_PUBLISH_TOKEN = "pypi-AgEIcHl..."
+
+# Set permanently (run as admin)
+[System.Environment]::SetEnvironmentVariable('UV_PUBLISH_TOKEN', 'pypi-AgEIcHl...', 'User')
+
+# Verify it's set
+echo $env:UV_PUBLISH_TOKEN
+```
 
 ### Import Fails After Install
 - Check that `sandbox/__init__.py` exports all public APIs
@@ -186,6 +272,19 @@ git push
 ### Missing Files in Distribution
 - Update `[tool.hatch.build.targets.sdist]` in `pyproject.toml`
 - For wheels, ensure files are in `packages = ["sandbox"]` directory
+- Check `include` directives in build configuration
+
+### Publish Script Fails
+```powershell
+# Skip tests if they're already passing
+.\scripts\publish.ps1 pypi -SkipTests
+
+# Skip build if you've already built
+.\scripts\publish.ps1 pypi -SkipBuild
+
+# See what would happen without publishing
+.\scripts\publish.ps1 pypi -DryRun
+```
 
 ## Dependency Management
 
@@ -209,6 +308,7 @@ Current pinned dependencies:
 
 ## References
 
+- [uv Package Publishing Guide](https://docs.astral.sh/uv/guides/package/)
 - [Python Packaging User Guide](https://packaging.python.org/)
 - [PyPI Publishing Documentation](https://packaging.python.org/tutorials/packaging-projects/)
 - [Hatchling Build System](https://hatch.pypa.io/latest/config/build/)

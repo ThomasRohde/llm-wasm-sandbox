@@ -8,6 +8,8 @@ to prevent DoS attacks and ensure fair resource usage.
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import logging
 import time
 from collections import deque
 from dataclasses import dataclass, field
@@ -111,7 +113,7 @@ class RateLimiter:
             # Rate limit exceeded
             client.record_violation(self.config.cooldown_seconds)
             self.logger._emit(
-                "WARNING",
+                logging.WARNING,
                 "mcp.rate_limit.exceeded",
                 client_key=client_key,
                 requests_in_window=requests_in_window,
@@ -126,7 +128,7 @@ class RateLimiter:
             # Burst limit exceeded - temporary block
             client.blocked_until = now + 30  # 30 second block
             self.logger._emit(
-                "WARNING",
+                logging.WARNING,
                 "mcp.burst_limit.exceeded",
                 client_key=client_key,
                 recent_requests=recent_requests,
@@ -187,7 +189,9 @@ class RateLimiter:
             del self.clients[client_key]
 
         if to_remove:
-            self.logger._emit("INFO", "mcp.rate_limiter.cleanup", removed_clients=len(to_remove))
+            self.logger._emit(
+                logging.INFO, "mcp.rate_limiter.cleanup", removed_clients=len(to_remove)
+            )
 
     async def start_cleanup_task(self) -> None:
         """Start background cleanup task."""
@@ -198,7 +202,7 @@ class RateLimiter:
         """Stop background cleanup task."""
         if self._cleanup_task:
             self._cleanup_task.cancel()
-            with asyncio.suppress(asyncio.CancelledError):
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._cleanup_task
             self._cleanup_task = None
 

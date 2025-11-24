@@ -111,7 +111,9 @@ class TestWorkspaceSessionManager:
         assert session.language == "python"
         assert session.sandbox_session_id == "new-sandbox-id"
         assert session.workspace_id in manager._sessions
-        mock_create_sandbox.assert_called_once_with(runtime=RuntimeType.PYTHON, auto_persist_globals=False)
+        mock_create_sandbox.assert_called_once_with(
+            runtime=RuntimeType.PYTHON, auto_persist_globals=False
+        )
 
     @pytest.mark.asyncio
     async def test_get_or_create_session_existing(self):
@@ -151,7 +153,9 @@ class TestWorkspaceSessionManager:
             # Should create new session with same ID
             assert session.workspace_id == "expired-123"
             assert session.sandbox_session_id == "new-sandbox-id"
-            mock_create.assert_called_once_with(runtime=RuntimeType.PYTHON, auto_persist_globals=False)
+            mock_create.assert_called_once_with(
+                runtime=RuntimeType.PYTHON, auto_persist_globals=False
+            )
 
     @patch("mcp_server.sessions.create_sandbox")
     @pytest.mark.asyncio
@@ -169,7 +173,9 @@ class TestWorkspaceSessionManager:
         assert session.workspace_id == "custom-id"
         assert session.sandbox_session_id == "explicit-sandbox-id"
         assert "custom-id" in manager._sessions
-        mock_create_sandbox.assert_called_once_with(runtime=RuntimeType.JAVASCRIPT, auto_persist_globals=False)
+        mock_create_sandbox.assert_called_once_with(
+            runtime=RuntimeType.JAVASCRIPT, auto_persist_globals=False
+        )
 
     @pytest.mark.asyncio
     async def test_destroy_session_success(self):

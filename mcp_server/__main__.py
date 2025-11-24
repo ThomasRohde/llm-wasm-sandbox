@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import sys
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from .config import MCPConfig
 from .security import SecurityValidator
@@ -25,13 +25,13 @@ class ProtocolFilterIO:
     This prevents FastMCP's ASCII art banner from breaking the MCP protocol.
     """
 
-    def __init__(self, original_stdout, stderr):
+    def __init__(self, original_stdout: Any, stderr: Any) -> None:
         self.original_stdout = original_stdout
         self.stderr = stderr
         # Expose the underlying buffer for binary I/O operations
         self.buffer = original_stdout.buffer if hasattr(original_stdout, "buffer") else None
 
-    def write(self, message):
+    def write(self, message: str) -> int:
         # Heuristic: MCP JSON-RPC messages are JSON objects starting with '{'
         # Redirect banners and logs to stderr, JSON-RPC to stdout
         if message.strip().startswith("{"):
@@ -40,15 +40,16 @@ class ProtocolFilterIO:
         else:
             self.stderr.write(message)
             self.stderr.flush()
+        return len(message)
 
-    def flush(self):
+    def flush(self) -> None:
         self.original_stdout.flush()
         self.stderr.flush()
 
-    def isatty(self):
-        return self.original_stdout.isatty()
+    def isatty(self) -> bool:
+        return bool(self.original_stdout.isatty())
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Any:
         # Proxy any other attributes to the original stdout
         return getattr(self.original_stdout, name)
 
@@ -81,9 +82,7 @@ class PromiscuousSecurityValidator(SecurityValidator):
 
 def main() -> None:
     """Main CLI entry point."""
-    print(
-        "Starting MCP server with PROMISCUOUS security (ALL CODE ALLOWED)...", file=sys.stderr
-    )
+    print("Starting MCP server with PROMISCUOUS security (ALL CODE ALLOWED)...", file=sys.stderr)
     print("WARNING: All security filters disabled!", file=sys.stderr)
     print("Security relies entirely on WASM sandbox boundaries.", file=sys.stderr)
     print("", file=sys.stderr)
@@ -97,15 +96,13 @@ def main() -> None:
     import mcp_server.security
     import mcp_server.server
 
-    mcp_server.security.SecurityValidator = PromiscuousSecurityValidator
-    mcp_server.server.SecurityValidator = PromiscuousSecurityValidator
+    mcp_server.security.SecurityValidator = PromiscuousSecurityValidator  # type: ignore[misc]
+    mcp_server.server.SecurityValidator = PromiscuousSecurityValidator  # type: ignore[misc]
 
     config = MCPConfig()
     server = create_mcp_server(config)
 
-    print(
-        "Available tools: execute_code, list_runtimes, create_session, etc.", file=sys.stderr
-    )
+    print("Available tools: execute_code, list_runtimes, create_session, etc.", file=sys.stderr)
 
     try:
         asyncio.run(server.start_stdio())

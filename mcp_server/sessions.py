@@ -13,6 +13,7 @@ import secrets
 import time
 from contextlib import suppress
 from dataclasses import dataclass, field
+from typing import Any
 
 from sandbox import RuntimeType, create_sandbox
 from sandbox.core.logging import SandboxLogger
@@ -38,7 +39,7 @@ class WorkspaceSession:
         """Check if session has expired."""
         return time.time() - self.last_used_at > 600  # Default 10 minutes
 
-    def get_sandbox(self):
+    def get_sandbox(self) -> Any:
         """Get the sandbox instance for this session."""
         runtime = RuntimeType.PYTHON if self.language == "python" else RuntimeType.JAVASCRIPT
         return create_sandbox(
@@ -51,7 +52,7 @@ class WorkspaceSession:
         """Execute code in this workspace session."""
         sandbox = self.get_sandbox()
         # Note: sandbox.execute is synchronous, not async
-        result = sandbox.execute(code, timeout=timeout)
+        result: SandboxResult = sandbox.execute(code, timeout=timeout)
 
         self.last_used_at = time.time()
         self.execution_count += 1
@@ -67,7 +68,7 @@ class WorkspaceSessionManager:
     across tool calls.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.logger = SandboxLogger("mcp-sessions")
         self._sessions: dict[str, WorkspaceSession] = {}
         self._cleanup_task: asyncio.Task | None = None

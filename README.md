@@ -460,22 +460,48 @@ uv sync
 
 **Run development MCP server:**
 ```bash
-# Promiscuous mode (recommended - all code allowed, WASM sandbox provides security)
-uv run python examples/llm_wasm_mcp.py
+# Option 1: Using convenience script (easiest)
+.\scripts\run-mcp-dev.ps1
 
-# OR with standard security filters (more restrictive)
-uv run python examples/mcp_stdio_example.py
+# Option 2: Using the package directly
+uv run python -m mcp_server
+
+# Option 3: Using example scripts
+uv run python examples/llm_wasm_mcp.py      # Promiscuous mode
+uv run python examples/mcp_stdio_example.py  # With security filters
+
+# Note: The installed 'llm-wasm-mcp' command is only available after 'pip install'
+# In development, use one of the options above
 ```
 
 **Claude Desktop configuration for development:**
 ```json
 {
   "mcpServers": {
-    "llm-wasm-sandbox": {
+    "llm-wasm-sandbox-dev": {
       "command": "uv",
       "args": [
         "--directory",
-        "c:\\Users\\YourName\\Projects\\llm-wasm-sandbox",
+        "C:\\Users\\YourName\\Projects\\llm-wasm-sandbox",
+        "run",
+        "python",
+        "-m",
+        "mcp_server"
+      ]
+    }
+  }
+}
+```
+
+**Alternative (using example script):**
+```json
+{
+  "mcpServers": {
+    "llm-wasm-sandbox-dev": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "C:\\Users\\YourName\\Projects\\llm-wasm-sandbox",
         "run",
         "python",
         "examples/llm_wasm_mcp.py"
@@ -485,7 +511,7 @@ uv run python examples/mcp_stdio_example.py
 }
 ```
 
-**Note:** Use `--directory` instead of `cwd` to ensure uv resolves dependencies correctly. The shipped MCP server uses promiscuous security (all code allowed).
+**Note:** Use `--directory` instead of `cwd` to ensure uv resolves dependencies correctly. Replace `YourName` with your actual username.
 
 ### MCP Tools
 

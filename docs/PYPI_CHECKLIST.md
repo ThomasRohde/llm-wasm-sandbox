@@ -1,6 +1,8 @@
 # PyPI Publication Checklist ✅
 
-This checklist ensures the `llm-wasm-sandbox` package is ready for PyPI publication.
+This checklist ensures the `llm-wasm-sandbox` package is ready for PyPI publication using **uv package manager**.
+
+> **Note**: This project uses `uv` for all packaging operations. See `PUBLISHING.md` for detailed instructions.
 
 ## ✅ Package Metadata
 
@@ -50,9 +52,10 @@ All dependencies use appropriate version constraints for stability and compatibi
 ## ✅ Build & Distribution
 
 - [x] **Build backend**: Hatchling configured correctly
+- [x] **uv configuration**: Test PyPI index configured in `pyproject.toml`
+- [x] **UV_PUBLISH_TOKEN**: Environment variable set for publishing
 - [x] **Source dist**: `llm_wasm_sandbox-0.1.0.tar.gz` created successfully
 - [x] **Wheel**: `llm_wasm_sandbox-0.1.0-py3-none-any.whl` created successfully
-- [x] **Validation**: `twine check dist/*` passes
 - [x] **Package contents verified**:
   - Source dist includes sandbox, mcp_server, tests, scripts, config, docs
   - Wheel includes sandbox and mcp_server runtime packages
@@ -112,25 +115,49 @@ All dependencies use appropriate version constraints for stability and compatibi
 
 ## 🔄 Publication Steps (Pending)
 
+### Using the Publish Script (Recommended)
+
 **Test PyPI** (Recommended first):
 ```powershell
-twine upload --repository testpypi dist/*
+.\scripts\publish.ps1 testpypi
 ```
 
 **Production PyPI**:
 ```powershell
-twine upload dist/*
+# With confirmation prompt
+.\scripts\publish.ps1 pypi
+
+# Skip confirmation (use with caution!)
+.\scripts\publish.ps1 pypi -Force
+
+# Dry run
+.\scripts\publish.ps1 pypi -DryRun
+```
+
+### Using uv Directly
+
+**Test PyPI**:
+```powershell
+# Ensure UV_PUBLISH_TOKEN is set
+uv publish --index testpypi
+```
+
+**Production PyPI**:
+```powershell
+# Ensure UV_PUBLISH_TOKEN is set
+uv publish
 ```
 
 ## 📋 Post-Release Tasks (After Publishing)
 
-- [ ] Create git tag: `v0.1.0`
-- [ ] Push tag to GitHub
+- [ ] Create git tag: `git tag -a v0.1.0 -m "Release version 0.1.0"`
+- [ ] Push tag to GitHub: `git push origin v0.1.0`
 - [ ] Create GitHub Release with notes from CHANGELOG
 - [ ] Attach wheel and tar.gz to GitHub release
 - [ ] Test installation: `pip install llm-wasm-sandbox`
 - [ ] Verify import works in fresh environment
-- [ ] Bump version to `0.2.0-dev` for continued development
+- [ ] Bump version for continued development: `uv version --bump minor`
+- [ ] Commit version bump: `git add pyproject.toml uv.lock && git commit -m "Bump version to $(uv version)"`
 - [ ] Announce release (if applicable)
 
 ## 🔍 Final Verification Commands
@@ -138,10 +165,7 @@ twine upload dist/*
 ```powershell
 # Build the package
 Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue
-uv build
-
-# Validate distributions
-uv run twine check dist/*
+uv build --no-sources
 
 # Inspect wheel contents
 python -m zipfile -l dist\llm_wasm_sandbox-0.1.0-py3-none-any.whl
@@ -157,6 +181,12 @@ uv run mypy sandbox/
 
 # Lint check
 uv run ruff check sandbox/
+
+# Verify version
+uv version
+
+# Check UV_PUBLISH_TOKEN is set
+echo $env:UV_PUBLISH_TOKEN
 ```
 
 ## ✨ Ready for Publication!

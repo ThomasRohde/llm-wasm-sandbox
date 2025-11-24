@@ -49,7 +49,7 @@ class TestExecutionPolicy:
         """Test ExecutionPolicy has correct default values."""
         policy = ExecutionPolicy()
 
-        assert policy.fuel_budget == 2_000_000_000
+        assert policy.fuel_budget == 5_000_000_000
         assert policy.memory_bytes == 128_000_000
         assert policy.stdout_max_bytes == 2_000_000
         assert policy.stderr_max_bytes == 1_000_000
