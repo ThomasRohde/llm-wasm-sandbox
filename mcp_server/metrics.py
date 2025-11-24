@@ -95,13 +95,17 @@ class MCPMetrics:
         """Record a stdio message."""
         self.stdio_message_count += 1
 
-    def record_resource_usage(self, fuel_consumed: int, execution_time: float, memory_used: int) -> None:
+    def record_resource_usage(
+        self, fuel_consumed: int, execution_time: float, memory_used: int
+    ) -> None:
         """Record resource usage from sandbox execution."""
         self.total_fuel_consumed += fuel_consumed
         self.total_execution_time += execution_time
         self.peak_memory_usage = max(self.peak_memory_usage, memory_used)
 
-    def get_tool_execution_percentiles(self, tool_name: str | None = None) -> dict[str, dict[str, float]]:
+    def get_tool_execution_percentiles(
+        self, tool_name: str | None = None
+    ) -> dict[str, dict[str, float]]:
         """Get execution time percentiles for tools."""
         if self._tool_execution_percentiles is None:
             self._calculate_percentiles()
@@ -155,7 +159,9 @@ class MCPMetrics:
             "tool_executions": {
                 "total_count": self.tool_execution_count,
                 "error_count": self.tool_error_count,
-                "error_rate": self.tool_error_count / self.tool_execution_count if self.tool_execution_count > 0 else 0.0,
+                "error_rate": self.tool_error_count / self.tool_execution_count
+                if self.tool_execution_count > 0
+                else 0.0,
                 "average_time_ms": avg_tool_time * 1000,
                 "total_time_ms": self.tool_execution_total_time * 1000,
                 "errors_by_tool": dict(self.tool_errors),
@@ -170,7 +176,9 @@ class MCPMetrics:
                 "http_requests": {
                     "total_count": self.http_request_count,
                     "error_count": self.http_error_count,
-                    "error_rate": self.http_error_count / self.http_request_count if self.http_request_count > 0 else 0.0,
+                    "error_rate": self.http_error_count / self.http_request_count
+                    if self.http_request_count > 0
+                    else 0.0,
                     "average_time_ms": avg_http_time * 1000,
                 },
                 "stdio_messages": self.stdio_message_count,
@@ -240,7 +248,9 @@ class MCPMetricsCollector:
         """Record stdio message."""
         self.metrics.record_stdio_message()
 
-    def record_resource_usage(self, fuel_consumed: int, execution_time: float, memory_used: int) -> None:
+    def record_resource_usage(
+        self, fuel_consumed: int, execution_time: float, memory_used: int
+    ) -> None:
         """Record resource usage from sandbox execution."""
         self.metrics.record_resource_usage(fuel_consumed, execution_time, memory_used)
 

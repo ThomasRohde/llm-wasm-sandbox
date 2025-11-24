@@ -53,6 +53,7 @@ class PythonSandbox(BaseSandbox):
         session_id: str,
         storage_adapter: StorageAdapter,
         logger: Any = None,
+        auto_persist_globals: bool = False,
     ) -> None:
         """Initialize PythonSandbox with WASM binary path and session config.
 
@@ -62,9 +63,11 @@ class PythonSandbox(BaseSandbox):
             session_id: UUIDv4 string identifying the session
             storage_adapter: StorageAdapter for workspace operations
             logger: Optional SandboxLogger (created if None)
+            auto_persist_globals: If True, automatically wrap code with state save/restore
         """
         super().__init__(policy, session_id, storage_adapter, logger)
         self.wasm_binary_path = wasm_binary_path
+        self.auto_persist_globals = auto_persist_globals
 
     def execute(self, code: str, inject_setup: bool = True, **kwargs: Any) -> SandboxResult:
         """Execute untrusted Python code in WASM sandbox with resource limits and session tracking.
@@ -98,6 +101,12 @@ class PythonSandbox(BaseSandbox):
             session_id=self.session_id,
             inject_setup=inject_setup,
         )
+
+        # Auto-wrap code with state persistence if enabled
+        if self.auto_persist_globals:
+            from sandbox.state import wrap_stateful_code
+
+            code = wrap_stateful_code(code)
 
         # Write code to workspace
         user_code_path = self._write_untrusted_code(code, inject_setup)

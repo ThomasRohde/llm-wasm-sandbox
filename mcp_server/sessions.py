@@ -26,6 +26,7 @@ class WorkspaceSession:
     workspace_id: str
     language: str
     sandbox_session_id: str
+    auto_persist_globals: bool = False
     created_at: float = field(default_factory=time.time)
     last_used_at: float = field(default_factory=time.time)
     execution_count: int = 0
@@ -40,7 +41,11 @@ class WorkspaceSession:
     def get_sandbox(self):
         """Get the sandbox instance for this session."""
         runtime = RuntimeType.PYTHON if self.language == "python" else RuntimeType.JAVASCRIPT
-        return create_sandbox(runtime=runtime, session_id=self.sandbox_session_id)
+        return create_sandbox(
+            runtime=runtime,
+            session_id=self.sandbox_session_id,
+            auto_persist_globals=self.auto_persist_globals,
+        )
 
     async def execute_code(self, code: str, timeout: int | None = None) -> SandboxResult:
         """Execute code in this workspace session."""
@@ -68,7 +73,7 @@ class WorkspaceSessionManager:
         self._cleanup_task: asyncio.Task | None = None
 
     async def get_or_create_session(
-        self, language: str, session_id: str | None = None
+        self, language: str, session_id: str | None = None, auto_persist_globals: bool = False
     ) -> WorkspaceSession:
         """
         Get or create a workspace session.
@@ -82,13 +87,16 @@ class WorkspaceSessionManager:
 
         # Create new sandbox session
         runtime = RuntimeType.PYTHON if language == "python" else RuntimeType.JAVASCRIPT
-        sandbox = create_sandbox(runtime=runtime)
+        sandbox = create_sandbox(runtime=runtime, auto_persist_globals=auto_persist_globals)
         sandbox_session_id = sandbox.session_id
 
         # Create workspace session
         workspace_id = session_id or f"workspace_{secrets.token_urlsafe(8)}"
         session = WorkspaceSession(
-            workspace_id=workspace_id, language=language, sandbox_session_id=sandbox_session_id
+            workspace_id=workspace_id,
+            language=language,
+            sandbox_session_id=sandbox_session_id,
+            auto_persist_globals=auto_persist_globals,
         )
 
         self._sessions[workspace_id] = session
@@ -103,18 +111,21 @@ class WorkspaceSessionManager:
         return session
 
     async def create_session(
-        self, language: str, session_id: str | None = None
+        self, language: str, session_id: str | None = None, auto_persist_globals: bool = False
     ) -> WorkspaceSession:
         """Create a new workspace session explicitly."""
         # Create new sandbox session
         runtime = RuntimeType.PYTHON if language == "python" else RuntimeType.JAVASCRIPT
-        sandbox = create_sandbox(runtime=runtime)
+        sandbox = create_sandbox(runtime=runtime, auto_persist_globals=auto_persist_globals)
         sandbox_session_id = sandbox.session_id
 
         # Create workspace session
         workspace_id = session_id or f"workspace_{secrets.token_urlsafe(8)}"
         session = WorkspaceSession(
-            workspace_id=workspace_id, language=language, sandbox_session_id=sandbox_session_id
+            workspace_id=workspace_id,
+            language=language,
+            sandbox_session_id=sandbox_session_id,
+            auto_persist_globals=auto_persist_globals,
         )
 
         self._sessions[workspace_id] = session
@@ -173,7 +184,9 @@ class WorkspaceSessionManager:
                 self.logger._emit(logging.INFO, "Reset workspace session", workspace_id=session_id)
                 return True
             except Exception as e:
-                self.logger._emit(logging.WARNING, "Failed to reset session", session_id=session_id, error=str(e))
+                self.logger._emit(
+                    logging.WARNING, "Failed to reset session", session_id=session_id, error=str(e)
+                )
                 return False
         return False
 

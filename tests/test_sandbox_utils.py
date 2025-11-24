@@ -11,9 +11,9 @@ from pathlib import Path
 
 import pytest
 
-from sandbox.core.models import ExecutionPolicy, SandboxResult
-from sandbox.runtimes.python import PythonSandbox
+from sandbox.core.models import ExecutionPolicy
 from sandbox.core.storage import DiskStorageAdapter
+from sandbox.runtimes.python import PythonSandbox
 from sandbox.vendor import copy_vendor_to_workspace
 
 

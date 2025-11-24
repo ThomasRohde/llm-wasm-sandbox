@@ -122,11 +122,18 @@ class ExecutionPolicy(BaseModel):
             raise PolicyValidationError(f"Invalid execution policy: {e}") from e
 
     @classmethod
-    def model_validate(
-        cls, obj: Any, *, strict: bool | None = None, context: dict[str, Any] | None = None
-    ) -> "ExecutionPolicy":
+    def model_validate(  # type: ignore[override]
+        cls,
+        obj: Any,
+        *,
+        strict: bool | None = None,
+        from_attributes: bool | None = None,
+        context: Any | None = None,
+    ) -> ExecutionPolicy:
         try:
-            return super().model_validate(obj, strict=strict, context=context)  # type: ignore[arg-type]
+            return super().model_validate(
+                obj, strict=strict, from_attributes=from_attributes, context=context
+            )
         except ValidationError as e:
             raise PolicyValidationError(f"Invalid execution policy: {e}") from e
 

@@ -38,7 +38,7 @@ class AuditLogger:
         execution_time_ms: float,
         fuel_consumed: int,
         error_message: str | None = None,
-        **extra: Any
+        **extra: Any,
     ) -> None:
         """Log tool execution for audit purposes."""
         event_data = {
@@ -63,7 +63,7 @@ class AuditLogger:
         limit: int,
         window_seconds: int,
         blocked_duration: float,
-        **extra: Any
+        **extra: Any,
     ) -> None:
         """Log rate limit violations."""
         event_data = {
@@ -85,7 +85,7 @@ class AuditLogger:
         client_id: str,
         language: str | None = None,
         lifetime_seconds: float | None = None,
-        **extra: Any
+        **extra: Any,
     ) -> None:
         """Log session lifecycle events."""
         event_data = {
@@ -106,7 +106,7 @@ class AuditLogger:
         client_id: str,
         details: dict[str, Any],
         severity: str = "medium",
-        **extra: Any
+        **extra: Any,
     ) -> None:
         """Log security violations."""
         event_data = {
@@ -134,7 +134,7 @@ class AuditLogger:
         success: bool,
         auth_method: str | None = None,
         error_message: str | None = None,
-        **extra: Any
+        **extra: Any,
     ) -> None:
         """Log authentication events."""
         event_data = {
@@ -157,7 +157,7 @@ class AuditLogger:
         old_value: Any,
         new_value: Any,
         config_section: str,
-        **extra: Any
+        **extra: Any,
     ) -> None:
         """Log configuration changes."""
         event_data = {
@@ -173,11 +173,7 @@ class AuditLogger:
         self.logger._emit(logging.INFO, "mcp.audit.configuration_change", **event_data)
 
     def log_system_event(
-        self,
-        event_type: str,
-        details: dict[str, Any],
-        severity: str = "info",
-        **extra: Any
+        self, event_type: str, details: dict[str, Any], severity: str = "info", **extra: Any
     ) -> None:
         """Log system-level events."""
         event_data = {

@@ -5,9 +5,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from sandbox import RuntimeType
 from mcp_server.server import create_mcp_server
 from mcp_server.sessions import WorkspaceSession, WorkspaceSessionManager
+from sandbox import RuntimeType
 
 
 class TestWorkspaceSession:
@@ -16,9 +16,7 @@ class TestWorkspaceSession:
     def test_workspace_session_creation(self):
         """Test creating a workspace session."""
         session = WorkspaceSession(
-            workspace_id="test-123",
-            language="python",
-            sandbox_session_id="sandbox-456"
+            workspace_id="test-123", language="python", sandbox_session_id="sandbox-456"
         )
 
         assert session.workspace_id == "test-123"
@@ -34,9 +32,7 @@ class TestWorkspaceSession:
         # Create session in the past
         past_time = time.time() - 700  # 700 seconds ago
         session = WorkspaceSession(
-            workspace_id="test-123",
-            language="python",
-            sandbox_session_id="sandbox-456"
+            workspace_id="test-123", language="python", sandbox_session_id="sandbox-456"
         )
         session.created_at = past_time
         session.last_used_at = past_time
@@ -45,7 +41,9 @@ class TestWorkspaceSession:
         assert session.is_expired
 
         # Test with custom timeout - create a method to check
-        assert time.time() - session.last_used_at <= 800  # Should not be expired with longer timeout
+        assert (
+            time.time() - session.last_used_at <= 800
+        )  # Should not be expired with longer timeout
 
     @patch("mcp_server.sessions.create_sandbox")
     def test_get_sandbox(self, mock_create_sandbox):
@@ -54,16 +52,13 @@ class TestWorkspaceSession:
         mock_create_sandbox.return_value = mock_sandbox
 
         session = WorkspaceSession(
-            workspace_id="test-123",
-            language="python",
-            sandbox_session_id="sandbox-456"
+            workspace_id="test-123", language="python", sandbox_session_id="sandbox-456"
         )
 
         sandbox = session.get_sandbox()
 
         mock_create_sandbox.assert_called_once_with(
-            runtime=RuntimeType.PYTHON,
-            session_id="sandbox-456"
+            runtime=RuntimeType.PYTHON, session_id="sandbox-456", auto_persist_globals=False
         )
         assert sandbox == mock_sandbox
 
@@ -75,19 +70,18 @@ class TestWorkspaceSession:
         mock_result = MagicMock()
         mock_result.success = True
         mock_result.fuel_consumed = 100
-        mock_sandbox.execute = AsyncMock(return_value=mock_result)
+        mock_sandbox.execute = MagicMock(return_value=mock_result)  # Synchronous, not async
         mock_create_sandbox.return_value = mock_sandbox
 
         session = WorkspaceSession(
-            workspace_id="test-123",
-            language="python",
-            sandbox_session_id="sandbox-456"
+            workspace_id="test-123", language="python", sandbox_session_id="sandbox-456"
         )
 
         result = await session.execute_code("print('hello')")
 
         mock_sandbox.execute.assert_called_once_with("print('hello')", timeout=None)
-        assert result == mock_result
+        assert result.success == mock_result.success
+        assert result.fuel_consumed == mock_result.fuel_consumed
         assert session.execution_count == 1
         assert session.last_used_at > session.created_at
 
@@ -117,7 +111,7 @@ class TestWorkspaceSessionManager:
         assert session.language == "python"
         assert session.sandbox_session_id == "new-sandbox-id"
         assert session.workspace_id in manager._sessions
-        mock_create_sandbox.assert_called_once_with(runtime=RuntimeType.PYTHON)
+        mock_create_sandbox.assert_called_once_with(runtime=RuntimeType.PYTHON, auto_persist_globals=False)
 
     @pytest.mark.asyncio
     async def test_get_or_create_session_existing(self):
@@ -126,9 +120,7 @@ class TestWorkspaceSessionManager:
 
         # Create a session manually
         existing_session = WorkspaceSession(
-            workspace_id="existing-123",
-            language="python",
-            sandbox_session_id="sandbox-456"
+            workspace_id="existing-123", language="python", sandbox_session_id="sandbox-456"
         )
         manager._sessions["existing-123"] = existing_session
 
@@ -143,9 +135,7 @@ class TestWorkspaceSessionManager:
 
         # Create an expired session
         expired_session = WorkspaceSession(
-            workspace_id="expired-123",
-            language="python",
-            sandbox_session_id="sandbox-old"
+            workspace_id="expired-123", language="python", sandbox_session_id="sandbox-old"
         )
         expired_session.created_at = time.time() - 700  # Expired
         expired_session.last_used_at = time.time() - 700
@@ -161,7 +151,7 @@ class TestWorkspaceSessionManager:
             # Should create new session with same ID
             assert session.workspace_id == "expired-123"
             assert session.sandbox_session_id == "new-sandbox-id"
-            mock_create.assert_called_once_with(runtime=RuntimeType.PYTHON)
+            mock_create.assert_called_once_with(runtime=RuntimeType.PYTHON, auto_persist_globals=False)
 
     @patch("mcp_server.sessions.create_sandbox")
     @pytest.mark.asyncio
@@ -179,7 +169,7 @@ class TestWorkspaceSessionManager:
         assert session.workspace_id == "custom-id"
         assert session.sandbox_session_id == "explicit-sandbox-id"
         assert "custom-id" in manager._sessions
-        mock_create_sandbox.assert_called_once_with(runtime=RuntimeType.JAVASCRIPT)
+        mock_create_sandbox.assert_called_once_with(runtime=RuntimeType.JAVASCRIPT, auto_persist_globals=False)
 
     @pytest.mark.asyncio
     async def test_destroy_session_success(self):
@@ -188,9 +178,7 @@ class TestWorkspaceSessionManager:
 
         # Create a session
         session = WorkspaceSession(
-            workspace_id="destroy-test",
-            language="python",
-            sandbox_session_id="sandbox-destroy"
+            workspace_id="destroy-test", language="python", sandbox_session_id="sandbox-destroy"
         )
         manager._sessions["destroy-test"] = session
 
@@ -217,9 +205,7 @@ class TestWorkspaceSessionManager:
 
         # Create a session with some state
         session = WorkspaceSession(
-            workspace_id="reset-test",
-            language="python",
-            sandbox_session_id="sandbox-reset"
+            workspace_id="reset-test", language="python", sandbox_session_id="sandbox-reset"
         )
         session.execution_count = 5
         session.variables = ["x", "y"]
@@ -231,7 +217,9 @@ class TestWorkspaceSessionManager:
             mock_workspace_path.exists.return_value = True
             mock_workspace_path.iterdir.return_value = [
                 MagicMock(is_file=MagicMock(return_value=True)),  # file
-                MagicMock(is_file=MagicMock(return_value=False), is_dir=MagicMock(return_value=True))  # dir
+                MagicMock(
+                    is_file=MagicMock(return_value=False), is_dir=MagicMock(return_value=True)
+                ),  # dir
             ]
             mock_path.return_value = mock_workspace_path
 
@@ -258,9 +246,7 @@ class TestWorkspaceSessionManager:
 
         # Create a session
         session = WorkspaceSession(
-            workspace_id="info-test",
-            language="python",
-            sandbox_session_id="sandbox-info"
+            workspace_id="info-test", language="python", sandbox_session_id="sandbox-info"
         )
         session.execution_count = 3
         session.variables = ["a", "b"]
@@ -297,17 +283,13 @@ class TestWorkspaceSessionManager:
 
         # Create expired and active sessions
         expired_session = WorkspaceSession(
-            workspace_id="expired",
-            language="python",
-            sandbox_session_id="sandbox-expired"
+            workspace_id="expired", language="python", sandbox_session_id="sandbox-expired"
         )
         expired_session.created_at = time.time() - 700
         expired_session.last_used_at = time.time() - 700
 
         active_session = WorkspaceSession(
-            workspace_id="active",
-            language="python",
-            sandbox_session_id="sandbox-active"
+            workspace_id="active", language="python", sandbox_session_id="sandbox-active"
         )
 
         manager._sessions["expired"] = expired_session

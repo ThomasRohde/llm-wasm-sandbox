@@ -118,6 +118,21 @@ result = sandbox.execute("console.log('Hello from QuickJS!')")
 print(result.stdout)  # "Hello from QuickJS!"
 ```
 
+**Stateful Sessions with Automatic Variable Persistence:**
+```python
+from sandbox import create_sandbox, RuntimeType
+
+# Create session with auto-persist enabled
+sandbox = create_sandbox(runtime=RuntimeType.PYTHON, auto_persist_globals=True)
+
+# First execution - set variables
+sandbox.execute("counter = 100; data = [1, 2, 3]")
+
+# Second execution - variables automatically restored!
+sandbox.execute("print(f'counter={counter}, data={data}')")
+# Output: counter=100, data=[1, 2, 3]
+```
+
 ### Run Demo
 
 ```powershell
@@ -256,7 +271,33 @@ print(feedback)
 
 ### Multi-Turn Sessions
 
-For stateful LLM interactions with file persistence:
+**Option 1: Automatic Global Variable Persistence** (Recommended)
+
+```python
+from sandbox import create_sandbox, RuntimeType
+
+# Create session with auto-persist enabled
+sandbox = create_sandbox(runtime=RuntimeType.PYTHON, auto_persist_globals=True)
+
+# Turn 1: LLM sets variables (no manual save/load needed!)
+result1 = sandbox.execute("""
+users = ["Alice", "Bob"]
+count = len(users)
+print(f"Initialized: {users}")
+""")
+
+# Turn 2: Variables automatically restored
+result2 = sandbox.execute("""
+users.append("Charlie")
+count = len(users)
+print(f"Updated: {users}, count={count}")
+""")
+# Output: Updated: ['Alice', 'Bob', 'Charlie'], count=3
+```
+
+**Option 2: Manual File Persistence**
+
+For complex data structures or explicit control:
 
 ```python
 from sandbox import create_sandbox, RuntimeType
@@ -415,6 +456,8 @@ The MCP server exposes these tools to LLM clients:
 - **`execute_code`**: Execute Python or JavaScript code securely
 - **`list_runtimes`**: Enumerate available language runtimes
 - **`create_session`**: Create new execution sessions
+  - `language`: "python" or "javascript"
+  - `auto_persist_globals` (optional): Enable automatic variable persistence across executions
 - **`destroy_session`**: Clean up sessions
 - **`install_package`**: Install Python packages (Python only)
 - **`get_workspace_info`**: Inspect session state
@@ -434,17 +477,39 @@ The MCP server exposes these tools to LLM clients:
 
 ### Session Management
 
-MCP clients automatically get isolated workspaces:
+MCP clients automatically get isolated workspaces with optional automatic variable persistence:
 
+**Automatic Global Persistence (Recommended for LLM workflows):**
 ```python
-# Sessions persist across tool calls
+# Create session with auto-persist enabled
+await session.call_tool("create_session", {
+    "language": "python",
+    "auto_persist_globals": True
+})
+
+# Variables persist automatically across executions
+await session.call_tool("execute_code", {
+    "code": "counter = 0; data = []",
+    "language": "python"
+})
+
+await session.call_tool("execute_code", {
+    "code": "counter += 1; data.append('item'); print(counter, data)",
+    "language": "python"
+})
+# Output: 1 ['item']
+```
+
+**Manual File Persistence:**
+```python
+# Without auto_persist_globals, use files for state
 await session.call_tool("execute_code", {
     "code": "x = 42",
     "language": "python"
 })
 
 await session.call_tool("execute_code", {
-    "code": "print(x * 2)",  # x is still available
+    "code": "print(x * 2)",  # ❌ NameError: x is not defined
     "language": "python"
 })
 ```

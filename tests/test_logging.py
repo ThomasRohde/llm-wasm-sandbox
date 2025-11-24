@@ -6,9 +6,9 @@ structured event logging, key-value pairs, and event emission.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
-import logging
 import pytest
 import structlog
 

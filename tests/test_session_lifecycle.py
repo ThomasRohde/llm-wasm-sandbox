@@ -44,7 +44,6 @@ def test_create_session_sandbox_creates_workspace(tmp_path: Path) -> None:
 def test_create_session_sandbox_returns_sandbox_instance(tmp_path: Path) -> None:
     """Test that create_session_sandbox returns working sandbox."""
     sandbox = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=tmp_path)
-    session_id = sandbox.session_id
 
     # Verify sandbox can execute code
     result = sandbox.execute("print('hello from session')")
@@ -190,10 +189,8 @@ def test_session_isolation_between_sessions(tmp_path: Path) -> None:
     """Test that different sessions have isolated workspaces."""
     # Create two sessions
     sandbox_a = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=tmp_path)
-    session_id_a = sandbox_a.session_id
 
     sandbox_b = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=tmp_path)
-    session_id_b = sandbox_b.session_id
 
     # Write different files in each session
     result_a = sandbox_a.execute("""
@@ -221,7 +218,6 @@ with open('/app/data.txt', 'w') as f:
 def test_session_persistence_across_executions(tmp_path: Path) -> None:
     """Test that session state persists across multiple executions."""
     sandbox = create_sandbox(runtime=RuntimeType.PYTHON, workspace_root=tmp_path)
-    session_id = sandbox.session_id
 
     # First execution: write counter
     result1 = sandbox.execute("""

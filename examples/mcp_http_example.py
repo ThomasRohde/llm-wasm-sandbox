@@ -23,7 +23,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from mcp_server import create_mcp_server, MCPConfig, HTTPTransportConfig
+from mcp_server import HTTPTransportConfig, MCPConfig, create_mcp_server  # noqa: E402
 
 
 async def main():
@@ -56,10 +56,19 @@ async def main():
     server = create_mcp_server(config)
 
     print("Starting MCP server with HTTP transport...", file=sys.stderr)
-    print(f"Server URL: http://{http_config.host}:{http_config.port}{http_config.path}", file=sys.stderr)
+    print(
+        f"Server URL: http://{http_config.host}:{http_config.port}{http_config.path}",
+        file=sys.stderr,
+    )
     print(f"CORS origins: {http_config.cors_origins}", file=sys.stderr)
-    print(f"Rate limit: {http_config.rate_limit_requests} requests per {http_config.rate_limit_window_seconds}s", file=sys.stderr)
-    print("Available tools: execute_code, list_runtimes, create_session, destroy_session, install_package, get_workspace_info, reset_workspace", file=sys.stderr)
+    print(
+        f"Rate limit: {http_config.rate_limit_requests} requests per {http_config.rate_limit_window_seconds}s",
+        file=sys.stderr,
+    )
+    print(
+        "Available tools: execute_code, list_runtimes, create_session, destroy_session, install_package, get_workspace_info, reset_workspace",
+        file=sys.stderr,
+    )
 
     if http_config.auth_token:
         print(f"Auth token required: {http_config.auth_token[:8]}...", file=sys.stderr)

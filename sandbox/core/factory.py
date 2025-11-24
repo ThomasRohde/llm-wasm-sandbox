@@ -8,9 +8,7 @@ All sandboxes are session-aware with auto-generated session IDs.
 from __future__ import annotations
 
 import json
-import shutil
 import uuid
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -31,6 +29,7 @@ def create_sandbox(
     storage_adapter: StorageAdapter | None = None,
     logger: SandboxLogger | None = None,
     allow_non_uuid: bool = True,
+    auto_persist_globals: bool = False,
     **kwargs: Any,
 ) -> Any:  # Returns BaseSandbox but avoid circular import in type hint
     """Create a session-aware sandbox instance for the specified runtime type.
@@ -50,6 +49,10 @@ def create_sandbox(
                         If None, creates DiskStorageAdapter with workspace_root.
         logger: Optional SandboxLogger. If None, runtime creates default logger.
         allow_non_uuid: If False, session_id must be a valid UUID string.
+        auto_persist_globals: If True, automatically save/restore Python globals between
+                             executions using JSON serialization. Only serializable types
+                             (int, str, list, dict, bool, float, None) are persisted.
+                             Functions, modules, and classes are filtered out.
         **kwargs: Additional runtime-specific arguments passed to constructor.
                   For PythonSandbox: wasm_binary_path (default: "bin/python.wasm")
                   For JavaScriptSandbox: wasm_binary_path (default: "bin/quickjs.wasm")
@@ -102,10 +105,7 @@ def create_sandbox(
 
     # Create storage adapter if not provided
     if storage_adapter is None:
-        if workspace_root is None:
-            workspace_root = Path("workspace")
-        else:
-            workspace_root = Path(workspace_root)
+        workspace_root = Path("workspace") if workspace_root is None else Path(workspace_root)
         workspace_root = workspace_root.resolve()
         storage_adapter = DiskStorageAdapter(workspace_root)
     else:
@@ -171,8 +171,9 @@ def create_sandbox(
             storage_adapter.read_metadata(session_id)
         except (FileNotFoundError, json.JSONDecodeError):
             # Legacy session without metadata - create it now
-            from sandbox.sessions import SessionMetadata
             from datetime import UTC, datetime
+
+            from sandbox.sessions import SessionMetadata
 
             now = datetime.now(UTC).isoformat()
             metadata = SessionMetadata(
@@ -204,6 +205,7 @@ def create_sandbox(
             session_id=session_id,
             storage_adapter=storage_adapter,
             logger=logger,
+            auto_persist_globals=auto_persist_globals,
             **kwargs,
         )
 

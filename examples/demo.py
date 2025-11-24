@@ -168,14 +168,14 @@ print(f"✓ History: {data['history']}")
     code_turn5 = """
 with open('/app/task.txt', 'r') as f:
     task = f.read()
-    
+
 print(f"Task received: {task}")
 
 # Process task
 import json
 with open('/app/state.json', 'r') as f:
     data = json.load(f)
-    
+
 data['counter'] += 1
 data['history'].append('processed_task')
 
@@ -188,7 +188,7 @@ with open('/app/report.txt', 'w') as f:
 
 with open('/app/state.json', 'w') as f:
     json.dump(data, f)
-    
+
 print("✓ Report generated")
 """
 
@@ -812,7 +812,7 @@ print("\\n✓ Report saved to /app/report.json")
     console.print("[dim]• WASM sandbox starts with fuel=2B, memory=128MB limits[/dim]")
     console.print("[dim]• Stdout/stderr redirected to temporary log files[/dim]")
 
-    session_id, result = execute_in_session(llm_code, session_id="demo-9-llm")
+    _session_id, result = execute_in_session(llm_code, session_id="demo-9-llm")
 
     console.print("\n[bold cyan]Step 3: Capture Output[/bold cyan]")
     console.print("[bold]Console Output (stdout):[/bold]")

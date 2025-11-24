@@ -196,7 +196,7 @@ class TestCreateSandboxIntegration:
         custom_logger = SandboxLogger(logging.getLogger("integration"))
         custom_wasm = "integration/python.wasm"
 
-        sandbox = create_sandbox(
+        create_sandbox(
             runtime=RuntimeType.PYTHON,
             policy=custom_policy,
             workspace_root=custom_workspace_root,
@@ -269,8 +269,9 @@ class TestCreateSandboxJavaScriptIntegration:
 
     def test_create_javascript_sandbox_with_custom_logger(self) -> None:
         """Test factory with custom logger passes logger to JavaScriptSandbox."""
-        from sandbox.runtimes.javascript.sandbox import JavaScriptSandbox
         import logging
+
+        from sandbox.runtimes.javascript.sandbox import JavaScriptSandbox
 
         custom_logger = SandboxLogger(logging.getLogger("js-test"))
 
@@ -294,8 +295,9 @@ class TestCreateSandboxJavaScriptIntegration:
 
     def test_create_javascript_sandbox_with_all_parameters(self, tmp_path: Path) -> None:
         """Test factory with all custom parameters for JavaScript runtime."""
-        from sandbox.runtimes.javascript.sandbox import JavaScriptSandbox
         import logging
+
+        from sandbox.runtimes.javascript.sandbox import JavaScriptSandbox
 
         custom_policy = ExecutionPolicy(fuel_budget=800_000_000)
         custom_workspace = tmp_path / "full_js_workspace"

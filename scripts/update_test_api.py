@@ -119,7 +119,7 @@ def update_file(file_path: Path) -> None:
             var_match = re.search(r"(\s+)(sandbox\w*) = get_session_sandbox\(", line)
             if var_match:
                 indent_str = var_match.group(1)
-                var_name = var_match.group(2)
+                var_match.group(2)
 
                 # Replace the function call
                 line = line.replace("get_session_sandbox(", "create_sandbox(")

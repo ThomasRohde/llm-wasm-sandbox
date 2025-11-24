@@ -1,7 +1,8 @@
 """Tests for MCP server lifecycle and initialization."""
 
-import pytest
 from unittest.mock import AsyncMock
+
+import pytest
 
 from mcp_server.config import MCPConfig
 from mcp_server.server import MCPServer, create_mcp_server

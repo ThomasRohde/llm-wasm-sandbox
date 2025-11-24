@@ -21,7 +21,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from mcp_server import create_mcp_server, MCPConfig
+from mcp_server import MCPConfig, create_mcp_server  # noqa: E402
 
 
 async def main():
@@ -40,7 +40,10 @@ async def main():
     server = create_mcp_server(config)
 
     print("Starting MCP server with stdio transport...", file=sys.stderr)
-    print("Available tools: execute_code, list_runtimes, create_session, destroy_session, install_package, get_workspace_info, reset_workspace", file=sys.stderr)
+    print(
+        "Available tools: execute_code, list_runtimes, create_session, destroy_session, install_package, get_workspace_info, reset_workspace",
+        file=sys.stderr,
+    )
 
     try:
         await server.start_stdio()

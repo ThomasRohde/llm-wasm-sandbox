@@ -20,7 +20,7 @@ class TestMCPIntegrationStdio:
         server = create_mcp_server()
 
         # Mock the app's run_stdio_async to avoid actually running
-        with patch.object(server.app, 'run_stdio_async', new_callable=AsyncMock) as mock_run:
+        with patch.object(server.app, "run_stdio_async", new_callable=AsyncMock) as mock_run:
             # Start the server (this would normally run forever)
             start_task = asyncio.create_task(server.start_stdio())
 
@@ -44,8 +44,8 @@ class TestMCPIntegrationStdio:
         server = create_mcp_server()
 
         assert server.app is not None
-        assert hasattr(server, 'session_manager')
-        assert hasattr(server, 'start_stdio')
+        assert hasattr(server, "session_manager")
+        assert hasattr(server, "start_stdio")
 
 
 class TestMCPIntegrationHTTP:
@@ -60,7 +60,7 @@ class TestMCPIntegrationHTTP:
         config = HTTPTransportConfig()
 
         # Mock the app's run_http_async
-        with patch.object(server.app, 'run_http_async', new_callable=AsyncMock) as mock_run:
+        with patch.object(server.app, "run_http_async", new_callable=AsyncMock) as mock_run:
             # Start the server
             start_task = asyncio.create_task(server.start_http(config))
 
@@ -76,8 +76,8 @@ class TestMCPIntegrationHTTP:
             # Verify run_http_async was called with correct config
             mock_run.assert_called_once()
             call_args = mock_run.call_args
-            assert call_args[1]['host'] == '127.0.0.1'
-            assert call_args[1]['port'] == 8080
+            assert call_args[1]["host"] == "127.0.0.1"
+            assert call_args[1]["port"] == 8080
 
     @pytest.mark.asyncio
     async def test_http_server_custom_config(self):
@@ -85,7 +85,7 @@ class TestMCPIntegrationHTTP:
         server = create_mcp_server()
         config = HTTPTransportConfig(host="0.0.0.0", port=9000)
 
-        with patch.object(server.app, 'run_http_async', new_callable=AsyncMock) as mock_run:
+        with patch.object(server.app, "run_http_async", new_callable=AsyncMock) as mock_run:
             start_task = asyncio.create_task(server.start_http(config))
 
             await asyncio.sleep(0.1)
@@ -95,8 +95,8 @@ class TestMCPIntegrationHTTP:
                 await start_task
 
             call_args = mock_run.call_args
-            assert call_args[1]['host'] == '0.0.0.0'
-            assert call_args[1]['port'] == 9000
+            assert call_args[1]["host"] == "0.0.0.0"
+            assert call_args[1]["port"] == 9000
 
 
 class TestMCPClientServerInteraction:
@@ -111,8 +111,7 @@ class TestMCPClientServerInteraction:
         tasks = []
         for i in range(3):
             task = server.app._tool_manager.call_tool(
-                "create_session",
-                {"language": "python", "session_id": f"session-{i}"}
+                "create_session", {"language": "python", "session_id": f"session-{i}"}
             )
             tasks.append(task)
 
@@ -130,14 +129,12 @@ class TestMCPClientServerInteraction:
 
         # Test that we can create multiple sessions
         result1 = await server.app._tool_manager.call_tool(
-            "create_session",
-            {"language": "python", "session_id": "test1"}
+            "create_session", {"language": "python", "session_id": "test1"}
         )
         assert result1 is not None
 
         result2 = await server.app._tool_manager.call_tool(
-            "create_session",
-            {"language": "javascript", "session_id": "test2"}
+            "create_session", {"language": "javascript", "session_id": "test2"}
         )
         assert result2 is not None
 
@@ -147,14 +144,12 @@ class TestMCPClientServerInteraction:
 
         # Test destroy sessions
         destroy1 = await server.app._tool_manager.call_tool(
-            "destroy_session",
-            {"session_id": "test1"}
+            "destroy_session", {"session_id": "test1"}
         )
         assert destroy1 is not None
 
         destroy2 = await server.app._tool_manager.call_tool(
-            "destroy_session",
-            {"session_id": "test2"}
+            "destroy_session", {"session_id": "test2"}
         )
         assert destroy2 is not None
 
@@ -169,10 +164,7 @@ class TestMCPErrorHandlingIntegration:
 
         # Test with invalid tool name
         try:
-            result = await server.app._tool_manager.call_tool(
-                "non_existent_tool",
-                {}
-            )
+            result = await server.app._tool_manager.call_tool("non_existent_tool", {})
             # Should not crash, should return some error response
             assert result is not None
         except Exception as e:
@@ -185,10 +177,7 @@ class TestMCPErrorHandlingIntegration:
         server = create_mcp_server()
 
         # Test with invalid language
-        result = await server.app._tool_manager.call_tool(
-            "create_session",
-            {"language": "invalid"}
-        )
+        result = await server.app._tool_manager.call_tool("create_session", {"language": "invalid"})
         parsed = json.loads(result.content[0].text)
         assert parsed["success"] is False
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from collections import defaultdict, deque
+from collections import deque
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -154,10 +154,10 @@ class RateLimiter:
 
     def get_all_stats(self) -> dict[str, Any]:
         """Get statistics for all clients."""
-        now = time.time()
+        time.time()
         client_stats = {}
 
-        for client_key, client in self.clients.items():
+        for client_key, _client in self.clients.items():
             client_stats[client_key] = self.get_client_stats(client_key)
 
         return {
@@ -216,7 +216,11 @@ class HTTPRateLimiter(RateLimiter):
         """Extract client IP from HTTP request."""
         # This would need to be implemented based on the actual HTTP framework
         # For now, return a default
-        return getattr(request, 'client', {}).get('host', 'unknown') if hasattr(request, 'client') else 'unknown'
+        return (
+            getattr(request, "client", {}).get("host", "unknown")
+            if hasattr(request, "client")
+            else "unknown"
+        )
 
 
 class StdioRateLimiter(RateLimiter):

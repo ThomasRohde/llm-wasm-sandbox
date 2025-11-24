@@ -291,17 +291,17 @@ async def demo_report_generation():
 
     prompt = (
         "Create a JSON file at /app/metrics.json with:\n"
-        '```json\n'
-        '{\n'
+        "```json\n"
+        "{\n"
         '  "system": "Production API",\n'
         '  "date": "2024-01-15",\n'
         '  "metrics": [\n'
         '    {"name": "Requests/sec", "value": 1250},\n'
         '    {"name": "Avg Response Time", "value": 45},\n'
         '    {"name": "Error Rate", "value": 0.2}\n'
-        '  ]\n'
-        '}\n'
-        '```\n\n'
+        "  ]\n"
+        "}\n"
+        "```\n\n"
         "Then:\n"
         "1. Read the JSON and extract data\n"
         "2. Generate a Markdown report with:\n"
@@ -347,12 +347,12 @@ async def demo_text_processing():
         "/app/new_version.py:\n"
         "```python\n"
         "def calculate(x: int, y: int) -> int:\n"
-        "    \"\"\"Add two numbers.\"\"\"\n"
+        '    """Add two numbers."""\n'
         "    return x + y\n"
         "\n"
         "def main() -> None:\n"
         "    result = calculate(5, 3)\n"
-        "    print(f\"Result: {result}\")\n"
+        '    print(f"Result: {result}")\n'
         "```\n\n"
         "Then:\n"
         "1. Show diff between the two files\n"

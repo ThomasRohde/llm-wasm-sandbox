@@ -230,9 +230,13 @@ class MCPServer:
 
         @self.app.tool(
             name="create_session",
-            description="Create a new workspace session for code execution",
+            description="Create a new workspace session for code execution with optional automatic global variable persistence",
         )
-        async def create_session(language: str, session_id: str | None = None) -> MCPToolResult:
+        async def create_session(
+            language: str,
+            session_id: str | None = None,
+            auto_persist_globals: bool = False,
+        ) -> MCPToolResult:
             """Create a new workspace session."""
             # Check rate limit
             if not await self._check_rate_limit(session_id or "anonymous"):
@@ -251,19 +255,27 @@ class MCPServer:
                         )
 
                     session = await self.session_manager.create_session(
-                        language=language, session_id=session_id
+                        language=language,
+                        session_id=session_id,
+                        auto_persist_globals=auto_persist_globals,
                     )
 
                     # Record session creation
                     self.metrics.record_session_created()
 
                     return MCPToolResult(
-                        content=f"Created session {session.workspace_id} for {language}",
+                        content=f"Created session {session.workspace_id} for {language}"
+                        + (
+                            " with automatic global variable persistence"
+                            if auto_persist_globals
+                            else ""
+                        ),
                         structured_content={
                             "session_id": session.workspace_id,
                             "language": session.language,
                             "sandbox_session_id": session.sandbox_session_id,
                             "created_at": session.created_at,
+                            "auto_persist_globals": session.auto_persist_globals,
                         },
                     )
 
@@ -299,7 +311,9 @@ class MCPServer:
                             structured_content={"session_id": session_id},
                         )
                     else:
-                        return MCPToolResult(content=f"Session {session_id} not found", success=False)
+                        return MCPToolResult(
+                            content=f"Session {session_id} not found", success=False
+                        )
 
                 except Exception as e:
                     self.logger._emit(
@@ -418,13 +432,20 @@ if result.stderr:
                             structured_content=info,
                         )
                     else:
-                        return MCPToolResult(content=f"Session {session_id} not found", success=False)
+                        return MCPToolResult(
+                            content=f"Session {session_id} not found", success=False
+                        )
 
                 except Exception as e:
                     self.logger._emit(
-                        logging.ERROR, "Tool execution failed", tool="get_workspace_info", error=str(e)
+                        logging.ERROR,
+                        "Tool execution failed",
+                        tool="get_workspace_info",
+                        error=str(e),
                     )
-                    return MCPToolResult(content=f"Failed to get workspace info: {e!s}", success=False)
+                    return MCPToolResult(
+                        content=f"Failed to get workspace info: {e!s}", success=False
+                    )
 
         @self.app.tool(
             name="reset_workspace",
@@ -516,13 +537,13 @@ if result.stderr:
 
         # Note: HTTP timing would need to be integrated at the FastMCP level
         # For now, we rely on the tool-level timing
-        
+
         # Get uvicorn config but extract host/port separately
         # to avoid duplicate parameter error in FastMCP
         uvicorn_config = http_config.get_uvicorn_config()
         host = uvicorn_config.pop("host")
         port = uvicorn_config.pop("port")
-        
+
         await self.app.run_http_async(
             host=host,
             port=port,

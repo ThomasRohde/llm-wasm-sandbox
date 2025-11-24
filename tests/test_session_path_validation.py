@@ -63,7 +63,9 @@ class TestValidateSessionPath:
 
         # On Windows, absolute Unix paths like /etc/passwd get interpreted as C:\etc\passwd
         # which still escapes the workspace, so we check for "escapes" rather than "must be relative"
-        with pytest.raises(ValueError, match="escapes session workspace boundary|must be relative"):
+        with pytest.raises(
+            ValueError, match=r"escapes session workspace boundary|must be relative"
+        ):
             _validate_session_path(session_id, "/etc/passwd", workspace_root)
 
     def test_reject_session_id_with_separator(self, tmp_path: Path) -> None:

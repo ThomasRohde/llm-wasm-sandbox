@@ -292,7 +292,7 @@ class MyClass {
     constructor(value) {
         this.value = value;
     }
-    
+
     process() {
         return Array.from({length: this.value}, (_, i) => i * i);
     }
@@ -367,12 +367,12 @@ class TestJavaScriptSandboxWorkspace:
 
     def test_logs_dir_cleaned_by_default(self, javascript_sandbox):
         """Logs are cleaned up unless preservation is requested."""
-        before = {p for p in Path(tempfile.gettempdir()).glob("wasm-javascript-*")}
+        before = set(Path(tempfile.gettempdir()).glob("wasm-javascript-*"))
 
         code = "console.log('Test');"
         result = javascript_sandbox.execute(code)
 
-        after = {p for p in Path(tempfile.gettempdir()).glob("wasm-javascript-*")}
+        after = set(Path(tempfile.gettempdir()).glob("wasm-javascript-*"))
         created = [p for p in after if p not in before]
 
         assert result.metadata.get("logs_dir") is None

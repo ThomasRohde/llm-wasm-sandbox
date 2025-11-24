@@ -61,9 +61,11 @@ def main() -> None:
         return
 
     print(f"Found {len(all_python_files)} total Python file(s)")
-    print(
-        f"Skipping {len(uncommitted_files & {str(f.relative_to(Path.cwd())).replace('\\', '/') for f in all_python_files})} uncommitted file(s)"
+    uncommitted_count = len(
+        uncommitted_files
+        & {str(f.relative_to(Path.cwd())).replace("\\", "/") for f in all_python_files}
     )
+    print(f"Skipping {uncommitted_count} uncommitted file(s)")
     print(f"Processing {len(python_files)} file(s)\n")
 
     success_count = 0

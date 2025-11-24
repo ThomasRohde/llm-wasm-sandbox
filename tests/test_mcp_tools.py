@@ -1,8 +1,9 @@
 """Tests for MCP server tool functionality."""
 
 import json
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from mcp_server.server import create_mcp_server
 
@@ -140,7 +141,8 @@ class TestMCPToolExecuteCode:
 
         # Call the tool with session_id
         result = await server.app._tool_manager.call_tool(
-            "execute_code", {"code": "print('session test')", "language": "python", "session_id": "test-session"}
+            "execute_code",
+            {"code": "print('session test')", "language": "python", "session_id": "test-session"},
         )
 
         server.session_manager.get_or_create_session.assert_called_with(
@@ -188,14 +190,21 @@ class TestMCPToolCreateSession:
         server = create_mcp_server()
 
         # Mock the session manager
-        mock_session = type('MockSession', (), {
-            'workspace_id': "test-workspace-123",
-            'language': "python",
-            'sandbox_session_id': "sandbox-456",
-            'created_at': 1234567890.0
-        })()
+        mock_session = type(
+            "MockSession",
+            (),
+            {
+                "workspace_id": "test-workspace-123",
+                "language": "python",
+                "sandbox_session_id": "sandbox-456",
+                "created_at": 1234567890.0,
+                "auto_persist_globals": False,
+            },
+        )()
 
-        with patch.object(server.session_manager, 'create_session', new_callable=AsyncMock) as mock_method:
+        with patch.object(
+            server.session_manager, "create_session", new_callable=AsyncMock
+        ) as mock_method:
             mock_method.side_effect = lambda *args, **kwargs: mock_session
             # Call the tool
             result = await server.app._tool_manager.call_tool(
@@ -215,12 +224,17 @@ class TestMCPToolCreateSession:
         server = create_mcp_server()
 
         # Mock the session manager
-        mock_session = type('MockSession', (), {
-            'workspace_id': 'js-session-789',
-            'language': 'javascript',
-            'sandbox_session_id': 'js-sandbox-101',
-            'created_at': 1234567891.0
-        })()
+        mock_session = type(
+            "MockSession",
+            (),
+            {
+                "workspace_id": "js-session-789",
+                "language": "javascript",
+                "sandbox_session_id": "js-sandbox-101",
+                "created_at": 1234567891.0,
+                "auto_persist_globals": False,
+            },
+        )()
 
         server.session_manager.create_session = AsyncMock(return_value=mock_session)
 
@@ -240,9 +254,7 @@ class TestMCPToolCreateSession:
         server = create_mcp_server()
 
         # Call the tool with invalid language
-        result = await server.app._tool_manager.call_tool(
-            "create_session", {"language": "invalid"}
-        )
+        result = await server.app._tool_manager.call_tool("create_session", {"language": "invalid"})
 
         parsed = parse_tool_result(result)
         assert "Unsupported language" in parsed["content"]
@@ -254,12 +266,17 @@ class TestMCPToolCreateSession:
         server = create_mcp_server()
 
         # Mock the session manager
-        mock_session = type('MockSession', (), {
-            'workspace_id': 'custom-id',
-            'language': 'python',
-            'sandbox_session_id': 'sandbox-custom',
-            'created_at': 1234567892.0
-        })()
+        mock_session = type(
+            "MockSession",
+            (),
+            {
+                "workspace_id": "custom-id",
+                "language": "python",
+                "sandbox_session_id": "sandbox-custom",
+                "created_at": 1234567892.0,
+                "auto_persist_globals": False,
+            },
+        )()
 
         server.session_manager.create_session = AsyncMock(return_value=mock_session)
 
@@ -269,7 +286,7 @@ class TestMCPToolCreateSession:
         )
 
         server.session_manager.create_session.assert_called_with(
-            language="python", session_id="custom-id"
+            language="python", session_id="custom-id", auto_persist_globals=False
         )
         parsed = parse_tool_result(result)
         assert parsed["structured_content"]["session_id"] == "custom-id"

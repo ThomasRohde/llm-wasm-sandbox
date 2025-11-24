@@ -424,7 +424,8 @@ guest_data_path = "/readonly_data"
             toml_path = f.name
 
         try:
-            with pytest.raises(Exception):  # tomllib.TOMLDecodeError
+            # tomllib.TOMLDecodeError or ValueError for invalid TOML
+            with pytest.raises((ValueError, Exception)):
                 load_policy(toml_path)
         finally:
             Path(toml_path).unlink()

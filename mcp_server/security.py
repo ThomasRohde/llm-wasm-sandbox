@@ -8,7 +8,7 @@ to prevent injection attacks and ensure safe code execution.
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import ClassVar
 
 
 class SecurityValidator:
@@ -23,26 +23,42 @@ class SecurityValidator:
     """
 
     # Dangerous patterns in code
-    DANGEROUS_CODE_PATTERNS = [
+    DANGEROUS_CODE_PATTERNS: ClassVar[list[str]] = [
         # File system access - COMMENTED OUT to allow file operations
         # r'\b(open|file|os\.|pathlib|shutil)\b',
         # Network access
-        r'\b(socket|urllib|requests|http|ftp)\b',
+        r"\b(socket|urllib|requests|http|ftp)\b",
         # System commands
-        r'\b(subprocess|os\.system|os\.popen|commands)\b',
+        r"\b(subprocess|os\.system|os\.popen|commands)\b",
         # Dynamic code execution
-        r'\b(eval|exec|compile|__import__|importlib)\b',
+        r"\b(eval|exec|compile|__import__|importlib)\b",
         # Process manipulation
-        r'\b(psutil|signal|kill|terminate)\b',
+        r"\b(psutil|signal|kill|terminate)\b",
     ]
 
     # Dangerous package names
-    DANGEROUS_PACKAGES = {
+    DANGEROUS_PACKAGES: ClassVar[set[str]] = {
         # 'os', 'sys', 'pathlib' - REMOVED to allow basic file operations
-        'subprocess', 'shutil', 'socket', 'urllib',
-        'eval', 'exec', 'compile', 'importlib',
-        'psutil', 'signal', 'multiprocessing', 'threading', 'asyncio',
-        'ctypes', 'mmap', 'resource', 'gc', 'inspect', 'pickle', 'shelve',
+        "subprocess",
+        "shutil",
+        "socket",
+        "urllib",
+        "eval",
+        "exec",
+        "compile",
+        "importlib",
+        "psutil",
+        "signal",
+        "multiprocessing",
+        "threading",
+        "asyncio",
+        "ctypes",
+        "mmap",
+        "resource",
+        "gc",
+        "inspect",
+        "pickle",
+        "shelve",
     }
 
     MAX_CODE_LENGTH = 10000  # characters
@@ -79,7 +95,7 @@ class SecurityValidator:
                 return False, f"Potentially dangerous code pattern detected: {pattern}"
 
         # Check for suspicious imports
-        import_matches = re.findall(r'^\s*(?:import|from)\s+(\w+)', code, re.MULTILINE)
+        import_matches = re.findall(r"^\s*(?:import|from)\s+(\w+)", code, re.MULTILINE)
         for module in import_matches:
             if module.lower() in cls.DANGEROUS_PACKAGES:
                 return False, f"Import of potentially dangerous module: {module}"
@@ -91,9 +107,9 @@ class SecurityValidator:
         """Validate JavaScript code for security issues."""
         # Basic checks for Node.js APIs
         dangerous_js_patterns = [
-            r'\b(require|process|fs|path|child_process|http|https|net)\b',
-            r'\b(eval|Function|setTimeout|setInterval)\b',
-            r'\b(window|document|XMLHttpRequest)\b',  # Browser APIs
+            r"\b(require|process|fs|path|child_process|http|https|net)\b",
+            r"\b(eval|Function|setTimeout|setInterval)\b",
+            r"\b(window|document|XMLHttpRequest)\b",  # Browser APIs
         ]
 
         for pattern in dangerous_js_patterns:
@@ -109,18 +125,21 @@ class SecurityValidator:
             return False, "Package name must be a non-empty string"
 
         if len(package_name) > cls.MAX_PACKAGE_NAME_LENGTH:
-            return False, f"Package name too long: {len(package_name)} > {cls.MAX_PACKAGE_NAME_LENGTH}"
+            return (
+                False,
+                f"Package name too long: {len(package_name)} > {cls.MAX_PACKAGE_NAME_LENGTH}",
+            )
 
         # Check for dangerous package names
         if package_name.lower() in cls.DANGEROUS_PACKAGES:
             return False, f"Installation of dangerous package not allowed: {package_name}"
 
         # Basic package name validation (PEP 508 compliant-ish)
-        if not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9._-]*$', package_name):
+        if not re.match(r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$", package_name):
             return False, "Invalid package name format"
 
         # Check for path traversal attempts
-        if '..' in package_name or '/' in package_name or '\\' in package_name:
+        if ".." in package_name or "/" in package_name or "\\" in package_name:
             return False, "Package name contains invalid characters"
 
         return True, ""
@@ -135,7 +154,7 @@ class SecurityValidator:
             return False, f"Session ID too long: {len(session_id)} > {cls.MAX_SESSION_ID_LENGTH}"
 
         # Allow alphanumeric, hyphens, underscores
-        if not re.match(r'^[a-zA-Z0-9_-]+$', session_id):
+        if not re.match(r"^[a-zA-Z0-9_-]+$", session_id):
             return False, "Session ID contains invalid characters"
 
         return True, ""
@@ -147,7 +166,7 @@ class SecurityValidator:
             return ""
 
         # Remove null bytes and other control characters
-        sanitized = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', input_str)
+        sanitized = re.sub(r"[\x00-\x1f\x7f-\x9f]", "", input_str)
 
         # Truncate if too long
         if len(sanitized) > max_length:

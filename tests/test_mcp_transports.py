@@ -109,6 +109,7 @@ class TestHTTPTransportConfig:
 
         # Should return CORSMiddleware class
         from starlette.middleware.cors import CORSMiddleware
+
         assert middleware_class == CORSMiddleware
 
     def test_http_config_validation(self):

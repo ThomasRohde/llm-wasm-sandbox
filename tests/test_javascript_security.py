@@ -18,8 +18,8 @@ from pathlib import Path
 import pytest
 
 from sandbox.core.models import ExecutionPolicy, SandboxResult
-from sandbox.runtimes.javascript import JavaScriptSandbox
 from sandbox.core.storage import DiskStorageAdapter
+from sandbox.runtimes.javascript import JavaScriptSandbox
 
 
 @pytest.fixture

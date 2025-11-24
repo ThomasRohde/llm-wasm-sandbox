@@ -151,7 +151,7 @@ class StorageAdapter(ABC):
         pass
 
     @abstractmethod
-    def delete_path(self, session_id: str, relative_path: str) -> None:
+    def delete_path(self, session_id: str, relative_path: str, recursive: bool = True) -> None:
         """Delete file or directory from session workspace.
 
         Must validate that relative_path doesn't escape session boundary.
@@ -159,6 +159,7 @@ class StorageAdapter(ABC):
         Args:
             session_id: UUIDv4 session identifier
             relative_path: Path relative to session workspace root
+            recursive: Allow deletion of directories (default: True)
 
         Raises:
             ValueError: If relative_path contains path traversal
@@ -611,7 +612,7 @@ class DiskStorageAdapter(StorageAdapter):
             Dictionary mapping relative paths to mtime (POSIX timestamp)
         """
         workspace, _ = self._validate_session_path(session_id)
-        snapshot = {}
+        snapshot: dict[str, float] = {}
 
         if not workspace.exists():
             return snapshot

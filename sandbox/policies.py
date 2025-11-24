@@ -66,7 +66,7 @@ def load_policy(path: str = "config/policy.toml") -> ExecutionPolicy:
     """
     if not os.path.exists(path):
         try:
-            return ExecutionPolicy(**DEFAULT_POLICY)  # type: ignore[arg-type]
+            return ExecutionPolicy(**DEFAULT_POLICY)
         except PolicyValidationError:
             raise
         except ValidationError as e:
@@ -87,7 +87,7 @@ def load_policy(path: str = "config/policy.toml") -> ExecutionPolicy:
         policy["guest_data_path"] = data.get("guest_data_path", "/data")
 
     try:
-        return ExecutionPolicy(**policy)  # type: ignore[arg-type]
+        return ExecutionPolicy(**policy)
     except PolicyValidationError:
         raise
     except ValidationError as e:

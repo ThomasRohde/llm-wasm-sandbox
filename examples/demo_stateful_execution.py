@@ -197,12 +197,12 @@ print("\n" + "=" * 70)
 print("Performance Comparison")
 print("=" * 70)
 
-print(f"\nManual JSON (3 executions):")
+print("\nManual JSON (3 executions):")
 print(f"  Total fuel: {sum([r.fuel_consumed or 0 for r in [result1, result2, result3]]):,}")
 
-print(f"\nAuto-wrapped (3 executions):")
+print("\nAuto-wrapped (3 executions):")
 # Note: wrapped code includes save/load overhead
-print(f"  Convenient but includes overhead from state serialization")
+print("  Convenient but includes overhead from state serialization")
 
 print("\n" + "=" * 70)
 print("Summary")

@@ -29,7 +29,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Any
 
-from agents import Agent, ModelSettings, Runner, RunContextWrapper, SQLiteSession, function_tool
+from agents import Agent, ModelSettings, RunContextWrapper, Runner, SQLiteSession, function_tool
 from dotenv import load_dotenv
 from rich.console import Console
 from rich.panel import Panel
@@ -40,7 +40,6 @@ from sandbox import (
     create_sandbox,
     delete_session_workspace,
 )
-
 
 # ---------- Sandbox State Management ----------
 

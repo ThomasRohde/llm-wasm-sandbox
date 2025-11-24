@@ -317,7 +317,7 @@ with open('/app/should_not_exist.txt', 'w') as f:
 class MyClass:
     def __init__(self, value):
         self.value = value
-    
+
     def process(self):
         return [x**2 for x in range(self.value)]
 
@@ -487,12 +487,12 @@ class TestPythonSandboxWorkspace:
 
     def test_logs_dir_cleaned_by_default(self, python_sandbox):
         """Logs are cleaned up unless explicitly preserved."""
-        before = {p for p in Path(tempfile.gettempdir()).glob("wasm-python-*")}
+        before = set(Path(tempfile.gettempdir()).glob("wasm-python-*"))
 
         code = "print('Test')"
         result = python_sandbox.execute(code)
 
-        after = {p for p in Path(tempfile.gettempdir()).glob("wasm-python-*")}
+        after = set(Path(tempfile.gettempdir()).glob("wasm-python-*"))
         created = [p for p in after if p not in before]
 
         assert result.metadata.get("logs_dir") is None

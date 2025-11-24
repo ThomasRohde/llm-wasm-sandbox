@@ -48,17 +48,17 @@ class TestPathTraversalPrevention:
         (temp_workspace / session_id).mkdir()
 
         with pytest.raises(
-            ValueError, match="path traversal detected|escapes session workspace boundary"
+            ValueError, match=r"path traversal detected|escapes session workspace boundary"
         ):
             _validate_session_path(session_id, "../etc/passwd", temp_workspace)
 
         with pytest.raises(
-            ValueError, match="path traversal detected|escapes session workspace boundary"
+            ValueError, match=r"path traversal detected|escapes session workspace boundary"
         ):
             _validate_session_path(session_id, "../../etc/passwd", temp_workspace)
 
         with pytest.raises(
-            ValueError, match="path traversal detected|escapes session workspace boundary"
+            ValueError, match=r"path traversal detected|escapes session workspace boundary"
         ):
             _validate_session_path(session_id, "dir/../../../etc/passwd", temp_workspace)
 
@@ -71,7 +71,7 @@ class TestPathTraversalPrevention:
         # Absolute Unix-style path
         with pytest.raises(
             ValueError,
-            match="path traversal detected|escapes session workspace boundary|must be relative",
+            match=r"path traversal detected|escapes session workspace boundary|must be relative",
         ):
             _validate_session_path(session_id, "/etc/passwd", temp_workspace)
 
@@ -79,7 +79,7 @@ class TestPathTraversalPrevention:
         if os.name == "nt":
             with pytest.raises(
                 ValueError,
-                match="path traversal detected|escapes session workspace boundary|must be relative",
+                match=r"path traversal detected|escapes session workspace boundary|must be relative",
             ):
                 _validate_session_path(session_id, "C:\\Windows\\System32", temp_workspace)
 

@@ -354,7 +354,7 @@ function sieveOfEratosthenes(limit) {
     const primes = [];
     const isPrime = new Array(limit + 1).fill(true);
     isPrime[0] = isPrime[1] = false;
-    
+
     for (let i = 2; i <= limit; i++) {
         if (isPrime[i]) {
             primes.push(i);

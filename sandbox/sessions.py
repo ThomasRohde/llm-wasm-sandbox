@@ -1105,7 +1105,11 @@ def prune_sessions(
 
     # Log start of pruning
     if logger is not None:
-        logger.log_prune_started(older_than_hours=older_than_hours, cutoff_time=cutoff.isoformat())
+        logger.log_prune_started(
+            threshold_hours=older_than_hours,
+            workspace_root=str(workspace_root),
+            dry_run=dry_run,
+        )
 
     # Enumerate all sessions
     for session_id in storage_adapter.enumerate_sessions():
@@ -1119,8 +1123,8 @@ def prune_sessions(
                 if logger is not None:
                     logger.log_prune_candidate(
                         session_id=session_id,
-                        updated_at=metadata.updated_at,
                         age_hours=(datetime.now(UTC) - updated_at).total_seconds() / 3600,
+                        threshold_hours=older_than_hours,
                     )
 
                 if not dry_run:
@@ -1129,7 +1133,12 @@ def prune_sessions(
                     reclaimed_bytes += session_size
 
                     if logger is not None:
-                        logger.log_prune_deleted(session_id=session_id, size_bytes=session_size)
+                        age_hours = (datetime.now(UTC) - updated_at).total_seconds() / 3600
+                        logger.log_prune_deleted(
+                            session_id=session_id,
+                            age_hours=age_hours,
+                            reclaimed_bytes=session_size,
+                        )
 
                 deleted_sessions.append(session_id)
         except FileNotFoundError:

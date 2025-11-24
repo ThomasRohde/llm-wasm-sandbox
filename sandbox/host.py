@@ -310,7 +310,7 @@ def _make_tree_readonly(path: Path) -> None:
     def _read_only_mode(mode: int) -> int:
         return mode & ~stat.S_IWUSR & ~stat.S_IWGRP & ~stat.S_IWOTH
 
-    for root, dirs, files in os.walk(path):
+    for root, _dirs, files in os.walk(path):
         root_path = Path(root)
         with contextlib.suppress(OSError):
             root_path.chmod(_read_only_mode(root_path.stat().st_mode))

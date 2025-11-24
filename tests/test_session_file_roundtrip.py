@@ -58,13 +58,13 @@ class TestSessionFileRoundtrip:
         code = """
 with open('/app/input.txt', 'r') as f:
     data = f.read()
-    
+
 # Process: uppercase and reverse
 processed = data.upper()[::-1]
 
 with open('/app/output.txt', 'w') as f:
     f.write(processed)
-    
+
 print(f"Processed {len(data)} characters")
 """
         result = sandbox.execute(code)
@@ -104,13 +104,13 @@ import json
 
 with open('/app/config.json', 'r') as f:
     config = json.load(f)
-    
+
 # Generate files based on config
 for i in range(config['count']):
     filename = f"/app/{config['prefix']}_{i}.txt"
     with open(filename, 'w') as f:
         f.write(f"{config['name']} - {config['prefix']} {i}\\n")
-        
+
 print(f"Generated {config['count']} files")
 """
         result = sandbox.execute(code)
@@ -147,13 +147,13 @@ print(f"Generated {config['count']} files")
         code = """
 with open('/app/data.bin', 'rb') as f:
     data = f.read()
-    
+
 # Transform: XOR with 0xFF (bitwise NOT)
 transformed = bytes(b ^ 0xFF for b in data)
 
 with open('/app/transformed.bin', 'wb') as f:
     f.write(transformed)
-    
+
 print(f"Transformed {len(data)} bytes")
 """
         result = sandbox.execute(code)
@@ -190,14 +190,14 @@ print(f"Transformed {len(data)} bytes")
         code = """
 with open('/app/inputs/data/config.txt', 'r') as f:
     data = f.read()
-    
+
 # Create nested output structure
 import os
 os.makedirs('/app/outputs/results', exist_ok=True)
 
 with open('/app/outputs/results/summary.txt', 'w') as f:
     f.write(f"Processed: {data.upper()}")
-    
+
 print("Created nested output")
 """
         result = sandbox.execute(code)
@@ -233,12 +233,12 @@ print("Created nested output")
         code_turn_1 = """
 with open('/app/state.txt', 'r') as f:
     count = int(f.read())
-    
+
 count += 1
 
 with open('/app/state.txt', 'w') as f:
     f.write(str(count))
-    
+
 print(f"Count: {count}")
 """
         result1 = sandbox.execute(code_turn_1)
@@ -273,7 +273,7 @@ for i in range(count):
     filename = f"/app/random_{i}_{random.randint(1000,9999)}.txt"
     with open(filename, 'w') as f:
         f.write(f"Random file {i}")
-        
+
 print(f"Created {count} files")
 """
         result = sandbox.execute(code)

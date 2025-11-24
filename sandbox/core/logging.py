@@ -23,7 +23,7 @@ def configure_structlog(level: int = logging.INFO, use_json: bool = False) -> No
         level: Minimum log level (default: logging.INFO)
         use_json: If True, use JSON renderer; otherwise use console renderer
     """
-    processors = [
+    processors: list[Any] = [
         structlog.contextvars.merge_contextvars,
         structlog.processors.add_log_level,
         structlog.processors.StackInfoRenderer(),
@@ -91,7 +91,7 @@ class SandboxLogger:
         method_name = logging.getLevelName(level).lower()
         log_method = getattr(self._logger, method_name, None)
         if not callable(log_method):
-            log_method = getattr(self._logger, "info")
+            log_method = self._logger.info
 
         log_kwargs = dict(extra)
         event_value = log_kwargs.pop("event", None)

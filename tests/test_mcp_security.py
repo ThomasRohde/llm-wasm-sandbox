@@ -62,19 +62,19 @@ class TestMCPSecurityBoundaries:
         # Execute code in session1
         await server.app._tool_manager.call_tool(
             "execute_code",
-            {"code": "print('test')", "language": "python", "session_id": "session1"}
+            {"code": "print('test')", "language": "python", "session_id": "session1"},
         )
 
         # Execute code in session2
         await server.app._tool_manager.call_tool(
             "execute_code",
-            {"code": "print('test')", "language": "python", "session_id": "session2"}
+            {"code": "print('test')", "language": "python", "session_id": "session2"},
         )
 
         # Verify different sessions were used
         calls = server.session_manager.get_or_create_session.call_args_list
-        session1_calls = [call for call in calls if call[1].get('session_id') == 'session1']
-        session2_calls = [call for call in calls if call[1].get('session_id') == 'session2']
+        session1_calls = [call for call in calls if call[1].get("session_id") == "session1"]
+        session2_calls = [call for call in calls if call[1].get("session_id") == "session2"]
 
         assert len(session1_calls) > 0
         assert len(session2_calls) > 0
@@ -87,7 +87,7 @@ class TestMCPSecurityBoundaries:
         # Try to execute code with non-existent session
         result = await server.app._tool_manager.call_tool(
             "execute_code",
-            {"code": "print('test')", "language": "python", "session_id": "non-existent"}
+            {"code": "print('test')", "language": "python", "session_id": "non-existent"},
         )
 
         parsed = parse_tool_result(result)
@@ -106,8 +106,7 @@ class TestMCPSecurityBoundaries:
 
         # Try to install package in JS session (use safe package name)
         result = await server.app._tool_manager.call_tool(
-            "install_package",
-            {"package_name": "numpy", "session_id": "js-session"}
+            "install_package", {"package_name": "numpy", "session_id": "js-session"}
         )
 
         parsed = parse_tool_result(result)
@@ -123,13 +122,12 @@ class TestMCPSecurityBoundaries:
         with pytest.raises(ValidationError):  # Should raise validation error
             await server.app._tool_manager.call_tool(
                 "execute_code",
-                {"language": "python"}  # missing code
+                {"language": "python"},  # missing code
             )
 
         # Test create_session with invalid language
         result = await server.app._tool_manager.call_tool(
-            "create_session",
-            {"language": "invalid_lang"}
+            "create_session", {"language": "invalid_lang"}
         )
 
         parsed = parse_tool_result(result)
@@ -145,8 +143,7 @@ class TestMCPSecurityBoundaries:
         server.session_manager.destroy_session = AsyncMock(return_value=False)
 
         result = await server.app._tool_manager.call_tool(
-            "destroy_session",
-            {"session_id": "some-session"}
+            "destroy_session", {"session_id": "some-session"}
         )
 
         parsed = parse_tool_result(result)
@@ -168,8 +165,7 @@ class TestMCPSecurityBoundaries:
         server.session_manager.get_session_info = AsyncMock(return_value=mock_info)
 
         result = await server.app._tool_manager.call_tool(
-            "get_workspace_info",
-            {"session_id": "test-session"}
+            "get_workspace_info", {"session_id": "test-session"}
         )
 
         parsed = parse_tool_result(result)
@@ -188,8 +184,7 @@ class TestMCPSecurityBoundaries:
         server.session_manager.reset_session = AsyncMock(return_value=True)
 
         result = await server.app._tool_manager.call_tool(
-            "reset_workspace",
-            {"session_id": "test-session"}
+            "reset_workspace", {"session_id": "test-session"}
         )
 
         parsed = parse_tool_result(result)
@@ -225,8 +220,7 @@ class TestMCPSecurityBoundaries:
         server = create_mcp_server()
 
         result = await server.app._tool_manager.call_tool(
-            "cancel_execution",
-            {"session_id": "test-session"}
+            "cancel_execution", {"session_id": "test-session"}
         )
 
         parsed = parse_tool_result(result)
@@ -293,8 +287,7 @@ class TestMCPResourceLimits:
 
         # Execute potentially long-running code
         result = await server.app._tool_manager.call_tool(
-            "execute_code",
-            {"code": "while True: pass", "language": "python"}
+            "execute_code", {"code": "while True: pass", "language": "python"}
         )
 
         parsed = parse_tool_result(result)
@@ -322,8 +315,7 @@ class TestMCPResourceLimits:
 
         # Execute memory-intensive code
         result = await server.app._tool_manager.call_tool(
-            "execute_code",
-            {"code": "[0] * 100000000", "language": "python"}
+            "execute_code", {"code": "[0] * 100000000", "language": "python"}
         )
 
         parsed = parse_tool_result(result)

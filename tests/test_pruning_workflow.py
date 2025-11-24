@@ -2,7 +2,6 @@ import json
 import time
 import uuid
 from datetime import UTC, datetime, timedelta
-from unittest import mock
 
 import pytest
 
