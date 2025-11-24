@@ -167,12 +167,19 @@ class WorkspaceSessionManager:
         if session_id in self._sessions:
             session = self._sessions[session_id]
             try:
-                # Clear all files in the session workspace
+                # Clear all files in the session workspace using sandbox's storage adapter
                 from pathlib import Path
 
-                workspace_path = Path("workspace") / session.sandbox_session_id
+                # Get the sandbox instance to access its storage adapter
+                sandbox = session.get_sandbox()
+                
+                # Use the storage adapter's workspace_root
+                workspace_path = sandbox.storage_adapter.workspace_root / session.sandbox_session_id
                 if workspace_path.exists():
                     for item in workspace_path.iterdir():
+                        # Skip metadata file and vendored packages
+                        if item.name in (".metadata.json", "site-packages"):
+                            continue
                         if item.is_file():
                             item.unlink()
                         elif item.is_dir():
