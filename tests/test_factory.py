@@ -37,7 +37,7 @@ class TestCreateSandboxDefaults:
         sandbox = create_sandbox()
 
         assert isinstance(sandbox.policy, ExecutionPolicy)
-        assert sandbox.policy.fuel_budget == 2_000_000_000  # Default from ExecutionPolicy
+        assert sandbox.policy.fuel_budget == 5_000_000_000  # Default from ExecutionPolicy (5B for heavy imports)
         assert sandbox.policy.memory_bytes == 128_000_000  # Default 128 million bytes
 
     def test_create_sandbox_default_uses_workspace_directory(self) -> None:
@@ -76,7 +76,8 @@ class TestCreateSandboxRuntimeSelection:
 
         assert isinstance(sandbox, JavaScriptSandbox)
         assert sandbox.session_id is not None
-        assert sandbox.wasm_binary_path == "bin/quickjs.wasm"
+        # Auto-detected path may be absolute
+        assert sandbox.wasm_binary_path.endswith("quickjs.wasm")
 
     def test_create_sandbox_with_invalid_runtime_raises_value_error(self) -> None:
         """Test create_sandbox(runtime='invalid') raises ValueError."""
@@ -169,10 +170,11 @@ class TestCreateSandboxKwargs:
         assert sandbox.wasm_binary_path == custom_wasm_path
 
     def test_create_sandbox_default_wasm_binary_path(self) -> None:
-        """Test create_sandbox() uses default bin/python.wasm if not specified."""
+        """Test create_sandbox() auto-detects bundled python.wasm if not specified."""
         sandbox = create_sandbox()
 
-        assert sandbox.wasm_binary_path == "bin/python.wasm"
+        # Auto-detected path may be absolute
+        assert sandbox.wasm_binary_path.endswith("python.wasm")
 
     def test_create_sandbox_passes_arbitrary_kwargs_to_runtime(self) -> None:
         """Test create_sandbox() passes unknown kwargs to runtime constructor."""
@@ -232,13 +234,14 @@ class TestCreateSandboxJavaScriptIntegration:
     """Integration tests for JavaScript runtime factory creation."""
 
     def test_create_javascript_sandbox_with_default_wasm_path(self) -> None:
-        """Test create_sandbox(runtime=JAVASCRIPT) uses default bin/quickjs.wasm."""
+        """Test create_sandbox(runtime=JAVASCRIPT) auto-detects bundled quickjs.wasm."""
         from sandbox.runtimes.javascript.sandbox import JavaScriptSandbox
 
         sandbox = create_sandbox(runtime=RuntimeType.JAVASCRIPT)
 
         assert isinstance(sandbox, JavaScriptSandbox)
-        assert sandbox.wasm_binary_path == "bin/quickjs.wasm"
+        # Auto-detected path may be absolute
+        assert sandbox.wasm_binary_path.endswith("quickjs.wasm")
 
     def test_create_javascript_sandbox_with_custom_policy(self) -> None:
         """Test factory with custom policy passes policy to JavaScriptSandbox."""

@@ -73,11 +73,15 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["sandbox", "mcp_server"]
+include = [
+    "/bin/*.wasm",
+]
 
 [tool.hatch.build.targets.sdist]
 include = [
     "/sandbox",
     "/mcp_server",
+    "/bin/*.wasm",
     "/tests",
     "/scripts",
     "/config",

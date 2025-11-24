@@ -12,6 +12,7 @@ This document provides step-by-step instructions for publishing the `llm-wasm-sa
 - [x] Package metadata complete (classifiers, keywords, urls)
 - [x] License file present and referenced in `pyproject.toml`
 - [x] Type hints marker (`py.typed`) included
+- [x] **WASM binaries present in `bin/` directory** (`python.wasm`, `quickjs.wasm`)
 - [x] Build succeeds without errors (`uv build`)
 
 ## Prerequisites
@@ -21,10 +22,19 @@ This document provides step-by-step instructions for publishing the `llm-wasm-sa
    - Test PyPI: https://test.pypi.org/manage/account/#api-tokens
    - PyPI: https://pypi.org/manage/account/#api-tokens
 3. **Install Tools**: Ensure you have `uv` or `build` and `twine` installed
+4. **WASM Binaries**: Ensure `bin/python.wasm` and `bin/quickjs.wasm` exist (run fetch scripts if needed)
 
 ## Build the Package
 
 ```powershell
+# Ensure WASM binaries are present (required for bundling)
+if (-not (Test-Path "bin/python.wasm")) {
+    .\scripts\fetch_wlr_python.ps1
+}
+if (-not (Test-Path "bin/quickjs.wasm")) {
+    .\scripts\fetch_quickjs.ps1
+}
+
 # Clean previous builds
 Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue
 
@@ -33,8 +43,8 @@ uv build
 ```
 
 This creates:
-- `dist/llm_wasm_sandbox-0.1.0.tar.gz` (source distribution)
-- `dist/llm_wasm_sandbox-0.1.0-py3-none-any.whl` (wheel)
+- `dist/llm_wasm_sandbox-0.1.0.tar.gz` (source distribution with WASM binaries)
+- `dist/llm_wasm_sandbox-0.1.0-py3-none-any.whl` (wheel with WASM binaries)
 
 ## Verify Package Contents
 
@@ -47,6 +57,7 @@ Verify it includes:
 - All `sandbox/` package files
 - `sandbox/py.typed` (type hints marker)
 - `sandbox/core/` and `sandbox/runtimes/` subdirectories
+- **`bin/python.wasm` and `bin/quickjs.wasm`** (bundled WASM runtimes)
 - `METADATA` with correct classifiers and dependencies
 
 ### Inspect the Source Distribution
@@ -57,7 +68,8 @@ tar -tzf dist\llm_wasm_sandbox-0.1.0.tar.gz | Select-Object -First 20
 Verify it includes:
 - All source files
 - `tests/` directory
-- `scripts/` for WASM binary fetching
+- `scripts/` for WASM binary fetching (for development)
+- **`bin/python.wasm` and `bin/quickjs.wasm`** (bundled WASM runtimes)
 - `config/policy.toml`
 - `LICENSE` and `README.md`
 
@@ -85,8 +97,8 @@ python -m venv test_env
 # Install from Test PyPI
 pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ llm-wasm-sandbox
 
-# Verify import works
-python -c "from sandbox import create_sandbox, RuntimeType; print('Import successful')"
+# Verify import works and WASM binaries are accessible
+python -c "from sandbox import create_sandbox, RuntimeType; sandbox = create_sandbox(runtime=RuntimeType.PYTHON); print('Package and runtimes successfully installed!')"
 
 # Deactivate and cleanup
 deactivate
@@ -131,7 +143,7 @@ uv publish --token <your-pypi-token>
 3. **Verify Installation**
    ```powershell
    pip install llm-wasm-sandbox
-   python -c "from sandbox import create_sandbox; print('Success')"
+   python -c "from sandbox import create_sandbox, RuntimeType; sandbox = create_sandbox(); print('Success - runtimes bundled!')"
    ```
 
 4. **Update Documentation**

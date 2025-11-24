@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial release of LLM WASM Sandbox
 - Production-grade security sandbox for executing untrusted Python code using WebAssembly
 - JavaScript runtime support via QuickJS-NG WASM
+- **Bundled WASM runtimes** - No separate downloads needed! `python.wasm` and `quickjs.wasm` are now included in the PyPI package
 - Type-safe API with Pydantic models (`ExecutionPolicy`, `SandboxResult`)
 - Multi-layered security model:
   - WASM memory safety with bounds checking

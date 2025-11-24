@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 from sandbox.core.logging import SandboxLogger
 from sandbox.core.models import ExecutionPolicy, RuntimeType
 from sandbox.core.storage import DiskStorageAdapter
+from sandbox.runtime_paths import get_python_wasm_path, get_quickjs_wasm_path
 from sandbox.sessions import _validate_session_workspace
 
 if TYPE_CHECKING:
@@ -54,8 +55,8 @@ def create_sandbox(
                              (int, str, list, dict, bool, float, None) are persisted.
                              Functions, modules, and classes are filtered out.
         **kwargs: Additional runtime-specific arguments passed to constructor.
-                  For PythonSandbox: wasm_binary_path (default: "bin/python.wasm")
-                  For JavaScriptSandbox: wasm_binary_path (default: "bin/quickjs.wasm")
+                  For PythonSandbox: wasm_binary_path (default: auto-detected bundled binary)
+                  For JavaScriptSandbox: wasm_binary_path (default: auto-detected bundled binary)
 
     Returns:
         BaseSandbox: Concrete sandbox instance (PythonSandbox or JavaScriptSandbox)
@@ -198,7 +199,16 @@ def create_sandbox(
     if runtime == RuntimeType.PYTHON:
         from sandbox.runtimes.python.sandbox import PythonSandbox
 
-        wasm_binary_path = kwargs.pop("wasm_binary_path", "bin/python.wasm")
+        # Use bundled binary by default, allow override via kwargs
+        if "wasm_binary_path" not in kwargs:
+            try:
+                wasm_binary_path = str(get_python_wasm_path())
+            except FileNotFoundError:
+                # Fallback for backward compatibility (development without downloaded binaries)
+                wasm_binary_path = "bin/python.wasm"
+        else:
+            wasm_binary_path = kwargs.pop("wasm_binary_path")
+
         return PythonSandbox(
             wasm_binary_path=wasm_binary_path,
             policy=policy,
@@ -212,7 +222,16 @@ def create_sandbox(
     elif runtime == RuntimeType.JAVASCRIPT:
         from sandbox.runtimes.javascript.sandbox import JavaScriptSandbox
 
-        wasm_binary_path = kwargs.pop("wasm_binary_path", "bin/quickjs.wasm")
+        # Use bundled binary by default, allow override via kwargs
+        if "wasm_binary_path" not in kwargs:
+            try:
+                wasm_binary_path = str(get_quickjs_wasm_path())
+            except FileNotFoundError:
+                # Fallback for backward compatibility (development without downloaded binaries)
+                wasm_binary_path = "bin/quickjs.wasm"
+        else:
+            wasm_binary_path = kwargs.pop("wasm_binary_path")
+
         return JavaScriptSandbox(
             wasm_binary_path=wasm_binary_path,
             policy=policy,

@@ -30,9 +30,10 @@ env/
 .uv/
 uv.lock
 
-# WASM binaries (large, download separately)
-bin/python.wasm
-bin/quickjs.wasm
+# WASM binaries - IMPORTANT: These ARE committed for PyPI distribution!
+# They are bundled with the package so users don't need separate downloads.
+# Download with: ./scripts/fetch_wlr_python.ps1 and ./scripts/fetch_quickjs.ps1
+# DO NOT add bin/*.wasm to .gitignore - they must be in the repository!
 
 # Vendored packages (download with manage_vendor.py)
 vendor/

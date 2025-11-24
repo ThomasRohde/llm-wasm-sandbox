@@ -39,6 +39,7 @@ Execute untrusted code safely using WebAssembly sandboxing with multi-layered se
 - **🔒 Production-Grade Security**: Multi-layered defense with WASM memory safety, WASI capabilities, and resource limits
 - **🐍 Python Runtime**: CPython 3.11 compiled to WASM via WebAssembly Language Runtimes
 - **📜 JavaScript Runtime**: QuickJS-NG WASM for secure JavaScript execution
+- **📦 Bundled Runtimes**: WASM binaries included in package - no separate downloads needed
 - **⚡ Deterministic Execution**: Fuel-based instruction counting prevents runaway code
 - **📦 Package Vendoring**: Pure-Python packages available in sandbox via `vendor/` directory
 - **💾 Persistent Sessions**: UUID-based session IDs with automatic workspace isolation
@@ -65,20 +66,10 @@ Execute untrusted code safely using WebAssembly sandboxing with multi-layered se
 #### From PyPI (Recommended)
 
 ```bash
-# Install the package
+# Install the package (includes WASM runtimes)
 pip install llm-wasm-sandbox
 
-# Download WASM runtimes (required for execution)
-# On Windows (PowerShell)
-Invoke-WebRequest -Uri "https://github.com/ThomasRohde/llm-wasm-sandbox/raw/main/scripts/fetch_wlr_python.ps1" -OutFile "fetch_wlr_python.ps1"
-.\fetch_wlr_python.ps1
-
-Invoke-WebRequest -Uri "https://github.com/ThomasRohde/llm-wasm-sandbox/raw/main/scripts/fetch_quickjs.ps1" -OutFile "fetch_quickjs.ps1"
-.\fetch_quickjs.ps1
-
-# On Linux/macOS
-curl -L -o bin/python.wasm "https://github.com/vmware-labs/webassembly-language-runtimes/releases/download/python/3.12.0+20231211-040d5a6/python-3.12.0.wasm"
-curl -L -o bin/quickjs.wasm "https://github.com/quickjs-ng/quickjs/releases/download/v0.11.0/quickjs-v0.11.0-x86_64-linux.wasm"
+# That's it! The WASM runtimes (python.wasm and quickjs.wasm) are bundled automatically.
 ```
 
 #### From Source
@@ -93,7 +84,7 @@ uv sync
 # OR with pip
 pip install -r requirements.txt
 
-# Download WASM runtimes
+# Download WASM runtimes (required for development)
 .\scripts\fetch_wlr_python.ps1   # CPython WASM binary
 .\scripts\fetch_quickjs.ps1       # QuickJS WASM binary
 ```
@@ -158,8 +149,8 @@ uv run python examples/demo_session_workflow.py
 ```
 llm-wasm-sandbox/
 ├── bin/
-│   ├── python.wasm               # CPython WASM binary (downloaded)
-│   └── quickjs.wasm              # QuickJS WASM binary (downloaded)
+│   ├── python.wasm               # CPython WASM binary (bundled with package)
+│   └── quickjs.wasm              # QuickJS WASM binary (bundled with package)
 ├── config/
 │   └── policy.toml               # Execution policy configuration
 ├── sandbox/
@@ -426,24 +417,10 @@ The sandbox now includes **Model Context Protocol (MCP) server support** for sta
 
 **Install from PyPI:**
 ```bash
+# Install package with bundled WASM runtimes
 pip install llm-wasm-sandbox
 
-# Download WASM runtimes (required)
-# On Windows (PowerShell)
-Invoke-WebRequest -Uri "https://github.com/ThomasRohde/llm-wasm-sandbox/raw/main/scripts/fetch_wlr_python.ps1" -OutFile "fetch_wlr_python.ps1"
-.\fetch_wlr_python.ps1
-
-Invoke-WebRequest -Uri "https://github.com/ThomasRohde/llm-wasm-sandbox/raw/main/scripts/fetch_quickjs.ps1" -OutFile "fetch_quickjs.ps1"
-.\fetch_quickjs.ps1
-
-# On Linux/macOS
-curl -L -o bin/python.wasm "https://github.com/vmware-labs/webassembly-language-runtimes/releases/download/python/3.12.0+20231211-040d5a6/python-3.12.0.wasm"
-curl -L -o bin/quickjs.wasm "https://github.com/quickjs-ng/quickjs/releases/download/v0.11.0/quickjs-v0.11.0-x86_64-linux.wasm"
-```
-
-**Start MCP server:**
-```bash
-# Simple stdio mode (for Claude Desktop)
+# Start MCP server (runtimes included)
 python -m mcp_server
 
 # Or use the command alias (if in PATH)
@@ -476,7 +453,7 @@ cd llm-wasm-sandbox
 # Install with uv
 uv sync
 
-# Fetch WASM binaries
+# Fetch WASM binaries (required for development)
 .\scripts\fetch_wlr_python.ps1
 .\scripts\fetch_quickjs.ps1
 ```
@@ -523,6 +500,8 @@ The MCP server exposes these tools to LLM clients:
 - **`install_package`**: Install Python packages (Python only)
 - **`get_workspace_info`**: Inspect session state
 - **`reset_workspace`**: Clear session files
+
+**Note:** WASM runtimes are bundled with the package, so no separate downloads are needed.
 
 ### MCP Transports
 
@@ -895,12 +874,19 @@ print(result.stdout)
 <details>
 <summary><b>🚨 <code>python.wasm not found</code></b></summary>
 
-**Solution:** Download the WASM binary
+**For PyPI installations:** This should not happen - binaries are bundled automatically. Try reinstalling:
 ```powershell
-.\scripts\fetch_wlr_python.ps1
+pip uninstall llm-wasm-sandbox
+pip install llm-wasm-sandbox
 ```
 
-**Verify:** Check that `bin/python.wasm` exists and is ~50-100 MB
+**For development/source installations:** Download the WASM binary
+```powershell
+.\scripts\fetch_wlr_python.ps1
+.\scripts\fetch_quickjs.ps1
+```
+
+**Verify:** Check that `bin/python.wasm` exists and is ~26 MB
 
 </details>
 
@@ -1180,6 +1166,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] Pluggable storage adapter interface
 - [x] Session pruning and lifecycle management
 - [x] MCP server integration
+- [x] Bundled WASM runtimes in PyPI package
 - [ ] Improved async execution support
 - [ ] Network sandboxing with explicit socket grants
 - [ ] Enhanced metrics and profiling
