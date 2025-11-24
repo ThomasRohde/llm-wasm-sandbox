@@ -1,0 +1,66 @@
+name: Test Package Availability
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run weekly to catch vendor directory drift
+    - cron: '0 0 * * 0'
+
+jobs:
+  test-package-imports:
+    name: Verify Documented Packages Import Successfully
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    
+    - name: Install uv
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+    
+    - name: Install dependencies
+      run: |
+        uv sync
+    
+    - name: Download WASM binaries
+      run: |
+        # Download python.wasm
+        chmod +x scripts/fetch_wlr_python.sh
+        ./scripts/fetch_wlr_python.sh
+        
+        # Download quickjs.wasm
+        chmod +x scripts/fetch_quickjs.ps1
+        pwsh scripts/fetch_quickjs.ps1
+    
+    - name: Verify vendor directory populated
+      run: |
+        echo "Checking vendor/site-packages contents..."
+        ls -la vendor/site-packages/ || echo "Vendor directory missing!"
+        
+        # Verify key packages exist
+        test -d vendor/site-packages/openpyxl || echo "ERROR: openpyxl missing"
+        test -d vendor/site-packages/tabulate || echo "ERROR: tabulate missing"
+        test -d vendor/site-packages/jinja2 || echo "ERROR: jinja2 missing"
+    
+    - name: Test package imports from bug report
+      run: |
+        # This is the exact test case from the GitHub Copilot bug report
+        uv run python scripts/test_package_imports.py
+    
+    - name: Test MCP list_available_packages path correctness
+      run: |
+        # Verify MCP tool returns correct path
+        uv run python scripts/test_mcp_path.py
+    
+    - name: Run integration tests
+      run: |
+        uv run pytest tests/test_mcp_tools.py::TestMCPToolListAvailablePackages -v

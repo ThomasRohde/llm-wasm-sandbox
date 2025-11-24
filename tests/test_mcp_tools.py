@@ -434,3 +434,90 @@ class TestMCPToolResetWorkspace:
         parsed = parse_tool_result(result)
         assert "Failed to reset session test-workspace" in parsed["content"]
         assert parsed["success"] is False
+
+
+class TestMCPToolListAvailablePackages:
+    """Test the list_available_packages tool functionality."""
+
+    @pytest.mark.asyncio
+    async def test_list_available_packages_returns_correct_path(self):
+        """Test that list_available_packages returns correct /data/site-packages path."""
+        server = create_mcp_server()
+
+        # Call the tool
+        result = await server.app._tool_manager.call_tool("list_available_packages", {})
+
+        parsed = parse_tool_result(result)
+        
+        # Verify the tool returns success
+        assert parsed["success"] is True
+        
+        # Verify the usage instructions contain the correct path
+        assert "/data/site-packages" in parsed["content"]
+        assert "sys.path.insert(0, '/data/site-packages')" in parsed["content"]
+        
+        # Verify the WRONG path is NOT in the response
+        assert "/app/site-packages" not in parsed["content"]
+        
+        # Verify package categories are listed
+        assert "openpyxl" in parsed["content"]
+        assert "tabulate" in parsed["content"]
+        assert "jinja2" in parsed["content"]
+
+    @pytest.mark.asyncio
+    async def test_package_import_workflow_with_correct_path(self):
+        """
+        Integration test: Verify the exact workflow from the bug report works.
+        
+        This simulates:
+        1. LLM calls list_available_packages
+        2. LLM parses usage instructions
+        3. LLM executes code following those instructions
+        4. Package imports succeed
+        """
+        server = create_mcp_server()
+
+        # Step 1: Get package list and usage instructions
+        package_result = await server.app._tool_manager.call_tool("list_available_packages", {})
+        parsed_packages = parse_tool_result(package_result)
+        
+        # Verify we got the correct path in instructions
+        assert "/data/site-packages" in parsed_packages["content"]
+        
+        # Step 2: Mock session to test code execution with the documented path
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.stdout = "openpyxl successfully imported\nWorkbook: <class 'openpyxl.workbook.workbook.Workbook'>"
+        mock_result.stderr = ""
+        mock_result.exit_code = 0
+        mock_result.success = True
+        mock_result.fuel_consumed = 50000000
+        mock_result.duration_seconds = 0.5
+        mock_result.memory_used_bytes = 0
+        mock_session.execute_code = AsyncMock(return_value=mock_result)
+        
+        server.session_manager.get_or_create_session = AsyncMock(return_value=mock_session)
+        
+        # Step 3: Execute code following the documented instructions
+        test_code = """import sys
+sys.path.insert(0, '/data/site-packages')
+from openpyxl import Workbook
+print("openpyxl successfully imported")
+print(f"Workbook: {Workbook}")
+"""
+        
+        execute_result = await server.app._tool_manager.call_tool(
+            "execute_code", {"code": test_code, "language": "python"}
+        )
+        
+        parsed_exec = parse_tool_result(execute_result)
+        
+        # Step 4: Verify the execution succeeded
+        assert parsed_exec["success"] is True
+        assert "openpyxl successfully imported" in parsed_exec["content"]
+        assert "Workbook" in parsed_exec["content"]
+        
+        # Verify the session was called with our code
+        mock_session.execute_code.assert_called_once()
+        call_args = mock_session.execute_code.call_args
+        assert test_code in call_args.kwargs.get("code", call_args.args[0] if call_args.args else "")

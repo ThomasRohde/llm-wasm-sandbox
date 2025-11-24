@@ -37,7 +37,7 @@ class ServerConfig(BaseModel):
         "- Full Python standard library (pathlib, json, csv, re, etc.)\n\n"
         "To use vendored packages in Python, add this at the start of your code:\n"
         "import sys\n"
-        "sys.path.insert(0, '/app/site-packages')\n\n"
+        "sys.path.insert(0, '/data/site-packages')\n\n"
         "For numerical operations, use stdlib alternatives:\n"
         "- statistics module for mean, median, stdev\n"
         "- math module for sqrt, log, trig functions\n"

@@ -382,7 +382,7 @@ class MCPServer:
                     usage_note = (
                         "\nUsage: Add this at the start of your Python code:\n"
                         "import sys\n"
-                        "sys.path.insert(0, '/app/site-packages')\n\n"
+                        "sys.path.insert(0, '/data/site-packages')\n\n"
                         "Note: pip install is NOT supported (WASI limitation). "
                         "Use pre-installed packages or pure Python implementations.\n\n"
                         "⚠ IMPORTANT: PowerPoint (.pptx) creation/editing is NOT supported because:\n"

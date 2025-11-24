@@ -515,6 +515,30 @@ policy = ExecutionPolicy(
 - Check that the MCP server starts without errors
 - Restart Claude Desktop after configuration changes
 
+**Package import errors (ModuleNotFoundError)**
+- **CRITICAL**: Vendored packages are mounted at `/data/site-packages`, NOT `/app/site-packages`
+- Add this at the start of your Python code:
+  ```python
+  import sys
+  sys.path.insert(0, '/data/site-packages')
+  ```
+- Use `list_available_packages` tool to see all pre-installed packages
+- Available packages include: openpyxl, XlsxWriter, PyPDF2, tabulate, jinja2, markdown, python-dateutil, and more
+- Note: Only pure-Python packages work in WASM (no C/Rust extensions)
+
+**Path confusion (/app vs /data)**
+- `/app` = Your session workspace (read/write files here)
+- `/data/site-packages` = Vendored packages (read-only, shared across sessions)
+- Example workflow:
+  ```python
+  import sys
+  sys.path.insert(0, '/data/site-packages')  # Add vendored packages
+  from openpyxl import Workbook  # Import from /data
+  
+  wb = Workbook()
+  wb.save('/app/output.xlsx')  # Save to workspace
+  ```
+
 ### Debugging
 
 Enable debug logging:
