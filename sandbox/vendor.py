@@ -205,7 +205,7 @@ RECOMMENDED_PACKAGES = [
     "PyPDF2",  # Read/write/merge PDF files
     # Document processing - Other formats
     "odfpy",  # Read/write OpenDocument Format (.odf, .ods, .odp)
-    "mammoth",  # Convert Word .docx to HTML/markdown
+    "mammoth",  # Convert Word .docx to HTML/markdown (read-only)
     # Python 2/3 compatibility utilities
     "six",  # Required by python-dateutil and other packages
     # Date/Time utilities
@@ -219,6 +219,9 @@ RECOMMENDED_PACKAGES = [
     "markdown",  # Convert Markdown to HTML
     # Structured data with validation
     "attrs",  # Classes without boilerplate (useful for data modeling)
+    "jsonschema",  # JSON schema validation (pure-Python fallback mode)
+    # XML processing
+    "defusedxml",  # Secure XML processing wrapper around stdlib
     # TOML parsing (Python <3.11 compatibility)
     "tomli ; python_version < '3.11'",  # TOML parser for older Python versions
 ]
@@ -269,11 +272,16 @@ commonly useful for LLM-generated code.
 - Conditionally installed only for Python <3.11
 - stdlib tomllib preferred when available
 
-**Known incompatible packages** (have native dependencies):
-- python-docx: Requires lxml native extensions (use mammoth for .docx parsing instead)
-- pdfminer.six: Requires cryptography native extensions (use PyPDF2 instead)
-- jsonschema: Requires rpds-py native extensions (use manual JSON validation or alternative libraries)
-- Any package requiring lxml, cryptography, rpds-py, or other compiled extensions
+**Known incompatible packages** (have C/Rust extension dependencies):
+- **python-pptx**: Requires lxml.etree (C ext) + Pillow (C ext) - PowerPoint not supported
+- **python-docx**: Requires lxml.etree (C ext) - use mammoth for .docx reading instead
+- **lxml**: Base package imports but lxml.etree (C ext) doesn't work - use stdlib xml.etree
+- **Pillow/PIL**: Image processing C extension - not available in WASM
+- **pdfminer.six**: Requires cryptography (C ext) - use PyPDF2 instead
+- **cryptography**: Pure C extension package - not available
+- **cffi**: C FFI not functional in WASM
+- **rpds-py**: Rust extension (jsonschema dependency) - jsonschema may have limited functionality
+- Any package requiring native (C/Rust/C++) extensions
 
 **Installation notes**:
 - Packages may include optional native extensions (.pyd, .so) that are safely ignored

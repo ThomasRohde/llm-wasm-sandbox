@@ -10,11 +10,24 @@ from __future__ import annotations
 
 import asyncio
 import sys
+import warnings
 from typing import Any, ClassVar
+
+# Suppress python-dotenv warnings when it's installed as a transitive dependency
+# (e.g., from openai-example extras) but not actually used by the MCP server
+warnings.filterwarnings("ignore", message="Python-dotenv could not parse statement.*")
+warnings.filterwarnings("ignore", message="python-dotenv could not parse statement.*")
 
 from .config import MCPConfig
 from .security import SecurityValidator
 from .server import create_mcp_server
+
+# Get version from pyproject.toml
+try:
+    import importlib.metadata
+    __version__ = importlib.metadata.version("llm-wasm-sandbox")
+except Exception:
+    __version__ = "unknown"
 
 
 class ProtocolFilterIO:
@@ -34,17 +47,29 @@ class ProtocolFilterIO:
     def write(self, message: str) -> int:
         # Heuristic: MCP JSON-RPC messages are JSON objects starting with '{'
         # Redirect banners and logs to stderr, JSON-RPC to stdout
-        if message.strip().startswith("{"):
-            self.original_stdout.write(message)
-            self.original_stdout.flush()
-        else:
-            self.stderr.write(message)
-            self.stderr.flush()
+        try:
+            if message.strip().startswith("{"):
+                self.original_stdout.write(message)
+                self.original_stdout.flush()
+            else:
+                self.stderr.write(message)
+                self.stderr.flush()
+        except ValueError:
+            # Handle closed file during shutdown - silently ignore
+            pass
         return len(message)
 
     def flush(self) -> None:
-        self.original_stdout.flush()
-        self.stderr.flush()
+        try:
+            self.original_stdout.flush()
+        except ValueError:
+            # Handle closed file during shutdown
+            pass
+        try:
+            self.stderr.flush()
+        except ValueError:
+            # Handle closed file during shutdown
+            pass
 
     def isatty(self) -> bool:
         return bool(self.original_stdout.isatty())
@@ -80,18 +105,8 @@ class PromiscuousSecurityValidator(SecurityValidator):
         return True, ""
 
 
-def main() -> None:
-    """Main CLI entry point."""
-    print("Starting MCP server with PROMISCUOUS security (ALL CODE ALLOWED)...", file=sys.stderr)
-    print("WARNING: All security filters disabled!", file=sys.stderr)
-    print("Security relies entirely on WASM sandbox boundaries.", file=sys.stderr)
-    print("", file=sys.stderr)
-
-    # Install the smart stdout filter to redirect banners to stderr
-    # while preserving JSON-RPC messages on stdout
-    original_stdout = sys.stdout
-    sys.stdout = ProtocolFilterIO(original_stdout, sys.stderr)
-
+async def async_main() -> None:
+    """Async main entry point with proper signal handling."""
     # Monkey-patch the security module to use promiscuous validator
     import mcp_server.security
     import mcp_server.server
@@ -105,14 +120,33 @@ def main() -> None:
     print("Available tools: execute_code, list_runtimes, create_session, etc.", file=sys.stderr)
 
     try:
-        asyncio.run(server.start_stdio())
-    except KeyboardInterrupt:
+        await server.start_stdio()
+    except asyncio.CancelledError:
         print("\nShutting down MCP server...", file=sys.stderr)
-        asyncio.run(server.shutdown())
     except Exception as e:
         print(f"MCP server error: {e}", file=sys.stderr)
-        asyncio.run(server.shutdown())
         sys.exit(1)
+    finally:
+        await server.shutdown()
+
+
+def main() -> None:
+    """Main CLI entry point."""
+    print(f"LLM WASM Sandbox MCP Server v{__version__}", file=sys.stderr)
+    print("Starting MCP server with PROMISCUOUS security (ALL CODE ALLOWED)...", file=sys.stderr)
+    print("WARNING: All security filters disabled!", file=sys.stderr)
+    print("Security relies entirely on WASM sandbox boundaries.", file=sys.stderr)
+    print("", file=sys.stderr)
+
+    # Install the smart stdout filter to redirect banners to stderr
+    # while preserving JSON-RPC messages on stdout
+    original_stdout = sys.stdout
+    sys.stdout = ProtocolFilterIO(original_stdout, sys.stderr)
+
+    try:
+        asyncio.run(async_main())
+    except KeyboardInterrupt:
+        print("\nGraceful shutdown complete.", file=sys.stderr)
 
 
 if __name__ == "__main__":

@@ -423,7 +423,10 @@ pip install llm-wasm-sandbox
 # Start MCP server (runtimes included)
 python -m mcp_server
 
-# Or use the command alias (if in PATH)
+# Or use uvx for one-off execution (no installation needed)
+uvx --from llm-wasm-sandbox llm-wasm-mcp
+
+# Or use the command alias (if installed and in PATH)
 llm-wasm-mcp
 ```
 

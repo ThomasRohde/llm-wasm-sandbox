@@ -337,6 +337,7 @@ class MCPServer:
                             "openpyxl - Read/write Excel .xlsx files",
                             "XlsxWriter - Write Excel .xlsx files (write-only, lighter)",
                             "PyPDF2 - Read/write/merge PDF files",
+                            "pdfminer.six - PDF text extraction (pure-Python mode)",
                             "odfpy - Read/write OpenDocument Format (.odf, .ods, .odp)",
                             "mammoth - Convert Word .docx to HTML/Markdown",
                         ],
@@ -347,6 +348,7 @@ class MCPServer:
                             "markdown - Convert Markdown to HTML",
                             "python-dateutil - Advanced date/time parsing",
                             "attrs - Classes without boilerplate",
+                            "jsonschema - JSON schema validation",
                         ],
                         "utilities": [
                             "certifi - Mozilla's CA bundle",
@@ -355,6 +357,7 @@ class MCPServer:
                             "urllib3 - HTTP client (encoding utilities only, no networking)",
                             "six - Python 2/3 compatibility",
                             "tomli - TOML parser (Python <3.11)",
+                            "cffi - Foreign function interface (limited WASM support)",
                         ],
                         "stdlib_highlights": [
                             "json, csv, xml - Data formats",
@@ -367,6 +370,13 @@ class MCPServer:
                             "zipfile, tarfile, gzip - Compression",
                             "sqlite3 - In-memory SQL database",
                         ],
+                        "incompatible_c_extensions": [
+                            "❌ python-pptx - Requires lxml.etree (C extension not available in WASM)",
+                            "❌ python-docx - Requires lxml.etree (C extension not available in WASM)",
+                            "❌ Pillow/PIL - Image processing (C extension not available in WASM)",
+                            "❌ lxml.etree - XML processing C extension (base lxml package imports but etree doesn't work)",
+                            "Note: Use mammoth for Word .docx reading, PyPDF2 for PDFs, openpyxl for Excel",
+                        ],
                     }
 
                     usage_note = (
@@ -374,7 +384,16 @@ class MCPServer:
                         "import sys\n"
                         "sys.path.insert(0, '/app/site-packages')\n\n"
                         "Note: pip install is NOT supported (WASI limitation). "
-                        "Use pre-installed packages or pure Python implementations."
+                        "Use pre-installed packages or pure Python implementations.\n\n"
+                        "⚠ IMPORTANT: PowerPoint (.pptx) creation/editing is NOT supported because:\n"
+                        "  - python-pptx requires lxml.etree (C extension)\n"
+                        "  - Pillow/PIL required for images (C extension)\n"
+                        "  - These C extensions cannot run in the WASM sandbox\n\n"
+                        "For document processing, use:\n"
+                        "  - Excel: openpyxl, XlsxWriter\n"
+                        "  - PDF: PyPDF2, pdfminer.six\n"
+                        "  - Word: mammoth (read-only, converts to HTML/Markdown)\n"
+                        "  - OpenDocument: odfpy (.odt, .ods, .odp)"
                     )
 
                     content_lines = []
@@ -481,8 +500,15 @@ class MCPServer:
                 try:
                     metrics_summary = self.metrics.get_summary()
 
+                    # Add version information
+                    server_version = self.config.server.version
+                    metrics_summary["server"] = {
+                        "version": server_version,
+                        "name": self.config.server.name,
+                    }
+
                     return MCPToolResult(
-                        content=f"MCP Server Metrics: {metrics_summary['tool_executions']['total_count']} tool executions, {metrics_summary['sessions']['active_count']} active sessions",
+                        content=f"MCP Server v{server_version}: {metrics_summary['tool_executions']['total_count']} tool executions, {metrics_summary['sessions']['active_count']} active sessions",
                         structured_content=metrics_summary,
                     )
 

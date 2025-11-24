@@ -11,11 +11,21 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 
+def _get_package_version() -> str:
+    """Get package version from metadata."""
+    try:
+        import importlib.metadata
+
+        return importlib.metadata.version("llm-wasm-sandbox")
+    except Exception:
+        return "0.3.0"  # Fallback to current version
+
+
 class ServerConfig(BaseModel):
     """Server identification and metadata."""
 
     name: str = "llm-wasm-sandbox"
-    version: str = "0.1.0"
+    version: str = Field(default_factory=_get_package_version)
     instructions: str = (
         "This server provides secure code execution in a WebAssembly sandbox. "
         "Use the execute_code tool to run Python or JavaScript code safely.\n\n"
