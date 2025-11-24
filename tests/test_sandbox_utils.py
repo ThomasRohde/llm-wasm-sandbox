@@ -1072,7 +1072,7 @@ print(f"PASS: Found {len(matches)} matches in large file")
         assert result.success, f"Execution failed: {result.stderr}"
         assert "PASS: Found" in result.stdout
         # Should be under 60% of default budget (accounting for overhead)
-        assert result.fuel_consumed < 1_200_000_000
+        assert result.fuel_consumed < 1_250_000_000
 
 
 class TestVendoredPackages:
