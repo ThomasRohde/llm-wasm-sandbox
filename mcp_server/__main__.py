@@ -2,84 +2,120 @@
 """
 MCP Server CLI for LLM WASM Sandbox.
 
-Command-line interface to run the MCP server with different transports.
+Command-line interface to run the MCP server with promiscuous security
+(all code allowed - security relies on WASM sandbox boundaries).
 """
 
 from __future__ import annotations
 
-import argparse
+import asyncio
 import sys
-from pathlib import Path
+from typing import ClassVar
 
 from .config import MCPConfig
+from .security import SecurityValidator
 from .server import create_mcp_server
+
+
+class ProtocolFilterIO:
+    """
+    A smart wrapper for stdout that directs JSON-RPC messages to real stdout
+    and everything else (banners, logs) to stderr.
+
+    This prevents FastMCP's ASCII art banner from breaking the MCP protocol.
+    """
+
+    def __init__(self, original_stdout, stderr):
+        self.original_stdout = original_stdout
+        self.stderr = stderr
+        # Expose the underlying buffer for binary I/O operations
+        self.buffer = original_stdout.buffer if hasattr(original_stdout, "buffer") else None
+
+    def write(self, message):
+        # Heuristic: MCP JSON-RPC messages are JSON objects starting with '{'
+        # Redirect banners and logs to stderr, JSON-RPC to stdout
+        if message.strip().startswith("{"):
+            self.original_stdout.write(message)
+            self.original_stdout.flush()
+        else:
+            self.stderr.write(message)
+            self.stderr.flush()
+
+    def flush(self):
+        self.original_stdout.flush()
+        self.stderr.flush()
+
+    def isatty(self):
+        return self.original_stdout.isatty()
+
+    def __getattr__(self, name):
+        # Proxy any other attributes to the original stdout
+        return getattr(self.original_stdout, name)
+
+
+class PromiscuousSecurityValidator(SecurityValidator):
+    """
+    Promiscuous security validator - ALLOWS EVERYTHING.
+
+    WARNING: This validator disables all security checks.
+    Use only in trusted environments where the WASM sandbox
+    provides the primary security boundary.
+    """
+
+    # No patterns blocked - allow everything
+    DANGEROUS_CODE_PATTERNS: ClassVar[list[str]] = []
+
+    # No packages blocked - allow everything
+    DANGEROUS_PACKAGES: ClassVar[set[str]] = set()
+
+    @classmethod
+    def _validate_javascript_code(cls, code: str) -> tuple[bool, str]:
+        """
+        Validate JavaScript code - ALLOWS EVERYTHING.
+
+        All JavaScript code is permitted. Security relies entirely
+        on the WASM sandbox boundaries.
+        """
+        return True, ""
 
 
 def main() -> None:
     """Main CLI entry point."""
-    parser = argparse.ArgumentParser(
-        description="MCP Server for LLM WASM Sandbox",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  # Run with stdio transport (for Claude Desktop)
-  python -m mcp.server
-
-  # Run with HTTP transport
-  python -m mcp.server --transport http --port 8080
-
-  # Load custom config
-  python -m mcp.server --config /path/to/mcp.toml
-        """,
+    print(
+        "Starting MCP server with PROMISCUOUS security (ALL CODE ALLOWED)...", file=sys.stderr
     )
+    print("WARNING: All security filters disabled!", file=sys.stderr)
+    print("Security relies entirely on WASM sandbox boundaries.", file=sys.stderr)
+    print("", file=sys.stderr)
 
-    parser.add_argument(
-        "--transport",
-        choices=["stdio", "http"],
-        default="stdio",
-        help="Transport to use (default: stdio)",
-    )
+    # Install the smart stdout filter to redirect banners to stderr
+    # while preserving JSON-RPC messages on stdout
+    original_stdout = sys.stdout
+    sys.stdout = ProtocolFilterIO(original_stdout, sys.stderr)
 
-    parser.add_argument(
-        "--host", default="127.0.0.1", help="Host for HTTP transport (default: 127.0.0.1)"
-    )
+    # Monkey-patch the security module to use promiscuous validator
+    import mcp_server.security
+    import mcp_server.server
 
-    parser.add_argument(
-        "--port", type=int, default=8080, help="Port for HTTP transport (default: 8080)"
-    )
+    mcp_server.security.SecurityValidator = PromiscuousSecurityValidator
+    mcp_server.server.SecurityValidator = PromiscuousSecurityValidator
 
-    parser.add_argument("--config", type=Path, help="Path to MCP configuration file")
-
-    args = parser.parse_args()
-
-    # Load configuration
-    config = MCPConfig.from_file(args.config) if args.config else MCPConfig()
-
-    # Override transport config from CLI
-    if args.transport == "http":
-        config.transport_http.enabled = True
-        config.transport_http.host = args.host
-        config.transport_http.port = args.port
-
-    # Create and start server
+    config = MCPConfig()
     server = create_mcp_server(config)
 
+    print(
+        "Available tools: execute_code, list_runtimes, create_session, etc.", file=sys.stderr
+    )
+
     try:
-        if args.transport == "stdio":
-            import asyncio
-
-            asyncio.run(server.start_stdio())
-        else:
-            import asyncio
-
-            asyncio.run(
-                server.start_http(host=config.transport_http.host, port=config.transport_http.port)
-            )
+        asyncio.run(server.start_stdio())
     except KeyboardInterrupt:
         print("\nShutting down MCP server...", file=sys.stderr)
-        import asyncio
-
         asyncio.run(server.shutdown())
+    except Exception as e:
+        print(f"MCP server error: {e}", file=sys.stderr)
+        asyncio.run(server.shutdown())
+        sys.exit(1)
 
 
 if __name__ == "__main__":

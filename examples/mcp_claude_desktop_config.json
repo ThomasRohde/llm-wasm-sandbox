@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "llm-wasm-sandbox": {
+      "command": "llm-wasm-mcp"
+    }
+  }
+}

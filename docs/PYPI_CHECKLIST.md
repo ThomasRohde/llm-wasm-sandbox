@@ -39,10 +39,12 @@ All dependencies use appropriate version constraints for stability and compatibi
 ## ✅ Package Structure
 
 - [x] **Source package** (`sandbox/`): All Python modules included
+- [x] **MCP server** (`mcp_server/`): Full MCP server implementation included
+- [x] **Console scripts**: `llm-wasm-mcp` command-line tool entry point
 - [x] **Type hints**: `py.typed` marker file present
 - [x] **Subpackages**: `core/` and `runtimes/` properly structured
 - [x] **Public API**: Clean `__init__.py` with `__all__` exports
-- [x] **Config files**: `config/policy.toml` included in source dist
+- [x] **Config files**: `config/policy.toml` and `config/mcp.toml` included in source dist
 - [x] **Scripts**: WASM binary fetch scripts included for users
 
 ## ✅ Build & Distribution
@@ -52,10 +54,12 @@ All dependencies use appropriate version constraints for stability and compatibi
 - [x] **Wheel**: `llm_wasm_sandbox-0.1.0-py3-none-any.whl` created successfully
 - [x] **Validation**: `twine check dist/*` passes
 - [x] **Package contents verified**:
-  - Source dist includes tests, scripts, config, docs
-  - Wheel includes only runtime package files
+  - Source dist includes sandbox, mcp_server, tests, scripts, config, docs
+  - Wheel includes sandbox and mcp_server runtime packages
   - `py.typed` marker present in wheel
   - LICENSE file included in both distributions
+  - Console script entry point `llm-wasm-mcp` registered
+- [x] **MCP server**: Fully packaged and accessible via `llm-wasm-mcp` command
 
 ## ✅ Testing
 

@@ -424,23 +424,73 @@ The sandbox now includes **Model Context Protocol (MCP) server support** for sta
 
 ### Quick MCP Start
 
-**Install MCP dependencies:**
+**Install from PyPI:**
 ```bash
 pip install llm-wasm-sandbox
-# OR from source
-uv sync
+
+# Download WASM runtimes (required)
+# On Windows (PowerShell)
+Invoke-WebRequest -Uri "https://github.com/ThomasRohde/llm-wasm-sandbox/raw/main/scripts/fetch_wlr_python.ps1" -OutFile "fetch_wlr_python.ps1"
+.\fetch_wlr_python.ps1
+
+Invoke-WebRequest -Uri "https://github.com/ThomasRohde/llm-wasm-sandbox/raw/main/scripts/fetch_quickjs.ps1" -OutFile "fetch_quickjs.ps1"
+.\fetch_quickjs.ps1
+
+# On Linux/macOS
+curl -L -o bin/python.wasm "https://github.com/vmware-labs/webassembly-language-runtimes/releases/download/python/3.12.0+20231211-040d5a6/python-3.12.0.wasm"
+curl -L -o bin/quickjs.wasm "https://github.com/quickjs-ng/quickjs/releases/download/v0.11.0/quickjs-v0.11.0-x86_64-linux.wasm"
 ```
 
-**Start MCP server with stdio transport:**
+**Start MCP server:**
 ```bash
-uv run python examples/mcp_stdio_example.py
+# Simple stdio mode (for Claude Desktop)
+python -m mcp_server
+
+# Or use the command alias (if in PATH)
+llm-wasm-mcp
 ```
 
 **Configure Claude Desktop:**
 
-Choose one of these configurations based on your security requirements:
+Add to your Claude Desktop configuration (see Settings → Developer → Edit Config):
 
-**Option 1: Standard Security (Recommended)**
+```json
+{
+  "mcpServers": {
+    "llm-wasm-sandbox": {
+      "command": "python",
+      "args": ["-m", "mcp_server"]
+    }
+  }
+}
+```
+
+### Development Setup (from source)
+
+**Install MCP dependencies:**
+```bash
+# Clone the repository
+git clone https://github.com/ThomasRohde/llm-wasm-sandbox.git
+cd llm-wasm-sandbox
+
+# Install with uv
+uv sync
+
+# Fetch WASM binaries
+.\scripts\fetch_wlr_python.ps1
+.\scripts\fetch_quickjs.ps1
+```
+
+**Run development MCP server:**
+```bash
+# Promiscuous mode (recommended - all code allowed, WASM sandbox provides security)
+uv run python examples/llm_wasm_mcp.py
+
+# OR with standard security filters (more restrictive)
+uv run python examples/mcp_stdio_example.py
+```
+
+**Claude Desktop configuration for development:**
 ```json
 {
   "mcpServers": {
@@ -448,53 +498,17 @@ Choose one of these configurations based on your security requirements:
       "command": "uv",
       "args": [
         "--directory",
-        "/path/to/llm-wasm-sandbox",
-        "run",
-        "python",
-        "examples/mcp_stdio_example.py"
-      ]
-    }
-  }
-}
-```
-
-**Option 2: Promiscuous Mode (Development/Testing)**
-```json
-{
-  "mcpServers": {
-    "sandbox": {
-      "command": "uv",
-      "args": [
-        "--directory",
-        "/path/to/llm-wasm-sandbox",
-        "run",
-        "python",
-        "examples/sandbox.py"
-      ]
-    }
-  }
-}
-```
-
-**Windows Path Format:**
-```json
-{
-  "mcpServers": {
-    "sandbox": {
-      "command": "uv",
-      "args": [
-        "--directory",
         "c:\\Users\\YourName\\Projects\\llm-wasm-sandbox",
         "run",
         "python",
-        "examples/sandbox.py"
+        "examples/llm_wasm_mcp.py"
       ]
     }
   }
 }
 ```
 
-**Note:** Use `--directory` instead of `cwd` to ensure uv resolves dependencies correctly. The `sandbox.py` example disables all security filters (use only in trusted environments), while `mcp_stdio_example.py` enables standard security validation.
+**Note:** Use `--directory` instead of `cwd` to ensure uv resolves dependencies correctly. The shipped MCP server uses promiscuous security (all code allowed).
 
 ### MCP Tools
 
@@ -571,10 +585,12 @@ MCP inherits all sandbox security:
 
 ### Examples & Documentation
 
-- **Stdio Example**: `examples/mcp_stdio_example.py`
+- **Quick Start**: [`docs/MCP_QUICKSTART.md`](docs/MCP_QUICKSTART.md) - Get started in 5 minutes
+- **Full Documentation**: [`docs/MCP_INTEGRATION.md`](docs/MCP_INTEGRATION.md) - Complete reference
+- **Main MCP Server**: `examples/llm_wasm_mcp.py` - Promiscuous security (production-ready)
+- **Alternative with Filters**: `examples/mcp_stdio_example.py` - Standard security validation
 - **HTTP Example**: `examples/mcp_http_example.py`
 - **Claude Desktop Config**: `examples/mcp_claude_desktop_config.json`
-- **Full Documentation**: [`docs/MCP_INTEGRATION.md`](docs/MCP_INTEGRATION.md)
 
 ---
 
