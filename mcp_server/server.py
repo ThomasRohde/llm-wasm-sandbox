@@ -95,7 +95,20 @@ class MCPServer:
 
         @self.app.tool(
             name="execute_code",
-            description="Execute code in a secure WebAssembly sandbox. Supports Python and JavaScript.",
+            description="""Execute code in a secure WebAssembly sandbox. Supports Python and JavaScript.
+            
+            JavaScript Runtime Capabilities:
+            - Global objects (no import needed): std (file I/O via std.open), os (filesystem ops like os.readdir, os.stat, os.now)
+            - Global helper functions: readJson(), writeJson(), readText(), writeText(), readLines(), writeLines(), appendText(), fileExists(), fileSize(), listFiles(), copyFile(), removeFile()
+            - Vendored packages via requireVendor(): requireVendor('csv-simple'), requireVendor('string-utils'), requireVendor('json-utils')
+            - State persistence: _state object auto-persists when auto_persist_globals=True (e.g., _state.counter = (_state.counter || 0) + 1)
+            - All file operations limited to /app directory (WASI isolation)
+            
+            Python Runtime Capabilities:
+            - CPython 3.12 with full standard library
+            - 30+ pre-installed packages (openpyxl, PyPDF2, tabulate, jinja2, etc.)
+            - State persistence: Use auto_persist_globals=True for automatic global variable persistence
+            """,
         )
         async def execute_code(
             code: str,
@@ -233,7 +246,19 @@ class MCPServer:
 
         @self.app.tool(
             name="create_session",
-            description="Create a new workspace session for code execution with optional automatic global variable persistence",
+            description="""Create a new workspace session for code execution with optional automatic global variable persistence.
+            
+            For JavaScript: Set auto_persist_globals=True to enable _state object for automatic state persistence across executions.
+            Example: _state.counter = (_state.counter || 0) + 1;
+            
+            For Python: Set auto_persist_globals=True to automatically persist all global variables between executions.
+            
+            Sessions maintain:
+            - Isolated workspace directory (/app in guest)
+            - Persistent files across executions
+            - Import/module caching (Python)
+            - State object persistence (JavaScript with auto_persist_globals=True)
+            """,
         )
         async def create_session(
             language: str,
@@ -326,14 +351,14 @@ class MCPServer:
 
         @self.app.tool(
             name="list_available_packages",
-            description="List pre-installed packages available in Python sessions (no installation required). Includes fuel budget requirements for import operations.",
+            description="List pre-installed packages available in Python and JavaScript sessions (no installation required). Includes fuel budget requirements and runtime-specific capabilities.",
         )
         async def list_available_packages() -> MCPToolResult:
             """List pre-installed packages with fuel requirements."""
             with self.metrics.time_tool_execution("list_available_packages"):
                 try:
                     packages = {
-                        "document_processing": [
+                        "python_document_processing": [
                             "openpyxl - Read/write Excel .xlsx files (⚠️ REQUIRES 10B fuel budget for first import)",
                             "XlsxWriter - Write Excel .xlsx files, write-only, lighter alternative",
                             "PyPDF2 - Read/write/merge PDF files (⚠️ REQUIRES 10B fuel budget for first import)",
@@ -341,7 +366,7 @@ class MCPServer:
                             "odfpy - Read/write OpenDocument Format (.odf, .ods, .odp)",
                             "mammoth - Convert Word .docx to HTML/Markdown",
                         ],
-                        "text_data": [
+                        "python_text_data": [
                             "tabulate - Pretty-print tables (ASCII, Markdown, HTML) [~1.4B fuel for first import]",
                             "jinja2 - Template rendering (⚠️ REQUIRES 5-10B fuel budget for first import)",
                             "MarkupSafe - HTML/XML escaping (required by jinja2)",
@@ -349,7 +374,7 @@ class MCPServer:
                             "python-dateutil - Advanced date/time parsing [~1.6B fuel for first import]",
                             "attrs - Classes without boilerplate",
                         ],
-                        "utilities": [
+                        "python_utilities": [
                             "certifi - Mozilla's CA bundle",
                             "charset-normalizer - Character encoding detection",
                             "idna - Internationalized domain names",
@@ -358,7 +383,7 @@ class MCPServer:
                             "tomli - TOML parser (Python <3.11)",
                             "cffi - Foreign function interface (limited WASM support)",
                         ],
-                        "stdlib_highlights": [
+                        "python_stdlib_highlights": [
                             "json, csv, xml - Data formats [lightweight, <500M fuel]",
                             "re - Regular expressions",
                             "pathlib, os, shutil - File operations",
@@ -369,8 +394,22 @@ class MCPServer:
                             "zipfile, tarfile, gzip - Compression",
                             "sqlite3 - In-memory SQL database",
                         ],
+                        "javascript_vendored_packages": [
+                            "csv.js - CSV parsing and generation (pure JS)",
+                            "json_path.js - JSONPath queries for JSON navigation",
+                            "json_utils.js - JSON schema validation and utilities",
+                            "string_utils.js - String manipulation (slugify, truncate, palindrome, etc.)",
+                            "sandbox_utils.js - File I/O helpers (readJson, writeJson, readText, listFiles, etc.)",
+                        ],
+                        "javascript_stdlib": [
+                            "std module - File I/O (std.open, FILE operations)",
+                            "os module - Environment variables, file stats, directory operations",
+                            "JSON, Math, Date - Built-in JavaScript objects",
+                            "String, Array, Object - Native data structures",
+                            "RegExp - Regular expressions",
+                        ],
                         "fuel_requirements": [
-                            "📊 FUEL BUDGET REQUIREMENTS (first import only):",
+                            "📊 FUEL BUDGET REQUIREMENTS (Python - first import only):",
                             "  • Standard packages (tabulate, markdown, dateutil): 2-5B fuel (default budget OK)",
                             "  • Heavy packages (openpyxl, PyPDF2, jinja2): 5-10B fuel (increase budget!)",
                             "  • Stdlib modules: <500M fuel each",
@@ -379,7 +418,7 @@ class MCPServer:
                             "  • First import is expensive, subsequent imports use cached modules",
                             "  • Sessions persist imports across executions",
                             "  • Set ExecutionPolicy(fuel_budget=10_000_000_000) for document processing",
-                            "  • Use auto_persist_globals=True to cache imports automatically",
+                            "  • Use auto_persist_globals=True to cache imports/state automatically",
                         ],
                         "incompatible_c_extensions": [
                             "❌ python-pptx - Requires lxml.etree (C extension not available in WASM)",
@@ -391,28 +430,38 @@ class MCPServer:
                     }
 
                     usage_note = (
-                        "\n✅ USAGE INSTRUCTIONS:\n"
+                        "\n✅ PYTHON USAGE:\n"
                         "1. Packages are automatically available via /data/site-packages\n"
                         "2. No need to add sys.path.insert() - it's done automatically!\n"
                         "3. Just import directly: import openpyxl, from tabulate import tabulate\n\n"
-                        "⚠️ FUEL BUDGET REQUIREMENTS:\n"
+                        "✅ JAVASCRIPT USAGE:\n"
+                        "1. Vendored packages available via requireVendor() function (auto-injected)\n"
+                        "2. Example: const csv = requireVendor('csv.js'); csv.parse(data)\n"
+                        "3. sandbox_utils.js auto-injected: readJson(), writeJson(), listFiles(), etc.\n"
+                        "4. QuickJS std/os modules available: import * as std from 'std';\n\n"
+                        "⚠️ FUEL BUDGET REQUIREMENTS (Python):\n"
                         "- DEFAULT budget (5B): Works for tabulate, markdown, dateutil, stdlib\n"
                         "- INCREASE to 10B for: openpyxl, PyPDF2, jinja2 (first import only)\n"
                         "- Subsequent imports in same session use cached modules (<100M fuel)\n\n"
-                        "💡 BEST PRACTICES:\n"
+                        "💡 BEST PRACTICES (Both Runtimes):\n"
                         "- Use auto_persist_globals=True when creating sessions\n"
-                        "- Import heavy packages once at session start\n"
-                        "- Reuse sessions to benefit from cached imports\n\n"
+                        "  * Python: All global variables auto-saved between executions\n"
+                        "  * JavaScript: Use _state object (_state.counter = 1) for persistence\n"
+                        "- Import/load heavy packages once at session start\n"
+                        "- Reuse sessions to benefit from cached imports/state\n\n"
                         "🚫 NOT SUPPORTED:\n"
-                        "- pip install (WASI limitation - use pre-installed packages only)\n"
-                        "- PowerPoint .pptx editing (requires C extensions: python-pptx, Pillow)\n"
-                        "- Image processing (Pillow/PIL requires C extensions)\n"
-                        "- Full lxml.etree (C extension not available, use xml.etree.ElementTree instead)\n\n"
-                        "📦 DOCUMENT PROCESSING ALTERNATIVES:\n"
-                        "  Excel: openpyxl (read/write), XlsxWriter (write-only)\n"
-                        "  PDF: PyPDF2 (read/write/merge), pdfminer.six (text extraction)\n"
-                        "  Word: mammoth (read-only, converts to HTML/Markdown)\n"
-                        "  OpenDocument: odfpy (.odt, .ods, .odp)"
+                        "- pip install / npm install (WASI limitation - use pre-installed packages only)\n"
+                        "- Python: PowerPoint .pptx editing (requires C extensions: python-pptx, Pillow)\n"
+                        "- Python: Image processing (Pillow/PIL requires C extensions)\n"
+                        "- Python: Full lxml.etree (C extension not available, use xml.etree.ElementTree instead)\n"
+                        "- JavaScript: Node.js-specific APIs (fs, http, child_process, etc.)\n\n"
+                        "📦 DOCUMENT PROCESSING:\n"
+                        "  Python Excel: openpyxl (read/write), XlsxWriter (write-only)\n"
+                        "  Python PDF: PyPDF2 (read/write/merge), pdfminer.six (text extraction)\n"
+                        "  Python Word: mammoth (read-only, converts to HTML/Markdown)\n"
+                        "  Python OpenDocument: odfpy (.odt, .ods, .odp)\n"
+                        "  JavaScript CSV: csv.js (parse/generate CSV data)\n"
+                        "  JavaScript JSON: json_path.js, json_utils.js (queries, validation)"
                     )
 
                     content_lines = []

@@ -46,10 +46,18 @@ jobs:
         echo "Checking vendor/site-packages contents..."
         ls -la vendor/site-packages/ || echo "Vendor directory missing!"
         
-        # Verify key packages exist
+        # Verify key Python packages exist
         test -d vendor/site-packages/openpyxl || echo "ERROR: openpyxl missing"
         test -d vendor/site-packages/tabulate || echo "ERROR: tabulate missing"
         test -d vendor/site-packages/jinja2 || echo "ERROR: jinja2 missing"
+        
+        echo "Checking vendor_js/ contents..."
+        ls -la vendor_js/ || echo "JavaScript vendor directory missing!"
+        
+        # Verify key JavaScript packages exist
+        test -f vendor_js/sandbox_utils.js || echo "ERROR: sandbox_utils.js missing"
+        test -f vendor_js/csv.js || echo "ERROR: csv.js missing"
+        test -f vendor_js/json_path.js || echo "ERROR: json_path.js missing"
     
     - name: Test package imports from bug report
       run: |
@@ -64,3 +72,5 @@ jobs:
     - name: Run integration tests
       run: |
         uv run pytest tests/test_mcp_tools.py::TestMCPToolListAvailablePackages -v
+        uv run pytest tests/test_javascript_state.py -v
+        uv run pytest tests/test_javascript_vendor.py -v

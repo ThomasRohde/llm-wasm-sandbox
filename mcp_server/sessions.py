@@ -42,14 +42,14 @@ class WorkspaceSession:
     def get_sandbox(self) -> Any:
         """Get the sandbox instance for this session."""
         runtime = RuntimeType.PYTHON if self.language == "python" else RuntimeType.JAVASCRIPT
-        
+
         # Use higher fuel budget for MCP sessions to support package imports
         # openpyxl, PyPDF2, jinja2 require 5-10B fuel for first import
         policy = ExecutionPolicy(
             fuel_budget=10_000_000_000,  # 10B fuel for document processing packages
             memory_bytes=256 * 1024 * 1024,  # 256 MB
         )
-        
+
         return create_sandbox(
             runtime=runtime,
             session_id=self.sandbox_session_id,
@@ -97,13 +97,13 @@ class WorkspaceSessionManager:
 
         # Create new sandbox session with higher fuel budget for package imports
         runtime = RuntimeType.PYTHON if language == "python" else RuntimeType.JAVASCRIPT
-        
+
         # Use 10B fuel budget to support openpyxl, PyPDF2, jinja2 imports
         policy = ExecutionPolicy(
             fuel_budget=10_000_000_000,  # 10B fuel for document processing
             memory_bytes=256 * 1024 * 1024,  # 256 MB
         )
-        
+
         sandbox = create_sandbox(
             runtime=runtime,
             auto_persist_globals=auto_persist_globals,
@@ -137,13 +137,13 @@ class WorkspaceSessionManager:
         """Create a new workspace session explicitly."""
         # Create new sandbox session with higher fuel budget for package imports
         runtime = RuntimeType.PYTHON if language == "python" else RuntimeType.JAVASCRIPT
-        
+
         # Use 10B fuel budget to support openpyxl, PyPDF2, jinja2 imports
         policy = ExecutionPolicy(
             fuel_budget=10_000_000_000,  # 10B fuel for document processing
             memory_bytes=256 * 1024 * 1024,  # 256 MB
         )
-        
+
         sandbox = create_sandbox(
             runtime=runtime,
             auto_persist_globals=auto_persist_globals,
@@ -199,11 +199,10 @@ class WorkspaceSessionManager:
             session = self._sessions[session_id]
             try:
                 # Clear all files in the session workspace using sandbox's storage adapter
-                from pathlib import Path
 
                 # Get the sandbox instance to access its storage adapter
                 sandbox = session.get_sandbox()
-                
+
                 # Use the storage adapter's workspace_root
                 workspace_path = sandbox.storage_adapter.workspace_root / session.sandbox_session_id
                 if workspace_path.exists():

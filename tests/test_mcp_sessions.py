@@ -63,7 +63,7 @@ class TestWorkspaceSession:
         call_args = mock_create_sandbox.call_args
         assert call_args.kwargs["runtime"] == RuntimeType.PYTHON
         assert call_args.kwargs["session_id"] == "sandbox-456"
-        assert call_args.kwargs["auto_persist_globals"] == False
+        assert not call_args.kwargs["auto_persist_globals"]
         assert sandbox == mock_sandbox
 
     @patch("mcp_server.sessions.create_sandbox")
@@ -119,7 +119,7 @@ class TestWorkspaceSessionManager:
         assert mock_create_sandbox.called
         call_args = mock_create_sandbox.call_args
         assert call_args.kwargs["runtime"] == RuntimeType.PYTHON
-        assert call_args.kwargs["auto_persist_globals"] == False
+        assert not call_args.kwargs["auto_persist_globals"]
 
     @pytest.mark.asyncio
     async def test_get_or_create_session_existing(self):
@@ -163,7 +163,7 @@ class TestWorkspaceSessionManager:
             assert mock_create.called
             call_args = mock_create.call_args
             assert call_args.kwargs["runtime"] == RuntimeType.PYTHON
-            assert call_args.kwargs["auto_persist_globals"] == False
+            assert not call_args.kwargs["auto_persist_globals"]
 
     @patch("mcp_server.sessions.create_sandbox")
     @pytest.mark.asyncio
@@ -185,7 +185,7 @@ class TestWorkspaceSessionManager:
         assert mock_create_sandbox.called
         call_args = mock_create_sandbox.call_args
         assert call_args.kwargs["runtime"] == RuntimeType.JAVASCRIPT
-        assert call_args.kwargs["auto_persist_globals"] == False
+        assert not call_args.kwargs["auto_persist_globals"]
 
     @pytest.mark.asyncio
     async def test_destroy_session_success(self):

@@ -123,8 +123,8 @@ sandbox.execute("counter = 100; data = [1, 2, 3]")
 sandbox.execute("print(f'counter={counter}, data={data}')")
 # Output: counter=100, data=[1, 2, 3]
 
-# ⚠️ Note: auto_persist_globals is not yet supported for JavaScript runtime
-# due to QuickJS-WASI lacking file I/O APIs. Use Python runtime for this feature.
+# ✅ JavaScript runtime also supports auto_persist_globals!
+# See examples/demo_javascript_stateful.py for JavaScript examples.
 ```
 
 ### Run Demo

@@ -4,7 +4,7 @@ This is the exact test case from the GitHub Copilot bug report (Nov 24, 2025).
 Verifies that the list_available_packages tool documentation is accurate.
 """
 
-from sandbox import RuntimeType, ExecutionPolicy, create_sandbox
+from sandbox import ExecutionPolicy, RuntimeType, create_sandbox
 
 # Increase fuel budget for package imports (some like openpyxl need 8-10B)
 policy = ExecutionPolicy(fuel_budget=10_000_000_000, memory_bytes=256 * 1024 * 1024)
@@ -48,7 +48,9 @@ print("PASS: {pkg_name}")
         print(f"Failed to import {pkg_name} (as {import_name}):")
         if result.stderr:
             # Truncate long stderr
-            stderr_preview = result.stderr[:500] + "..." if len(result.stderr) > 500 else result.stderr
+            stderr_preview = (
+                result.stderr[:500] + "..." if len(result.stderr) > 500 else result.stderr
+            )
             print(stderr_preview)
 
 # Report results

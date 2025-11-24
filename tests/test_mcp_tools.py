@@ -448,17 +448,20 @@ class TestMCPToolListAvailablePackages:
         result = await server.app._tool_manager.call_tool("list_available_packages", {})
 
         parsed = parse_tool_result(result)
-        
+
         # Verify the tool returns success
         assert parsed["success"] is True
-        
+
         # Verify the usage instructions indicate automatic availability
         assert "/data/site-packages" in parsed["content"]
-        assert "automatically available" in parsed["content"] or "done automatically" in parsed["content"]
-        
+        assert (
+            "automatically available" in parsed["content"]
+            or "done automatically" in parsed["content"]
+        )
+
         # Verify the WRONG path is NOT in the response
         assert "/app/site-packages" not in parsed["content"]
-        
+
         # Verify package categories are listed
         assert "openpyxl" in parsed["content"]
         assert "tabulate" in parsed["content"]
@@ -468,7 +471,7 @@ class TestMCPToolListAvailablePackages:
     async def test_package_import_workflow_with_correct_path(self):
         """
         Integration test: Verify the exact workflow from the bug report works.
-        
+
         This simulates:
         1. LLM calls list_available_packages
         2. LLM parses usage instructions
@@ -480,10 +483,10 @@ class TestMCPToolListAvailablePackages:
         # Step 1: Get package list and usage instructions
         package_result = await server.app._tool_manager.call_tool("list_available_packages", {})
         parsed_packages = parse_tool_result(package_result)
-        
+
         # Verify we got the correct path in instructions
         assert "/data/site-packages" in parsed_packages["content"]
-        
+
         # Step 2: Mock session to test code execution with the documented path
         mock_session = AsyncMock()
         mock_result = MagicMock()
@@ -495,9 +498,9 @@ class TestMCPToolListAvailablePackages:
         mock_result.duration_seconds = 0.5
         mock_result.memory_used_bytes = 0
         mock_session.execute_code = AsyncMock(return_value=mock_result)
-        
+
         server.session_manager.get_or_create_session = AsyncMock(return_value=mock_session)
-        
+
         # Step 3: Execute code following the documented instructions
         test_code = """import sys
 sys.path.insert(0, '/data/site-packages')
@@ -505,19 +508,187 @@ from openpyxl import Workbook
 print("openpyxl successfully imported")
 print(f"Workbook: {Workbook}")
 """
-        
+
         execute_result = await server.app._tool_manager.call_tool(
             "execute_code", {"code": test_code, "language": "python"}
         )
-        
+
         parsed_exec = parse_tool_result(execute_result)
-        
+
         # Step 4: Verify the execution succeeded
         assert parsed_exec["success"] is True
         assert "openpyxl successfully imported" in parsed_exec["content"]
         assert "Workbook" in parsed_exec["content"]
-        
+
         # Verify the session was called with our code
         mock_session.execute_code.assert_called_once()
         call_args = mock_session.execute_code.call_args
-        assert test_code in call_args.kwargs.get("code", call_args.args[0] if call_args.args else "")
+        assert test_code in call_args.kwargs.get(
+            "code", call_args.args[0] if call_args.args else ""
+        )
+
+
+class TestMCPToolJavaScriptStatePersistence:
+    """Test JavaScript state persistence through MCP tools."""
+
+    @pytest.mark.asyncio
+    async def test_javascript_state_persistence_workflow(self):
+        """Test JavaScript state persistence across executions via MCP."""
+        server = create_mcp_server()
+
+        # Create mock session with state persistence enabled
+        mock_session = AsyncMock()
+        mock_session.language = "javascript"
+        mock_session.auto_persist_globals = True
+
+        # Mock first execution - set state
+        mock_result1 = MagicMock()
+        mock_result1.stdout = "Counter: 1"
+        mock_result1.stderr = ""
+        mock_result1.exit_code = 0
+        mock_result1.success = True
+        mock_result1.fuel_consumed = 1000
+        mock_result1.duration_seconds = 0.05
+        mock_result1.memory_used_bytes = 0
+
+        # Mock second execution - increment state
+        mock_result2 = MagicMock()
+        mock_result2.stdout = "Counter: 2"
+        mock_result2.stderr = ""
+        mock_result2.exit_code = 0
+        mock_result2.success = True
+        mock_result2.fuel_consumed = 1200
+        mock_result2.duration_seconds = 0.06
+        mock_result2.memory_used_bytes = 0
+
+        mock_session.execute_code = AsyncMock(side_effect=[mock_result1, mock_result2])
+        server.session_manager.get_or_create_session = AsyncMock(return_value=mock_session)
+
+        # Execution 1: Initialize counter
+        code1 = "_state.counter = 1; console.log('Counter:', _state.counter);"
+        result1 = await server.app._tool_manager.call_tool(
+            "execute_code", {"code": code1, "language": "javascript", "session_id": "test-js"}
+        )
+
+        parsed1 = parse_tool_result(result1)
+        assert parsed1["success"] is True
+        assert "Counter: 1" in parsed1["content"]
+
+        # Execution 2: Increment counter
+        code2 = "_state.counter = _state.counter + 1; console.log('Counter:', _state.counter);"
+        result2 = await server.app._tool_manager.call_tool(
+            "execute_code", {"code": code2, "language": "javascript", "session_id": "test-js"}
+        )
+
+        parsed2 = parse_tool_result(result2)
+        assert parsed2["success"] is True
+        assert "Counter: 2" in parsed2["content"]
+
+        # Verify execute_code was called twice
+        assert mock_session.execute_code.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_create_javascript_session_with_auto_persist(self):
+        """Test creating JavaScript session with auto_persist_globals enabled."""
+        server = create_mcp_server()
+
+        # Mock the session manager
+        mock_session = type(
+            "MockSession",
+            (),
+            {
+                "workspace_id": "js-stateful-session",
+                "language": "javascript",
+                "sandbox_session_id": "js-sandbox-789",
+                "created_at": 1234567893.0,
+                "auto_persist_globals": True,
+            },
+        )()
+
+        server.session_manager.create_session = AsyncMock(return_value=mock_session)
+
+        # Call the tool with auto_persist_globals=True
+        result = await server.app._tool_manager.call_tool(
+            "create_session",
+            {"language": "javascript", "auto_persist_globals": True},
+        )
+
+        parsed = parse_tool_result(result)
+        assert parsed["success"] is True
+        assert parsed["structured_content"]["language"] == "javascript"
+        assert "js-stateful-session" in parsed["content"]
+
+        # Verify create_session was called with correct parameters
+        server.session_manager.create_session.assert_called_with(
+            language="javascript", session_id=None, auto_persist_globals=True
+        )
+
+    @pytest.mark.asyncio
+    async def test_javascript_vendored_package_execution(self):
+        """Test JavaScript execution using vendored packages via MCP."""
+        server = create_mcp_server()
+
+        # Mock session
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.stdout = "Parsed: 2 rows\nFirst: Alice"
+        mock_result.stderr = ""
+        mock_result.exit_code = 0
+        mock_result.success = True
+        mock_result.fuel_consumed = 2000
+        mock_result.duration_seconds = 0.08
+        mock_result.memory_used_bytes = 0
+        mock_session.execute_code = AsyncMock(return_value=mock_result)
+
+        server.session_manager.get_or_create_session = AsyncMock(return_value=mock_session)
+
+        # Execute code using vendored CSV package
+        code = """
+const csv = requireVendor('csv-simple');
+const data = csv.parse('name,age\\nAlice,30\\nBob,25');
+console.log('Parsed:', data.length, 'rows');
+console.log('First:', data[0].name);
+"""
+        result = await server.app._tool_manager.call_tool(
+            "execute_code", {"code": code, "language": "javascript"}
+        )
+
+        parsed = parse_tool_result(result)
+        assert parsed["success"] is True
+        assert "Parsed: 2 rows" in parsed["content"]
+        assert "First: Alice" in parsed["content"]
+
+    @pytest.mark.asyncio
+    async def test_javascript_helper_utilities_execution(self):
+        """Test JavaScript execution using helper utilities via MCP."""
+        server = create_mcp_server()
+
+        # Mock session
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.stdout = "Message: Hello\nCount: 42"
+        mock_result.stderr = ""
+        mock_result.exit_code = 0
+        mock_result.success = True
+        mock_result.fuel_consumed = 1500
+        mock_result.duration_seconds = 0.07
+        mock_result.memory_used_bytes = 0
+        mock_session.execute_code = AsyncMock(return_value=mock_result)
+
+        server.session_manager.get_or_create_session = AsyncMock(return_value=mock_session)
+
+        # Execute code using helper utilities
+        code = """
+writeJson('/app/test.json', {message: 'Hello', count: 42});
+const data = readJson('/app/test.json');
+console.log('Message:', data.message);
+console.log('Count:', data.count);
+"""
+        result = await server.app._tool_manager.call_tool(
+            "execute_code", {"code": code, "language": "javascript"}
+        )
+
+        parsed = parse_tool_result(result)
+        assert parsed["success"] is True
+        assert "Message: Hello" in parsed["content"]
+        assert "Count: 42" in parsed["content"]

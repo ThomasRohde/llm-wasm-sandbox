@@ -1,26 +1,13 @@
 """State persistence utilities for maintaining JavaScript globals across executions.
 
-⚠️ IMPORTANT: JavaScript auto_persist_globals is NOT YET SUPPORTED ⚠️
-
-This module is a placeholder for future JavaScript state persistence functionality.
-The QuickJS-WASI runtime currently does not expose file I/O APIs (std.open, os.open),
-making automatic state persistence impossible without native bindings.
-
-Current Status:
-- ✅ Python auto_persist_globals: FULLY SUPPORTED
-- ❌ JavaScript auto_persist_globals: NOT SUPPORTED (planned for future)
-
-Workaround for JavaScript:
-Use manual file persistence via Python's sandbox_utils or explicit file operations
-in the parent application between executions.
-
 This module provides helpers for saving and restoring JavaScript state between
-sandbox executions using JSON serialization. State would be automatically stored
-in the session workspace and survive across multiple execute() calls.
+sandbox executions using JSON serialization via QuickJS's std module file I/O.
+State is automatically stored in the session workspace and survives across
+multiple execute() calls.
 
-Key Features (when supported):
+Key Features:
 - Automatic serialization of primitive types (number, string, array, object, boolean, null)
-- Filtering of non-serializable objects (functions, classes, symbols)
+- Filtering of non-serializable objects (functions, classes, symbols, undefined)
 - Session-aware storage (state isolated per session)
 - Helper code that can be injected into sandbox execution
 
@@ -35,12 +22,12 @@ Pattern 1: Auto-save/restore with wrapper code
     >>> session_id = sandbox.session_id
     >>>
     >>> # First execution saves state
-    >>> code1 = "let counter = 0; let data = [];"
+    >>> code1 = "_state.counter = 0; _state.data = [];"
     >>> wrapped1 = wrap_stateful_code(code1)
     >>> result1 = sandbox.execute(wrapped1)
     >>>
     >>> # Second execution restores and uses state
-    >>> code2 = "counter += 10; data.push('item'); console.log(counter, data);"
+    >>> code2 = "_state.counter += 10; _state.data.push('item'); console.log(_state.counter, _state.data);"
     >>> wrapped2 = wrap_stateful_code(code2)
     >>> result2 = sandbox.execute(wrapped2)
     >>> print(result2.stdout)
@@ -55,17 +42,10 @@ Security Considerations
 
 Limitations
 ----------
-⚠️ **CRITICAL**: Feature not yet available due to QuickJS-WASI lacking file I/O APIs
-- QuickJS-WASI does not expose std.open() or os.open() for file operations
-- Cannot persist state without native file I/O bindings
-- Python's auto_persist_globals works perfectly (use Python runtime instead)
-- Future support requires QuickJS-NG WASI to add file system APIs
-
-Theoretical limitations (when/if feature becomes available):
 - Complex objects (Map, Set, custom classes) not supported
 - Circular references not handled
 - Large state may impact execution fuel consumption
-- Global variables must use var/let/const declarations to be captured
+- Global variables must be stored in _state object to persist
 """
 
 from __future__ import annotations
@@ -77,6 +57,7 @@ STATE_FILENAME = ".session_state.json"
 def save_state_code(filename: str = STATE_FILENAME) -> str:
     """Generate JavaScript code to save global state to JSON file.
 
+    Uses QuickJS's global std object for file I/O.
     Saves the _state object to a JSON file (only if defined).
 
     Args:
@@ -91,8 +72,10 @@ def save_state_code(filename: str = STATE_FILENAME) -> str:
     return f"""
 if (typeof _state !== 'undefined') {{
     const f = std.open('/app/{filename}', 'w');
-    f.puts(JSON.stringify(_state));
-    f.close();
+    if (f) {{
+        f.puts(JSON.stringify(_state));
+        f.close();
+    }}
 }}
 """.strip()
 
@@ -100,6 +83,7 @@ if (typeof _state !== 'undefined') {{
 def load_state_code(filename: str = STATE_FILENAME) -> str:
     """Generate JavaScript code to load state from JSON file.
 
+    Uses QuickJS's global std object for file I/O.
     Creates a module-level var _state that's accessible to user code.
 
     Args:
@@ -115,11 +99,13 @@ def load_state_code(filename: str = STATE_FILENAME) -> str:
 var _state = {{}};
 try {{
     const f = std.open('/app/{filename}', 'r');
-    const content = f.readAsString();
-    f.close();
-    _state = JSON.parse(content);
+    if (f) {{
+        const content = f.readAsString();
+        f.close();
+        _state = JSON.parse(content);
+    }}
 }} catch (e) {{
-    // State file doesn't exist yet (first execution)
+    // State file doesn't exist yet (first execution) or JSON parse error
 }}
 """.strip()
 
@@ -150,7 +136,7 @@ def wrap_stateful_code(code: str, filename: str = STATE_FILENAME) -> str:
         str: Wrapped code with state management
 
     Examples:
-        >>> user_code = "_state.counter = (_state.counter || 0) + 1;"
+        >>> user_code = "_state.counter = (_state.counter || 0) + 1; console.log(_state.counter);"
         >>> wrapped = wrap_stateful_code(user_code)
         >>> # Execution 1: _state.counter becomes 1
         >>> # Execution 2: _state.counter becomes 2

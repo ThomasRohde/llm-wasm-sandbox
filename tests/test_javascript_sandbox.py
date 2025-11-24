@@ -29,9 +29,9 @@ def temp_workspace():
 
 
 @pytest.fixture
-def default_policy():
-    """Create default ExecutionPolicy for tests."""
-    return ExecutionPolicy()
+def default_policy(policy_with_vendor_js):
+    """Create default ExecutionPolicy for tests with vendor_js mount."""
+    return policy_with_vendor_js
 
 
 @pytest.fixture

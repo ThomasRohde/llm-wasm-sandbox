@@ -3,16 +3,22 @@
 This test verifies that the JavaScript sandbox correctly persists global
 variables across multiple executions when auto_persist_globals=True.
 
-⚠️ IMPORTANT: These tests are currently SKIPPED because JavaScript auto_persist_globals
-is not yet supported. QuickJS-WASI does not expose file I/O APIs (std.open, os.open),
-making automatic state persistence impossible. Use Python runtime for this feature.
+⚠️ IMPORTANT: These tests are currently SKIPPED because they test the OLD API
+(let/const variable persistence). The NEW API requires using _state object.
+See tests/test_javascript_state.py for working state persistence tests.
+
+Historical Note: Originally skipped because QuickJS-WASI file I/O was not integrated.
+Now fully implemented using QuickJS std.open() APIs.
 """
 
 import pytest
-from sandbox import create_sandbox, RuntimeType
+
+from sandbox import RuntimeType, create_sandbox
 
 
-@pytest.mark.skip(reason="JavaScript auto_persist_globals not yet supported - QuickJS-WASI lacks file I/O APIs")
+@pytest.mark.skip(
+    reason="Old API (let/const persistence) not supported - use _state object instead (see test_javascript_state.py)"
+)
 def test_javascript_auto_persist_basic():
     """Test basic variable persistence across JavaScript executions."""
     # Create sandbox with auto_persist enabled
@@ -33,7 +39,9 @@ def test_javascript_auto_persist_basic():
     )
 
 
-@pytest.mark.skip(reason="JavaScript auto_persist_globals not yet supported - QuickJS-WASI lacks file I/O APIs")
+@pytest.mark.skip(
+    reason="Old API (let/const persistence) not supported - use _state object instead (see test_javascript_state.py)"
+)
 def test_javascript_auto_persist_mutation():
     """Test that mutated variables persist correctly."""
     sandbox = create_sandbox(runtime=RuntimeType.JAVASCRIPT, auto_persist_globals=True)
@@ -72,7 +80,9 @@ def test_javascript_auto_persist_disabled():
     )
 
 
-@pytest.mark.skip(reason="JavaScript auto_persist_globals not yet supported - QuickJS-WASI lacks file I/O APIs")
+@pytest.mark.skip(
+    reason="Old API (let/const persistence) not supported - use _state object instead (see test_javascript_state.py)"
+)
 def test_javascript_auto_persist_objects():
     """Test that object variables persist correctly."""
     sandbox = create_sandbox(runtime=RuntimeType.JAVASCRIPT, auto_persist_globals=True)
@@ -98,7 +108,9 @@ def test_javascript_auto_persist_objects():
     )
 
 
-@pytest.mark.skip(reason="JavaScript auto_persist_globals not yet supported - QuickJS-WASI lacks file I/O APIs")
+@pytest.mark.skip(
+    reason="Old API (let/const persistence) not supported - use _state object instead (see test_javascript_state.py)"
+)
 def test_javascript_auto_persist_multiple_types():
     """Test persistence of various JavaScript types."""
     sandbox = create_sandbox(runtime=RuntimeType.JAVASCRIPT, auto_persist_globals=True)

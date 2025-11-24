@@ -11,7 +11,7 @@ from pathlib import Path
 # Add project root to path to import local mcp_server
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from mcp_server.server import create_mcp_server  # noqa: E402
+from mcp_server.server import create_mcp_server
 
 
 async def test():
@@ -21,14 +21,14 @@ async def test():
     content = result.content[0].text
 
     # Verify CORRECT path is documented
-    assert (
-        "/data/site-packages" in content
-    ), "Missing correct path /data/site-packages in MCP tool response"
+    assert "/data/site-packages" in content, (
+        "Missing correct path /data/site-packages in MCP tool response"
+    )
 
     # Verify WRONG path is NOT in response
-    assert (
-        "/app/site-packages" not in content
-    ), "Found incorrect path /app/site-packages in MCP tool response"
+    assert "/app/site-packages" not in content, (
+        "Found incorrect path /app/site-packages in MCP tool response"
+    )
 
     print("✅ MCP list_available_packages tool uses correct path")
 

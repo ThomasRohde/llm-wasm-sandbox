@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from sandbox import create_sandbox, RuntimeType
+from sandbox import RuntimeType, create_sandbox
 from sandbox.core.models import ExecutionPolicy
 
 

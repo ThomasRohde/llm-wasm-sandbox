@@ -18,6 +18,45 @@ from sandbox.host import run_untrusted_javascript
 if TYPE_CHECKING:
     from sandbox.core.storage import StorageAdapter
 
+# Prepended to user code so LLM-generated code can use vendored packages
+# and helper utilities without needing to manually import std module or
+# know about the /data_js read-only WASI mount point
+INJECTED_SETUP = """// QuickJS standard library (std and os) are available as globals via --std flag
+// No need to import them
+
+// requireVendor helper - loads vendored packages from /data_js
+globalThis.requireVendor = function requireVendor(name) {
+    const path = `/data_js/${name}.js`;
+    const f = std.open(path, 'r');
+    if (!f) {
+        throw new Error(`Vendor package not found: ${name}`);
+    }
+    const src = f.readAsString();
+    f.close();
+
+    const module = { exports: {} };
+    const func = new Function('module', 'exports', src);
+    func(module, module.exports);
+    return module.exports;
+};
+
+// Load sandbox utilities into global scope for convenience
+const _sandboxUtils = requireVendor('sandbox-utils');
+globalThis.readJson = _sandboxUtils.readJson;
+globalThis.writeJson = _sandboxUtils.writeJson;
+globalThis.readText = _sandboxUtils.readText;
+globalThis.writeText = _sandboxUtils.writeText;
+globalThis.fileExists = _sandboxUtils.fileExists;
+globalThis.readLines = _sandboxUtils.readLines;
+globalThis.writeLines = _sandboxUtils.writeLines;
+globalThis.appendText = _sandboxUtils.appendText;
+globalThis.fileSize = _sandboxUtils.fileSize;
+globalThis.listFiles = _sandboxUtils.listFiles;
+globalThis.copyFile = _sandboxUtils.copyFile;
+globalThis.removeFile = _sandboxUtils.removeFile;
+
+"""
+
 
 class JavaScriptSandbox(BaseSandbox):
     """Type-safe JavaScript sandbox implementation using QuickJS WASM runtime.
@@ -113,12 +152,12 @@ class JavaScriptSandbox(BaseSandbox):
         self.wasm_binary_path = wasm_binary_path
         self.auto_persist_globals = auto_persist_globals
 
-    def execute(self, code: str, **kwargs: Any) -> SandboxResult:
+    def execute(self, code: str, inject_setup: bool = True, **kwargs: Any) -> SandboxResult:
         """Execute untrusted JavaScript code in WASM sandbox with resource limits and session tracking.
 
         Workflow:
         1. Log execution start with policy details and session_id
-        2. Write code to workspace/user_code.js
+        2. Write code to workspace/user_code.js (with optional std module setup)
         3. Snapshot filesystem state for delta detection
         4. Execute via host.run_untrusted_javascript() with WASI isolation
         5. Measure execution duration and detect file changes
@@ -128,6 +167,7 @@ class JavaScriptSandbox(BaseSandbox):
 
         Args:
             code: Untrusted JavaScript source code to execute
+            inject_setup: If True, prepend std module imports and requireVendor helper
             **kwargs: Reserved for future extensions
 
         Returns:
@@ -191,7 +231,7 @@ class JavaScriptSandbox(BaseSandbox):
             code = wrap_stateful_code(code)
 
         # Write code to workspace
-        user_code_path = self._write_untrusted_code(code)
+        user_code_path = self._write_untrusted_code(code, inject_setup)
 
         # Snapshot filesystem before execution
         before_files = self._snapshot_workspace(exclude=user_code_path)
@@ -280,15 +320,19 @@ class JavaScriptSandbox(BaseSandbox):
         # will be caught and reported in stderr
         return True
 
-    def _write_untrusted_code(self, code: str) -> str:
+    def _write_untrusted_code(self, code: str, inject_setup: bool = True) -> str:
         """Write untrusted JavaScript code to workspace via storage adapter.
 
         Args:
             code: JavaScript source code to write
+            inject_setup: If True, prepend INJECTED_SETUP (std imports, requireVendor)
 
         Returns:
             Relative path to written user_code.js file
         """
+        if inject_setup:
+            code = INJECTED_SETUP + code
+
         filename = self.storage_adapter.JAVASCRIPT_CODE_FILENAME
         self.storage_adapter.write_file(self.session_id, filename, code.encode("utf-8"))
         return filename

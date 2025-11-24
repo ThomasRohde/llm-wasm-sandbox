@@ -396,8 +396,12 @@ def run_untrusted_javascript(
                     FilePerms.READ_ONLY,
                 )
 
-        # JavaScript-specific argv: ["quickjs", "/app/user_code.js"]
-        js_argv = ["quickjs", f"{policy.guest_mount_path}/user_code.js"]
+        # JavaScript-specific argv: ["qjs", "--std", "/app/user_code.js"]
+        # --std: Initialize std and os modules as global objects
+        # Note: We use global std/os instead of ES6 module imports because
+        # the QuickJS-NG WASI binary's module loader doesn't resolve builtin
+        # module names like "std" and "os" when using -m flag.
+        js_argv = ["qjs", "--std", f"{policy.guest_mount_path}/user_code.js"]
         wasi.argv = tuple(js_argv)
 
         # Minimal env for JavaScript (no NODE_ENV needed for QuickJS)

@@ -111,7 +111,7 @@ const arr = Array.from({length: 100}, (_, i) => i * 2);
 const sum = arr.reduce((a, b) => a + b, 0);
 console.log('Sum: ' + sum);
 """
-        result = sandbox.execute(code)
+        result = sandbox.execute(code, inject_setup=False)
 
         assert result.success is True
         assert result.fuel_consumed is not None
@@ -195,7 +195,7 @@ for (let i = 0; i < 100; i++) {
     console.log('Line ' + i + ': AAAAAAAAAA');
 }
 """
-        result = sandbox.execute(code)
+        result = sandbox.execute(code, inject_setup=False)
 
         # Stdout should be capped
         assert len(result.stdout) <= policy.stdout_max_bytes
@@ -278,7 +278,7 @@ class TestJavaScriptEnvironmentVariableIsolation:
         code = """
 console.log('Env configured');
 """
-        result = sandbox.execute(code)
+        result = sandbox.execute(code, inject_setup=False)
 
         # Just verify execution works with custom env
         assert isinstance(result, SandboxResult)
@@ -308,7 +308,7 @@ console.log('Env configured');
             code = """
 console.log('Env isolation test');
 """
-            result = sandbox.execute(code)
+            result = sandbox.execute(code, inject_setup=False)
 
             # Verify execution completes successfully
             assert isinstance(result, SandboxResult)
@@ -346,7 +346,7 @@ class TestJavaScriptNoNetworkAccess:
 // This test documents the expectation
 console.log('No network APIs available');
 """
-        result = sandbox.execute(code)
+        result = sandbox.execute(code, inject_setup=False)
 
         assert result.success is True
         assert "No network APIs available" in result.stdout

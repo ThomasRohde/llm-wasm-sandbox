@@ -9,22 +9,24 @@ Command-line interface to run the MCP server with promiscuous security
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import sys
 import warnings
 from typing import Any, ClassVar
+
+from .config import MCPConfig
+from .security import SecurityValidator
+from .server import create_mcp_server
 
 # Suppress python-dotenv warnings when it's installed as a transitive dependency
 # (e.g., from openai-example extras) but not actually used by the MCP server
 warnings.filterwarnings("ignore", message="Python-dotenv could not parse statement.*")
 warnings.filterwarnings("ignore", message="python-dotenv could not parse statement.*")
 
-from .config import MCPConfig
-from .security import SecurityValidator
-from .server import create_mcp_server
-
 # Get version from pyproject.toml
 try:
     import importlib.metadata
+
     __version__ = importlib.metadata.version("llm-wasm-sandbox")
 except Exception:
     __version__ = "unknown"
@@ -60,16 +62,12 @@ class ProtocolFilterIO:
         return len(message)
 
     def flush(self) -> None:
-        try:
+        with contextlib.suppress(ValueError):
+            # Handle closed file during shutdown
             self.original_stdout.flush()
-        except ValueError:
+        with contextlib.suppress(ValueError):
             # Handle closed file during shutdown
-            pass
-        try:
             self.stderr.flush()
-        except ValueError:
-            # Handle closed file during shutdown
-            pass
 
     def isatty(self) -> bool:
         return bool(self.original_stdout.isatty())

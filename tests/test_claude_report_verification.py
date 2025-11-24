@@ -80,6 +80,7 @@ except Exception as e:
     def test_openpyxl_import(self):
         """Test if openpyxl package can be imported (as advertised in README)."""
         from sandbox.core.models import ExecutionPolicy
+
         policy = ExecutionPolicy(fuel_budget=10_000_000_000)  # 10B required for openpyxl
         sandbox = create_sandbox(runtime=RuntimeType.PYTHON, policy=policy)
         result = sandbox.execute("""
@@ -147,6 +148,7 @@ except Exception as e:
     def test_pypdf2_import(self):
         """Test if PyPDF2 package can be imported (as advertised in README)."""
         from sandbox.core.models import ExecutionPolicy
+
         policy = ExecutionPolicy(fuel_budget=10_000_000_000)  # 10B required for PyPDF2
         sandbox = create_sandbox(runtime=RuntimeType.PYTHON, policy=policy)
         result = sandbox.execute("""
@@ -171,7 +173,9 @@ except Exception as e:
 class TestJavaScriptSessionPersistence:
     """Verify JavaScript session persistence with auto_persist_globals."""
 
-    @pytest.mark.skip(reason="JavaScript auto_persist_globals not yet supported - QuickJS-WASI lacks file I/O APIs")
+    @pytest.mark.skip(
+        reason="Old API (let/const persistence) not supported - use _state object instead (see test_javascript_state.py)"
+    )
     def test_javascript_auto_persist_basic(self):
         """Test if JavaScript variables persist with auto_persist_globals=True."""
         sandbox = create_sandbox(runtime=RuntimeType.JAVASCRIPT, auto_persist_globals=True)
@@ -204,7 +208,9 @@ console.log("Got: counter=" + counter + ", data=" + JSON.stringify(data) + ", ob
         assert "counter=100" in result2.stdout, "counter variable should persist"
         assert "[1,2,3]" in result2.stdout, "data array should persist"
 
-    @pytest.mark.skip(reason="JavaScript auto_persist_globals not yet supported - QuickJS-WASI lacks file I/O APIs")
+    @pytest.mark.skip(
+        reason="Old API (let/const persistence) not supported - use _state object instead (see test_javascript_state.py)"
+    )
     def test_javascript_auto_persist_modification(self):
         """Test if JavaScript variable modifications persist."""
         sandbox = create_sandbox(runtime=RuntimeType.JAVASCRIPT, auto_persist_globals=True)

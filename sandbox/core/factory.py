@@ -53,9 +53,9 @@ def create_sandbox(
         auto_persist_globals: If True, automatically save/restore globals between executions
                              using JSON serialization. Only serializable types are persisted.
                              Functions, modules, and classes are filtered out.
-                             ⚠️ PYTHON ONLY: Not yet supported for JavaScript runtime due to
-                             QuickJS-WASI lacking file I/O APIs. JavaScript will accept the
-                             parameter but feature will not work until runtime adds file support.
+                             Supported for both Python and JavaScript runtimes.
+                             JavaScript: Uses QuickJS std.open() for file-backed state persistence.
+                             Python: Uses pickle-based serialization for all global variables.
         **kwargs: Additional runtime-specific arguments passed to constructor.
                   For PythonSandbox: wasm_binary_path (default: auto-detected bundled binary)
                   For JavaScriptSandbox: wasm_binary_path (default: auto-detected bundled binary)
@@ -138,17 +138,31 @@ def create_sandbox(
 
     # Detect vendor path for read-only mounting (if policy doesn't already specify mount_data_dir)
     if policy.mount_data_dir is None and isinstance(storage_adapter, DiskStorageAdapter):
-        vendor_candidates = [
-            storage_adapter.workspace_root,  # For tests that put site-packages directly in workspace_root
-            storage_adapter.workspace_root.parent / "vendor",  # Standard location
-            Path("vendor"),  # Fallback to project root
-        ]
-        for candidate in vendor_candidates:
-            if (candidate / "site-packages").exists():
-                # Configure policy to mount vendor as read-only at /data
-                policy.mount_data_dir = str(candidate.resolve())
-                policy.guest_data_path = "/data"
-                break
+        # For Python runtime, look for vendor/site-packages
+        if runtime == RuntimeType.PYTHON:
+            vendor_candidates = [
+                storage_adapter.workspace_root,  # For tests that put site-packages directly in workspace_root
+                storage_adapter.workspace_root.parent / "vendor",  # Standard location
+                Path("vendor"),  # Fallback to project root
+            ]
+            for candidate in vendor_candidates:
+                if (candidate / "site-packages").exists():
+                    # Configure policy to mount vendor as read-only at /data
+                    policy.mount_data_dir = str(candidate.resolve())
+                    policy.guest_data_path = "/data"
+                    break
+        # For JavaScript runtime, look for vendor_js directory
+        elif runtime == RuntimeType.JAVASCRIPT:
+            vendor_js_candidates = [
+                storage_adapter.workspace_root.parent / "vendor_js",  # Standard location
+                Path("vendor_js"),  # Fallback to project root
+            ]
+            for candidate in vendor_js_candidates:
+                if candidate.exists() and candidate.is_dir():
+                    # Configure policy to mount vendor_js as read-only at /data_js
+                    policy.mount_data_dir = str(candidate.resolve())
+                    policy.guest_data_path = "/data_js"
+                    break
 
     # Create session via storage adapter
     if not storage_adapter.session_exists(session_id):
@@ -204,6 +218,9 @@ def create_sandbox(
         else:
             wasm_binary_path = kwargs.pop("wasm_binary_path")
 
+        # Filter out workspace_path if present (it's for storage_adapter, not sandbox)
+        kwargs.pop("workspace_path", None)
+
         return PythonSandbox(
             wasm_binary_path=wasm_binary_path,
             policy=policy,
@@ -226,6 +243,9 @@ def create_sandbox(
                 wasm_binary_path = "bin/quickjs.wasm"
         else:
             wasm_binary_path = kwargs.pop("wasm_binary_path")
+
+        # Filter out workspace_path if present (it's for storage_adapter, not sandbox)
+        kwargs.pop("workspace_path", None)
 
         return JavaScriptSandbox(
             wasm_binary_path=wasm_binary_path,
