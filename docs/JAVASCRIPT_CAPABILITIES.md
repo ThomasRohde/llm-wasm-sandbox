@@ -474,6 +474,10 @@ console.log(csvString);
 
 Helper functions for JSON path access and validation.
 
+> **⚠️ Limitation:** Path syntax only supports **dot notation** (e.g., `'user.address.city'`). 
+> Array index syntax like `'users[0].name'` is **not supported** and will return `undefined`.
+> To access array elements, use multiple operations: `jsonUtils.get(data, 'users')[0].name`
+
 #### `jsonUtils.get(obj, path, defaultValue?)` → `any`
 Safe nested property access using dot notation.
 
@@ -494,6 +498,11 @@ console.log(city);  // 'NYC'
 
 const missing = jsonUtils.get(user, 'address.country', 'USA');
 console.log(missing);  // 'USA' (default)
+
+// ⚠️ Array index syntax NOT supported:
+const data = { users: [{name: 'Alice'}, {name: 'Bob'}] };
+// WRONG: jsonUtils.get(data, 'users[0].name')  // Returns undefined!
+// RIGHT: jsonUtils.get(data, 'users')[0].name  // Returns 'Alice'
 ```
 
 #### `jsonUtils.set(obj, path, value)` → `void`

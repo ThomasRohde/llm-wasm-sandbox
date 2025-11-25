@@ -82,12 +82,22 @@ Security Considerations
 - State file is workspace-scoped (no cross-session access)
 - No code execution during deserialization (JSON.parse is safe)
 
+Supported Types
+--------------
+- Primitives: int, str, float, bool, None
+- Collections: list, dict, tuple, set (sets become lists)
+- Paths: pathlib.Path, PosixPath, WindowsPath (converted to strings)
+- Dates: datetime.datetime, date, time (converted to ISO format strings)
+- Binary: bytes (converted to base64 with 'b64:' prefix)
+
 Limitations
 ----------
-- Complex objects (custom classes, numpy arrays) not supported
+- Custom classes and numpy arrays not supported (use dicts/lists instead)
+- Functions, modules, and classes are silently skipped
 - Nested object depth limited by JSON serializer
 - Large state may impact execution fuel consumption
 - No automatic conflict resolution for concurrent executions
+- Restored Path values will be strings (use Path(value) to convert back)
 """
 
 from __future__ import annotations
@@ -179,6 +189,12 @@ def save_state_code(state_var: str = "globals()", filename: str = STATE_FILENAME
     Returns a code snippet that serializes globals to a JSON file in the
     session workspace. This code should be appended to user code.
 
+    Handles common non-JSON types by converting them:
+    - pathlib.Path/PosixPath/WindowsPath → string
+    - datetime.datetime/date/time → ISO format string
+    - sets → lists
+    - bytes → base64 string (prefixed with 'b64:')
+
     Args:
         state_var: Python expression that returns dict to save (default: globals())
         filename: Target filename in /app/ (default: .session_state.json)
@@ -190,21 +206,69 @@ def save_state_code(state_var: str = "globals()", filename: str = STATE_FILENAME
         >>> code = save_state_code()
         >>> print(code)
         import json
-        _state = {k: v for k, v in globals().items()
-                  if not k.startswith('_') and not callable(v) and
-                  type(v).__name__ in ('int', 'str', 'list', 'dict', 'float', 'bool', 'NoneType')}
+        from pathlib import Path, PurePath
+        import datetime
+        import base64
+        
+        def _serialize_value(v):
+            if isinstance(v, PurePath):
+                return str(v)
+            elif isinstance(v, (datetime.datetime, datetime.date, datetime.time)):
+                return v.isoformat()
+            elif isinstance(v, set):
+                return list(v)
+            elif isinstance(v, bytes):
+                return 'b64:' + base64.b64encode(v).decode('ascii')
+            elif isinstance(v, dict):
+                return {k: _serialize_value(val) for k, val in v.items()}
+            elif isinstance(v, (list, tuple)):
+                return [_serialize_value(item) for item in v]
+            return v
+        
+        _state = {}
+        for k, v in globals().items():
+            if k.startswith('_') or callable(v) or type(v).__name__ == 'module':
+                continue
+            try:
+                _state[k] = _serialize_value(v)
+            except:
+                pass
         with open('/app/.session_state.json', 'w') as _f:
             json.dump(_state, _f)
-        del _state, _f
+        del _state, _f, _serialize_value
     """
     return f"""
 import json
-_state = {{k: v for k, v in {state_var}.items()
-          if not k.startswith('_') and not callable(v) and
-          type(v).__name__ in ('int', 'str', 'list', 'dict', 'float', 'bool', 'NoneType')}}
+from pathlib import Path, PurePath
+import datetime
+import base64
+
+def _serialize_value(v):
+    if isinstance(v, PurePath):
+        return str(v)
+    elif isinstance(v, (datetime.datetime, datetime.date, datetime.time)):
+        return v.isoformat()
+    elif isinstance(v, set):
+        return list(v)
+    elif isinstance(v, bytes):
+        return 'b64:' + base64.b64encode(v).decode('ascii')
+    elif isinstance(v, dict):
+        return {{k: _serialize_value(val) for k, val in v.items()}}
+    elif isinstance(v, (list, tuple)):
+        return [_serialize_value(item) for item in v]
+    return v
+
+_state = {{}}
+for k, v in {state_var}.items():
+    if k.startswith('_') or callable(v) or type(v).__name__ == 'module':
+        continue
+    try:
+        _state[k] = _serialize_value(v)
+    except:
+        pass
 with open('/app/{filename}', 'w') as _f:
     json.dump(_state, _f)
-del _state, _f
+del _state, _f, _serialize_value
 """.strip()
 
 
@@ -337,33 +401,72 @@ SANDBOX_UTILS_STATE_MODULE = '''
 
 These functions provide simple state management for LLM-generated code
 that needs to preserve variables across multiple executions.
+
+Handles common non-JSON types by converting them:
+- pathlib.Path/PosixPath/WindowsPath → string
+- datetime.datetime/date/time → ISO format string
+- sets → lists
+- bytes → base64 string (prefixed with 'b64:')
 """
 
 import json
 from typing import Any
+from pathlib import PurePath
+import datetime
+import base64
+
+
+def _serialize_value(v: Any) -> Any:
+    """Convert non-JSON-serializable types to JSON-compatible values."""
+    if isinstance(v, PurePath):
+        return str(v)
+    elif isinstance(v, (datetime.datetime, datetime.date, datetime.time)):
+        return v.isoformat()
+    elif isinstance(v, set):
+        return list(v)
+    elif isinstance(v, bytes):
+        return 'b64:' + base64.b64encode(v).decode('ascii')
+    elif isinstance(v, dict):
+        return {k: _serialize_value(val) for k, val in v.items()}
+    elif isinstance(v, (list, tuple)):
+        return [_serialize_value(item) for item in v]
+    return v
+
 
 def save_state(state: dict[str, Any], filename: str = ".session_state.json") -> None:
     """Save state dictionary to session workspace.
 
-    Only JSON-serializable values are saved. Functions, classes, and modules
-    are automatically filtered out.
+    Automatically converts common non-JSON types:
+    - pathlib.Path → string
+    - datetime objects → ISO format string
+    - sets → lists
+    - bytes → base64 string
+    
+    Functions, classes, and modules are filtered out.
 
     Args:
-        state: Dictionary with serializable values
+        state: Dictionary with values to save
         filename: Target filename in /app/ (default: .session_state.json)
 
     Examples:
         >>> # Save variables for next execution
         >>> save_state({'counter': 42, 'data': [1, 2, 3]})
 
+        >>> # Paths are automatically converted to strings
+        >>> from pathlib import Path
+        >>> save_state({'file': Path('/app/data.txt')})  # Saves as "/app/data.txt"
+
         >>> # Custom filename
         >>> save_state({'config': {'key': 'value'}}, 'mystate.json')
     """
-    filtered = {
-        k: v for k, v in state.items()
-        if not k.startswith('_') and not callable(v) and
-        type(v).__name__ in ('int', 'str', 'list', 'dict', 'float', 'bool', 'NoneType')
-    }
+    filtered = {}
+    for k, v in state.items():
+        if k.startswith('_') or callable(v) or type(v).__name__ == 'module':
+            continue
+        try:
+            filtered[k] = _serialize_value(v)
+        except:
+            pass
 
     with open(f'/app/{filename}', 'w') as f:
         json.dump(filtered, f, indent=2)

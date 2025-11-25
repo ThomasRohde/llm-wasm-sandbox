@@ -304,8 +304,21 @@ class MCPServer:
                     if "fuel_analysis" in result.metadata:
                         structured_content["fuel_analysis"] = result.metadata["fuel_analysis"]
 
+                    # Build content string with fuel guidance when relevant
+                    content = result.stdout or result.stderr
+                    fuel_analysis = result.metadata.get("fuel_analysis", {})
+                    fuel_status = fuel_analysis.get("status", "")
+                    
+                    # Add fuel guidance to content for warning/critical/exhausted statuses
+                    if fuel_status in ("warning", "critical", "exhausted"):
+                        fuel_note = fuel_analysis.get("recommendation", "")
+                        if fuel_note and content:
+                            content = f"{content}\n\n📊 Fuel Analysis: {fuel_note}"
+                        elif fuel_note:
+                            content = f"📊 Fuel Analysis: {fuel_note}"
+
                     return MCPToolResult(
-                        content=result.stdout or result.stderr,
+                        content=content,
                         structured_content=structured_content,
                         execution_time_ms=result.duration_ms,
                         success=result.success,
@@ -802,8 +815,8 @@ class MCPServer:
                         "  Python PDF: PyPDF2 (read/write/merge), pdfminer.six (text extraction)\n"
                         "  Python Word: mammoth (read-only, converts to HTML/Markdown)\n"
                         "  Python OpenDocument: odfpy (.odt, .ods, .odp)\n"
-                        "  JavaScript CSV: csv-simple (parse/generate CSV data)\n"
-                        "  JavaScript JSON: json-utils (path access, schema validation)"
+                        "  JavaScript CSV: csv-simple (parse/stringify CSV data)\n"
+                        "  JavaScript JSON: json-utils (path access with dot notation, schema validation)"
                     )
 
                     content_lines = []
