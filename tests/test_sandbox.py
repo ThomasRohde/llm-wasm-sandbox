@@ -25,7 +25,9 @@ from sandbox.vendor import (
 )
 
 
-def execute(code: str, inject_setup: bool = True, policy: ExecutionPolicy | None = None) -> dict:
+def execute(
+    code: str, inject_setup: bool = True, policy: ExecutionPolicy | None = None
+) -> dict[str, object]:
     """Helper function to execute code using new API and return dict for compatibility."""
     sandbox = create_sandbox(runtime=RuntimeType.PYTHON, policy=policy)
     result = sandbox.execute(code, inject_setup=inject_setup)

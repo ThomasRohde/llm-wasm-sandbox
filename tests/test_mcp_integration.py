@@ -15,7 +15,7 @@ class TestMCPIntegrationStdio:
     """Test MCP server with stdio transport integration."""
 
     @pytest.mark.asyncio
-    async def test_stdio_server_lifecycle(self):
+    async def test_stdio_server_lifecycle(self) -> None:
         """Test that stdio server can start and handle basic MCP messages."""
         server = create_mcp_server()
 
@@ -37,7 +37,7 @@ class TestMCPIntegrationStdio:
             mock_run.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_stdio_server_with_real_messages(self):
+    async def test_stdio_server_with_real_messages(self) -> None:
         """Test stdio server with simulated MCP protocol messages."""
         # This is a more advanced test that would require mocking stdin/stdout
         # For now, just verify the server can be created and has the right structure
@@ -52,7 +52,7 @@ class TestMCPIntegrationHTTP:
     """Test MCP server with HTTP transport integration."""
 
     @pytest.mark.asyncio
-    async def test_http_server_creation(self):
+    async def test_http_server_creation(self) -> None:
         """Test that HTTP server can be configured and started."""
         server = create_mcp_server()
 
@@ -80,7 +80,7 @@ class TestMCPIntegrationHTTP:
             assert call_args[1]["port"] == 8080
 
     @pytest.mark.asyncio
-    async def test_http_server_custom_config(self):
+    async def test_http_server_custom_config(self) -> None:
         """Test HTTP server with custom configuration."""
         server = create_mcp_server()
         config = HTTPTransportConfig(host="0.0.0.0", port=9000)
@@ -103,7 +103,7 @@ class TestMCPClientServerInteraction:
     """Test actual client-server interaction (simplified)."""
 
     @pytest.mark.asyncio
-    async def test_server_can_handle_multiple_sessions(self):
+    async def test_server_can_handle_multiple_sessions(self) -> None:
         """Test that server can handle multiple concurrent sessions."""
         server = create_mcp_server()
 
@@ -119,11 +119,11 @@ class TestMCPClientServerInteraction:
 
         # All should succeed
         for result in results:
-            parsed = json.loads(result.content[0].text)
+            parsed = json.loads(result.content[0].text)  # type: ignore[union-attr]
             assert parsed["success"] is True
 
     @pytest.mark.asyncio
-    async def test_server_tool_execution_pipeline(self):
+    async def test_server_tool_execution_pipeline(self) -> None:
         """Test that the server can handle a sequence of tool calls."""
         server = create_mcp_server()
 
@@ -158,7 +158,7 @@ class TestMCPErrorHandlingIntegration:
     """Test error handling in integrated scenarios."""
 
     @pytest.mark.asyncio
-    async def test_server_handles_invalid_requests_gracefully(self):
+    async def test_server_handles_invalid_requests_gracefully(self) -> None:
         """Test that server handles malformed requests without crashing."""
         server = create_mcp_server()
 
@@ -172,13 +172,13 @@ class TestMCPErrorHandlingIntegration:
             assert isinstance(e, Exception)
 
     @pytest.mark.asyncio
-    async def test_server_handles_execution_failures(self):
+    async def test_server_handles_execution_failures(self) -> None:
         """Test that execution failures are properly communicated."""
         server = create_mcp_server()
 
         # Test with invalid language
         result = await server.app._tool_manager.call_tool("create_session", {"language": "invalid"})
-        parsed = json.loads(result.content[0].text)
+        parsed = json.loads(result.content[0].text)  # type: ignore[union-attr]
         assert parsed["success"] is False
 
 

@@ -12,7 +12,7 @@ from mcp_server.sessions import WorkspaceSessionManager
 
 
 @pytest.mark.asyncio
-async def test_mcp_fuel_budget():
+async def test_mcp_fuel_budget() -> None:
     """Verify that MCP sessions use 10B fuel budget."""
     manager = WorkspaceSessionManager()
 
@@ -57,7 +57,9 @@ print(f"Second import fuel (cached): works!")
     print(f"Fuel consumed: {result2.fuel_consumed:,}")
     print(f"Stdout: {result2.stdout}")
 
-    if result2.fuel_consumed < 500_000_000:  # Should be much lower
+    if (
+        result2.fuel_consumed is not None and result2.fuel_consumed < 500_000_000
+    ):  # Should be much lower
         print("\n✅ PASS: Cached import uses minimal fuel")
 
     # Cleanup

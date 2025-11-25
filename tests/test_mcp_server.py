@@ -4,14 +4,14 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from mcp_server.config import MCPConfig
+from mcp_server.config import MCPConfig, ServerConfig
 from mcp_server.server import MCPServer, create_mcp_server
 
 
 class TestMCPServerInitialization:
     """Test MCP server initialization and configuration."""
 
-    def test_create_mcp_server_default_config(self):
+    def test_create_mcp_server_default_config(self) -> None:
         """Test creating MCP server with default configuration."""
         server = create_mcp_server()
 
@@ -19,29 +19,29 @@ class TestMCPServerInitialization:
         assert isinstance(server.config, MCPConfig)
         assert server.config.server.name == "llm-wasm-sandbox"
 
-    def test_create_mcp_server_custom_config(self):
+    def test_create_mcp_server_custom_config(self) -> None:
         """Test creating MCP server with custom configuration."""
-        config = MCPConfig(server={"name": "test-server", "version": "1.0.0"})
+        config = MCPConfig(server=ServerConfig(name="test-server", version="1.0.0"))
         server = create_mcp_server(config)
 
         assert server.config.server.name == "test-server"
         assert server.config.server.version == "1.0.0"
 
-    def test_server_has_fastmcp_app(self):
+    def test_server_has_fastmcp_app(self) -> None:
         """Test that server has a FastMCP app instance."""
         server = create_mcp_server()
 
         assert hasattr(server, "app")
         assert server.app.name == "llm-wasm-sandbox"
 
-    def test_server_has_session_manager(self):
+    def test_server_has_session_manager(self) -> None:
         """Test that server has a session manager."""
         server = create_mcp_server()
 
         assert hasattr(server, "session_manager")
         assert server.session_manager is not None
 
-    def test_server_has_logger(self):
+    def test_server_has_logger(self) -> None:
         """Test that server has a logger."""
         server = create_mcp_server()
 
@@ -52,7 +52,7 @@ class TestMCPServerInitialization:
 class TestMCPServerTools:
     """Test MCP server tool registration."""
 
-    def test_tools_are_registered(self):
+    def test_tools_are_registered(self) -> None:
         """Test that all expected tools are registered."""
         server = create_mcp_server()
 
@@ -75,7 +75,7 @@ class TestMCPServerTools:
         for tool_name in expected_tools:
             assert tool_name in tools, f"Tool {tool_name} not found in registered tools"
 
-    def test_tool_descriptions(self):
+    def test_tool_descriptions(self) -> None:
         """Test that tools have proper descriptions."""
         server = create_mcp_server()
         tools = server.app._tool_manager._tools
@@ -95,7 +95,7 @@ class TestMCPServerLifecycle:
     """Test MCP server lifecycle management."""
 
     @pytest.mark.asyncio
-    async def test_server_shutdown(self):
+    async def test_server_shutdown(self) -> None:
         """Test server shutdown cleans up resources."""
         server = create_mcp_server()
 
@@ -108,7 +108,7 @@ class TestMCPServerLifecycle:
         server.session_manager.cleanup.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_stdio_transport_start(self):
+    async def test_stdio_transport_start(self) -> None:
         """Test starting server with stdio transport."""
         server = create_mcp_server()
 
@@ -120,7 +120,7 @@ class TestMCPServerLifecycle:
         server.app.run_stdio_async.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_http_transport_start_default_config(self):
+    async def test_http_transport_start_default_config(self) -> None:
         """Test starting server with HTTP transport using default config."""
         server = create_mcp_server()
 
@@ -136,7 +136,7 @@ class TestMCPServerLifecycle:
         assert call_args[1]["port"] == 8080
 
     @pytest.mark.asyncio
-    async def test_http_transport_start_custom_config(self):
+    async def test_http_transport_start_custom_config(self) -> None:
         """Test starting server with HTTP transport using custom config."""
         from mcp_server.transports import HTTPTransportConfig
 
@@ -157,7 +157,7 @@ class TestMCPServerLifecycle:
 class TestMCPServerErrorHandling:
     """Test MCP server error handling."""
 
-    def test_server_initialization_with_invalid_config(self):
+    def test_server_initialization_with_invalid_config(self) -> None:
         """Test server handles invalid configuration gracefully."""
         # This should work since MCPConfig has defaults
         config = MCPConfig()
@@ -165,7 +165,7 @@ class TestMCPServerErrorHandling:
         assert server is not None
 
     @pytest.mark.asyncio
-    async def test_stdio_start_failure_handling(self):
+    async def test_stdio_start_failure_handling(self) -> None:
         """Test handling of stdio transport start failures."""
         server = create_mcp_server()
 
@@ -176,7 +176,7 @@ class TestMCPServerErrorHandling:
             await server.start_stdio()
 
     @pytest.mark.asyncio
-    async def test_http_start_failure_handling(self):
+    async def test_http_start_failure_handling(self) -> None:
         """Test handling of HTTP transport start failures."""
         server = create_mcp_server()
 

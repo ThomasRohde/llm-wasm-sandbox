@@ -80,7 +80,7 @@ class WorkspaceSessionManager:
     def __init__(self) -> None:
         self.logger = SandboxLogger("mcp-sessions")
         self._sessions: dict[str, WorkspaceSession] = {}
-        self._cleanup_task: asyncio.Task | None = None
+        self._cleanup_task: asyncio.Task[None] | None = None
 
     async def get_or_create_session(
         self, language: str, session_id: str | None = None, auto_persist_globals: bool = False
@@ -228,7 +228,7 @@ class WorkspaceSessionManager:
                 return False
         return False
 
-    async def get_session_info(self, session_id: str) -> dict | None:
+    async def get_session_info(self, session_id: str) -> dict[str, object] | None:
         """Get information about a workspace session."""
         if session_id in self._sessions:
             session = self._sessions[session_id]

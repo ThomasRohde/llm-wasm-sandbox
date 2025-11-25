@@ -8,7 +8,7 @@ import pytest
 from mcp_server.server import create_mcp_server
 
 
-def parse_tool_result(result):
+def parse_tool_result(result) -> dict[str, object]:
     """Parse FastMCP tool result from JSON content."""
     return json.loads(result.content[0].text)
 
@@ -17,7 +17,7 @@ class TestMCPToolExecuteCode:
     """Test the execute_code tool functionality."""
 
     @pytest.mark.asyncio
-    async def test_execute_code_python_success(self):
+    async def test_execute_code_python_success(self) -> None:
         """Test successful Python code execution."""
         server = create_mcp_server()
 
@@ -48,7 +48,7 @@ class TestMCPToolExecuteCode:
         assert parsed["success"] is True
 
     @pytest.mark.asyncio
-    async def test_execute_code_javascript_success(self):
+    async def test_execute_code_javascript_success(self) -> None:
         """Test successful JavaScript code execution."""
         server = create_mcp_server()
 
@@ -78,7 +78,7 @@ class TestMCPToolExecuteCode:
         assert parsed["success"] is True
 
     @pytest.mark.asyncio
-    async def test_execute_code_invalid_language(self):
+    async def test_execute_code_invalid_language(self) -> None:
         """Test execute_code with invalid language."""
         server = create_mcp_server()
 
@@ -92,7 +92,7 @@ class TestMCPToolExecuteCode:
         assert parsed["success"] is False
 
     @pytest.mark.asyncio
-    async def test_execute_code_execution_failure(self):
+    async def test_execute_code_execution_failure(self) -> None:
         """Test execute_code when execution fails."""
         server = create_mcp_server()
 
@@ -121,7 +121,7 @@ class TestMCPToolExecuteCode:
         assert parsed["success"] is False
 
     @pytest.mark.asyncio
-    async def test_execute_code_with_session_id(self):
+    async def test_execute_code_with_session_id(self) -> None:
         """Test execute_code with explicit session ID."""
         server = create_mcp_server()
 
@@ -157,7 +157,7 @@ class TestMCPToolListRuntimes:
     """Test the list_runtimes tool functionality."""
 
     @pytest.mark.asyncio
-    async def test_list_runtimes(self):
+    async def test_list_runtimes(self) -> None:
         """Test listing available runtimes."""
         server = create_mcp_server()
 
@@ -185,7 +185,7 @@ class TestMCPToolCreateSession:
     """Test the create_session tool functionality."""
 
     @pytest.mark.asyncio
-    async def test_create_session_python(self):
+    async def test_create_session_python(self) -> None:
         """Test creating a Python session."""
         server = create_mcp_server()
 
@@ -219,7 +219,7 @@ class TestMCPToolCreateSession:
             assert parsed["success"] is True
 
     @pytest.mark.asyncio
-    async def test_create_session_javascript(self):
+    async def test_create_session_javascript(self) -> None:
         """Test creating a JavaScript session."""
         server = create_mcp_server()
 
@@ -249,7 +249,7 @@ class TestMCPToolCreateSession:
         assert parsed["success"] is True
 
     @pytest.mark.asyncio
-    async def test_create_session_invalid_language(self):
+    async def test_create_session_invalid_language(self) -> None:
         """Test create_session with invalid language."""
         server = create_mcp_server()
 
@@ -261,7 +261,7 @@ class TestMCPToolCreateSession:
         assert parsed["success"] is False
 
     @pytest.mark.asyncio
-    async def test_create_session_with_custom_id(self):
+    async def test_create_session_with_custom_id(self) -> None:
         """Test create_session with custom session ID."""
         server = create_mcp_server()
 
@@ -297,7 +297,7 @@ class TestMCPToolDestroySession:
     """Test the destroy_session tool functionality."""
 
     @pytest.mark.asyncio
-    async def test_destroy_session_success(self):
+    async def test_destroy_session_success(self) -> None:
         """Test successful session destruction."""
         server = create_mcp_server()
 
@@ -314,7 +314,7 @@ class TestMCPToolDestroySession:
         assert parsed["success"] is True
 
     @pytest.mark.asyncio
-    async def test_destroy_session_not_found(self):
+    async def test_destroy_session_not_found(self) -> None:
         """Test destroying a non-existent session."""
         server = create_mcp_server()
 
@@ -334,7 +334,7 @@ class TestMCPToolCancelExecution:
     """Test the cancel_execution tool functionality."""
 
     @pytest.mark.asyncio
-    async def test_cancel_execution_not_supported(self):
+    async def test_cancel_execution_not_supported(self) -> None:
         """Test that cancel_execution returns not supported."""
         server = create_mcp_server()
 
@@ -353,7 +353,7 @@ class TestMCPToolGetWorkspaceInfo:
     """Test the get_workspace_info tool functionality."""
 
     @pytest.mark.asyncio
-    async def test_get_workspace_info_success(self):
+    async def test_get_workspace_info_success(self) -> None:
         """Test successful workspace info retrieval."""
         server = create_mcp_server()
 
@@ -383,7 +383,7 @@ class TestMCPToolGetWorkspaceInfo:
         assert parsed["success"] is True
 
     @pytest.mark.asyncio
-    async def test_get_workspace_info_not_found(self):
+    async def test_get_workspace_info_not_found(self) -> None:
         """Test workspace info for non-existent session."""
         server = create_mcp_server()
 
@@ -403,7 +403,7 @@ class TestMCPToolResetWorkspace:
     """Test the reset_workspace tool functionality."""
 
     @pytest.mark.asyncio
-    async def test_reset_workspace_success(self):
+    async def test_reset_workspace_success(self) -> None:
         """Test successful workspace reset."""
         server = create_mcp_server()
 
@@ -420,7 +420,7 @@ class TestMCPToolResetWorkspace:
         assert parsed["success"] is True
 
     @pytest.mark.asyncio
-    async def test_reset_workspace_failure(self):
+    async def test_reset_workspace_failure(self) -> None:
         """Test failed workspace reset."""
         server = create_mcp_server()
 
@@ -440,7 +440,7 @@ class TestMCPToolListAvailablePackages:
     """Test the list_available_packages tool functionality."""
 
     @pytest.mark.asyncio
-    async def test_list_available_packages_returns_correct_path(self):
+    async def test_list_available_packages_returns_correct_path(self) -> None:
         """Test that list_available_packages indicates packages are automatically available."""
         server = create_mcp_server()
 
@@ -468,7 +468,7 @@ class TestMCPToolListAvailablePackages:
         assert "jinja2" in parsed["content"]
 
     @pytest.mark.asyncio
-    async def test_package_import_workflow_with_correct_path(self):
+    async def test_package_import_workflow_with_correct_path(self) -> None:
         """
         Integration test: Verify the exact workflow from the bug report works.
 
@@ -532,7 +532,7 @@ class TestMCPToolJavaScriptStatePersistence:
     """Test JavaScript state persistence through MCP tools."""
 
     @pytest.mark.asyncio
-    async def test_javascript_state_persistence_workflow(self):
+    async def test_javascript_state_persistence_workflow(self) -> None:
         """Test JavaScript state persistence across executions via MCP."""
         server = create_mcp_server()
 
@@ -588,7 +588,7 @@ class TestMCPToolJavaScriptStatePersistence:
         assert mock_session.execute_code.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_create_javascript_session_with_auto_persist(self):
+    async def test_create_javascript_session_with_auto_persist(self) -> None:
         """Test creating JavaScript session with auto_persist_globals enabled."""
         server = create_mcp_server()
 
@@ -624,7 +624,7 @@ class TestMCPToolJavaScriptStatePersistence:
         )
 
     @pytest.mark.asyncio
-    async def test_javascript_vendored_package_execution(self):
+    async def test_javascript_vendored_package_execution(self) -> None:
         """Test JavaScript execution using vendored packages via MCP."""
         server = create_mcp_server()
 
@@ -659,7 +659,7 @@ console.log('First:', data[0].name);
         assert "First: Alice" in parsed["content"]
 
     @pytest.mark.asyncio
-    async def test_javascript_helper_utilities_execution(self):
+    async def test_javascript_helper_utilities_execution(self) -> None:
         """Test JavaScript execution using helper utilities via MCP."""
         server = create_mcp_server()
 

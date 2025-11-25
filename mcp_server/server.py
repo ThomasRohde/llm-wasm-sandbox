@@ -96,18 +96,122 @@ class MCPServer:
         @self.app.tool(
             name="execute_code",
             description="""Execute code in a secure WebAssembly sandbox. Supports Python and JavaScript.
-            
-            JavaScript Runtime Capabilities:
-            - Global objects (no import needed): std (file I/O via std.open), os (filesystem ops like os.readdir, os.stat, os.now)
-            - Global helper functions: readJson(), writeJson(), readText(), writeText(), readLines(), writeLines(), appendText(), fileExists(), fileSize(), listFiles(), copyFile(), removeFile()
-            - Vendored packages via requireVendor(): requireVendor('csv-simple'), requireVendor('string-utils'), requireVendor('json-utils')
-            - State persistence: _state object auto-persists when auto_persist_globals=True (e.g., _state.counter = (_state.counter || 0) + 1)
-            - All file operations limited to /app directory (WASI isolation)
-            
-            Python Runtime Capabilities:
-            - CPython 3.12 with full standard library
-            - 30+ pre-installed packages (openpyxl, PyPDF2, tabulate, jinja2, etc.)
-            - State persistence: Use auto_persist_globals=True for automatic global variable persistence
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            ⚙️ WHEN TO USE THIS TOOL:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            ✅ Data processing and analysis (CSV, JSON, Excel, PDF parsing)
+            ✅ File manipulation (read, write, transform files in /app directory)
+            ✅ Mathematical computations and algorithms
+            ✅ Text processing (parsing, formatting, templates)
+            ✅ One-off calculations or code snippets
+            ✅ Stateful workflows (counter, accumulator patterns with sessions)
+
+            ❌ DO NOT USE FOR:
+            - Network operations (HTTP requests, API calls) - not supported in WASI
+            - Long-running servers/daemons - execution times out
+            - Operations requiring system resources outside /app directory
+            - Package installation (pip/npm) - use pre-installed packages only
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            🐍 PYTHON RUNTIME (CPython 3.12 in WASM):
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            📦 Pre-installed Packages (30+, no pip install needed):
+               • Document processing: openpyxl, XlsxWriter, PyPDF2, mammoth, odfpy
+               • Text/data: tabulate, jinja2, markdown, python-dateutil
+               • Full standard library: json, csv, pathlib, re, math, statistics, etc.
+
+            💡 Usage Pattern:
+               import openpyxl  # Works automatically, no sys.path needed
+               from tabulate import tabulate
+               # Process data, read/write files in /app directory
+
+            ⚠️ Common Pitfalls:
+               • Fuel limits: Heavy packages (openpyxl, PyPDF2, jinja2) require 10B fuel
+                 for FIRST import. Use create_session with custom policy or increase budget.
+               • Path restrictions: All file operations MUST use /app/ prefix
+                 Example: open('/app/data.csv') ✅  |  open('data.csv') ❌
+               • C extensions: python-pptx, Pillow, lxml.etree NOT supported (use alternatives)
+               • Import caching: First import expensive, subsequent imports fast (use sessions!)
+
+            🔄 State Persistence (when auto_persist_globals=True in session):
+               • All global variables automatically saved between executions
+               • Example: counter = globals().get('counter', 0) + 1  # Persists across runs
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            🟨 JAVASCRIPT RUNTIME (QuickJS ES2023 in WASM):
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            📦 Built-in Capabilities:
+               • QuickJS std module: File I/O (std.open, std.loadFile, std.writeFile)
+               • QuickJS os module: Filesystem ops (os.readdir, os.stat, os.now, os.remove)
+               • Global helpers (auto-injected): readJson(), writeJson(), readText(),
+                 writeText(), listFiles(), fileExists(), copyFile(), etc.
+               • Vendored packages: csv.js, json_path.js, string_utils.js
+                 Usage: const csv = requireVendor('csv.js'); csv.parse(data);
+
+            💡 Usage Pattern:
+               // Option 1: Use global helpers (recommended for simple cases)
+               const data = readJson('/app/config.json');
+               writeText('/app/output.txt', 'result');
+
+               // Option 2: Use QuickJS std module for advanced I/O
+               import * as std from 'std';
+               const file = std.open('/app/data.csv', 'r');
+               const content = file.readAsString();
+               file.close();
+
+            ⚠️ Common Pitfalls:
+               • Tuple returns: QuickJS functions return tuples as [value, error]
+                 WRONG: const data = readJson('/app/file.json');  // TypeError if destructured
+                 RIGHT: const data = readJson('/app/file.json'); if (data) { use(data); }
+
+               • Path restrictions: All file operations MUST use /app/ prefix
+                 Example: readText('/app/data.txt') ✅  |  readText('data.txt') ❌
+
+               • No Node.js APIs: fs, http, child_process, etc. NOT available
+                 Use QuickJS std/os modules or global helpers instead
+
+               • Module syntax: Use import * as std from 'std'; (NOT require())
+
+            🔄 State Persistence (when auto_persist_globals=True in session):
+               • Use _state object to persist data between executions
+               • Example: _state.counter = (_state.counter || 0) + 1;  // Persists across runs
+               • _state is automatically saved/restored per session
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            📋 USAGE PATTERNS:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            1️⃣ One-off Calculation (no session needed):
+               execute_code(code="print(2 + 2)", language="python")
+
+            2️⃣ File Processing (single execution):
+               execute_code(code="data = readJson('/app/input.json'); ...", language="javascript")
+
+            3️⃣ Stateful Workflow (requires session with auto_persist_globals=True):
+               # First, create session:
+               create_session(language="python", auto_persist_globals=True)
+               # Then execute with state:
+               execute_code(code="counter = globals().get('counter', 0) + 1; print(counter)",
+                          session_id=<session_id>)
+
+            4️⃣ Heavy Package Usage (requires custom fuel budget):
+               # Create session with high fuel budget for openpyxl/PyPDF2:
+               create_session(language="python", session_id="excel-processor")
+               # Note: Use ExecutionPolicy(fuel_budget=10_000_000_000) at library level
+               execute_code(code="import openpyxl; ...", session_id="excel-processor")
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            ⚙️ PARAMETERS:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            • code (str): Code to execute. Remember to use /app/ prefix for all file paths!
+            • language (str): "python" or "javascript"
+            • timeout (int|None): Execution timeout in seconds (optional, defaults from policy)
+            • session_id (str|None): Session ID for persistent state/imports (optional)
+              - Omit for one-off executions (new temporary session created)
+              - Provide to reuse existing session (preserves imports, state, files)
+              - Use create_session first for custom configuration (fuel, auto_persist)
+
+            Returns: {stdout, stderr, exit_code, execution_time_ms, fuel_consumed, success}
             """,
         )
         async def execute_code(
@@ -181,16 +285,27 @@ class MCPServer:
                         language=language,
                     )
 
+                    # Build structured content with error guidance if available
+                    structured_content = {
+                        "stdout": result.stdout,
+                        "stderr": result.stderr,
+                        "exit_code": result.exit_code,
+                        "execution_time_ms": result.duration_ms,
+                        "fuel_consumed": result.fuel_consumed,
+                        "success": result.success,
+                    }
+
+                    # Add error guidance to structured content if available
+                    if "error_guidance" in result.metadata:
+                        structured_content["error_guidance"] = result.metadata["error_guidance"]
+
+                    # Add fuel analysis to structured content if available
+                    if "fuel_analysis" in result.metadata:
+                        structured_content["fuel_analysis"] = result.metadata["fuel_analysis"]
+
                     return MCPToolResult(
                         content=result.stdout or result.stderr,
-                        structured_content={
-                            "stdout": result.stdout,
-                            "stderr": result.stderr,
-                            "exit_code": result.exit_code,
-                            "execution_time_ms": result.duration_ms,
-                            "fuel_consumed": result.fuel_consumed,
-                            "success": result.success,
-                        },
+                        structured_content=structured_content,
                         execution_time_ms=result.duration_ms,
                         success=result.success,
                     )
@@ -214,7 +329,7 @@ class MCPServer:
 
         @self.app.tool(
             name="list_runtimes",
-            description="List all available programming language runtimes in the sandbox",
+            description="List all available programming language runtimes in the sandbox with version details, feature support, and API patterns",
         )
         async def list_runtimes() -> MCPToolResult:
             """List available runtimes."""
@@ -225,16 +340,101 @@ class MCPServer:
                             "name": "python",
                             "version": "3.12",
                             "description": "CPython compiled to WebAssembly",
+                            "features": {
+                                "es_version": "N/A (Python, not JavaScript)",
+                                "standard_library": "Full Python 3.12 stdlib",
+                                "pre_installed_packages": 30,
+                                "notable_packages": [
+                                    "openpyxl (Excel .xlsx)",
+                                    "PyPDF2 (PDF processing)",
+                                    "tabulate (table formatting)",
+                                    "jinja2 (templating)",
+                                    "markdown, python-dateutil, attrs",
+                                ],
+                                "state_persistence": "All global variables (when auto_persist_globals=True)",
+                                "import_caching": "Automatic in sessions (100x faster subsequent imports)",
+                            },
+                            "api_patterns": {
+                                "file_io": "Standard Python: open('/app/file.txt', 'r')",
+                                "import_syntax": "import openpyxl  # No sys.path needed, automatic",
+                                "state_access": "globals().get('var_name', default)  # Recommended pattern",
+                                "path_requirement": "All paths must start with /app/ (WASI restriction)",
+                            },
+                            "helper_functions": [
+                                "N/A - Use standard Python built-ins and stdlib",
+                                "pathlib.Path for path operations",
+                                "json.load/dump, csv.reader/writer for data",
+                            ],
+                            "fuel_requirements": {
+                                "stdlib_modules": "<500M fuel per import",
+                                "light_packages": "1-3B fuel (tabulate, markdown, dateutil)",
+                                "heavy_packages": "5-10B fuel (openpyxl, PyPDF2, jinja2) - FIRST import only",
+                                "cached_imports": "<100M fuel (subsequent imports in same session)",
+                            },
                         },
                         {
                             "name": "javascript",
                             "version": "ES2023",
                             "description": "QuickJS JavaScript engine in WebAssembly",
+                            "features": {
+                                "es_version": "ES2020+ (async/await, optional chaining, nullish coalescing, etc.)",
+                                "standard_library": "Full ES2023 built-ins (Array, Object, Map, Set, Promise, etc.)",
+                                "quickjs_modules": ["std (file I/O)", "os (filesystem operations)"],
+                                "vendored_packages": 5,
+                                "notable_packages": [
+                                    "csv.js (CSV parsing/generation)",
+                                    "json_path.js (JSONPath queries)",
+                                    "string_utils.js (string manipulation)",
+                                    "sandbox_utils.js (file I/O helpers - auto-injected)",
+                                ],
+                                "state_persistence": "_state object (when auto_persist_globals=True)",
+                                "global_helpers": "Auto-injected: readJson, writeJson, readText, writeText, listFiles, etc.",
+                            },
+                            "api_patterns": {
+                                "file_io_simple": "readJson('/app/data.json')  # Global helper, returns data or null",
+                                "file_io_advanced": "import * as std from 'std'; const f = std.open('/app/file.txt', 'r');",
+                                "vendored_packages": "const csv = requireVendor('csv.js');  # Function auto-injected",
+                                "state_access": "_state.counter = (_state.counter || 0) + 1;  # Always initialize",
+                                "path_requirement": "All paths must start with /app/ (WASI restriction)",
+                                "tuple_returns": "⚠️ QuickJS functions return [value, error] tuples - check truthiness before use",
+                            },
+                            "helper_functions": [
+                                "readJson(path), writeJson(path, data) - JSON I/O",
+                                "readText(path), writeText(path, text) - Text I/O",
+                                "readLines(path), writeLines(path, lines) - Line-based I/O",
+                                "appendText(path, text) - Append to file",
+                                "listFiles(dirPath) - List directory contents",
+                                "fileExists(path), fileSize(path) - File info",
+                                "copyFile(src, dest), removeFile(path) - File ops",
+                            ],
+                            "fuel_requirements": {
+                                "vendored_packages": "<100M fuel per requireVendor() call",
+                                "std_os_modules": "<50M fuel per import",
+                                "helper_functions": "<10M fuel per call (negligible overhead)",
+                            },
                         },
                     ]
 
+                    # Format runtimes for display
+                    content_lines = ["Available runtimes:\n"]
+                    for runtime in runtimes:
+                        content_lines.append(f"🔹 {runtime['name']} ({runtime['version']})")
+                        content_lines.append(f"   {runtime['description']}")
+                        features = runtime.get("features", {})
+                        if isinstance(features, dict):
+                            pkg_count = features.get("pre_installed_packages", 0)
+                            content_lines.append(f"   📦 Packages: {pkg_count}")
+                            notable = features.get("notable_packages", [])
+                            if isinstance(notable, list) and notable:
+                                content_lines.append(f"   💡 Notable: {', '.join(notable[:3])}")
+                        content_lines.append("")
+
+                    content_lines.append(
+                        "\n💡 Tip: Use list_available_packages for complete package list with fuel requirements"
+                    )
+
                     return MCPToolResult(
-                        content=f"Available runtimes: {', '.join(r['name'] for r in runtimes)}",
+                        content="\n".join(content_lines),
                         structured_content={"runtimes": runtimes},
                     )
 
@@ -247,17 +447,159 @@ class MCPServer:
         @self.app.tool(
             name="create_session",
             description="""Create a new workspace session for code execution with optional automatic global variable persistence.
-            
-            For JavaScript: Set auto_persist_globals=True to enable _state object for automatic state persistence across executions.
-            Example: _state.counter = (_state.counter || 0) + 1;
-            
-            For Python: Set auto_persist_globals=True to automatically persist all global variables between executions.
-            
-            Sessions maintain:
-            - Isolated workspace directory (/app in guest)
-            - Persistent files across executions
-            - Import/module caching (Python)
-            - State object persistence (JavaScript with auto_persist_globals=True)
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            🤔 WHEN TO CREATE A SESSION vs. USE DEFAULT:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            ✅ CREATE SESSION when you need:
+               1. Stateful execution (counter, accumulator, multi-step workflows)
+               2. Heavy package imports (openpyxl, PyPDF2, jinja2) - reuse cached imports
+               3. Persistent files across multiple executions
+               4. Custom execution policy (higher fuel budget, memory limits)
+               5. Multiple related operations on same dataset
+
+            ❌ USE DEFAULT (omit session_id in execute_code) when:
+               • One-off calculations or simple scripts
+               • No state needed between executions
+               • No heavy package imports
+               • Default resource limits sufficient (5B fuel, 128MB memory)
+
+            💡 Decision Tree:
+               Will you run multiple related executions? → YES → Create session
+               Do you need to preserve state/variables? → YES → Create session + auto_persist_globals
+               Will you import openpyxl/PyPDF2/jinja2? → YES → Create session (import caching!)
+               Simple one-time calculation? → NO session needed
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            🔄 AUTO-PERSIST GUIDELINES:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            🐍 Python (auto_persist_globals=True):
+               • ALL global variables automatically saved between executions
+               • Includes imported modules (cached for 100x faster subsequent imports!)
+               • Example workflow:
+                 1st execution: counter = 1; data = [1, 2, 3]
+                 2nd execution: print(counter)  # Output: 1 (persisted!)
+                                counter += 1
+                 3rd execution: print(counter)  # Output: 2
+
+               • Best practices:
+                 - Use globals().get('var_name', default) for safety
+                 - Imports are cached: import openpyxl once, reuse forever in session
+                 - Module-level variables persist automatically
+
+            🟨 JavaScript (auto_persist_globals=True):
+               • Use _state object for persistence (automatically injected)
+               • Example workflow:
+                 1st execution: _state.counter = (_state.counter || 0) + 1;
+                               console.log(_state.counter);  // Output: 1
+                 2nd execution: _state.counter = (_state.counter || 0) + 1;
+                               console.log(_state.counter);  // Output: 2
+
+               • What gets persisted:
+                 ✅ _state object properties (any JSON-serializable data)
+                 ❌ Regular variables (let/const/var) - NOT persisted without _state
+                 ❌ Functions, closures - NOT persisted
+
+               • Best practices:
+                 - Always initialize: _state.var = _state.var || defaultValue
+                 - Store data structures: _state.results = _state.results || []
+                 - Check existence: if (_state.config) { ... }
+
+            ⚠️ Limitations:
+               • Python: Functions/classes defined in global scope persist (be careful!)
+               • JavaScript: Only _state object persists, not regular variables
+               • Both: File system changes persist (files in /app directory)
+               • Performance: auto_persist adds ~5-10ms per execution (negligible)
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            🔧 SESSION LIFECYCLE:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            1. Create session:
+               create_session(language="python", session_id="my-workflow",
+                            auto_persist_globals=True)
+
+            2. Execute code (repeat as needed):
+               execute_code(code="...", language="python", session_id="my-workflow")
+               # State, imports, and files persist between calls
+
+            3. Check session status (optional):
+               get_workspace_info(session_id="my-workflow")
+               # Returns: execution_count, files, language, created_at
+
+            4. Clean up (optional):
+               destroy_session(session_id="my-workflow")
+               # Or let it auto-cleanup after inactivity timeout
+
+            💡 Session Management Tips:
+               • Sessions auto-cleanup after inactivity (default: 1 hour)
+               • Use meaningful session_id names ("excel-processor", "data-pipeline")
+               • Call destroy_session when done to free resources immediately
+               • reset_workspace to clear files but keep session (useful for testing)
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            ⚡ CUSTOM CONFIGURATION (Advanced):
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            For custom fuel budgets or memory limits, use the Python library directly:
+
+            from sandbox import create_sandbox, ExecutionPolicy, RuntimeType
+
+            policy = ExecutionPolicy(
+                fuel_budget=10_000_000_000,      # 10B for heavy packages
+                memory_bytes=256 * 1024 * 1024,  # 256MB for large datasets
+            )
+            sandbox = create_sandbox(runtime=RuntimeType.PYTHON, policy=policy)
+            result = sandbox.execute(code)
+
+            ⚠️ Note: MCP tool API does not expose custom policies yet. Use default session
+            for most cases. Heavy package imports (openpyxl, PyPDF2, jinja2) require
+            10B fuel - increase via library if hitting OutOfFuel errors.
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            📋 USAGE EXAMPLES:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            Example 1 - Counter Pattern (Python):
+              create_session(language="python", session_id="counter", auto_persist_globals=True)
+              execute_code("counter = globals().get('counter', 0) + 1; print(counter)",
+                          session_id="counter")  # Output: 1
+              execute_code("counter = globals().get('counter', 0) + 1; print(counter)",
+                          session_id="counter")  # Output: 2
+
+            Example 2 - Counter Pattern (JavaScript):
+              create_session(language="javascript", session_id="counter", auto_persist_globals=True)
+              execute_code("_state.counter = (_state.counter || 0) + 1; console.log(_state.counter)",
+                          session_id="counter")  # Output: 1
+              execute_code("_state.counter = (_state.counter || 0) + 1; console.log(_state.counter)",
+                          session_id="counter")  # Output: 2
+
+            Example 3 - Heavy Package Caching (Python):
+              create_session(language="python", session_id="excel-proc")
+              execute_code("import openpyxl; print('Imported!')", session_id="excel-proc")
+              # First import: ~5-7B fuel, slow
+              execute_code("import openpyxl; print('Cached!')", session_id="excel-proc")
+              # Subsequent: <100M fuel, 100x faster!
+
+            Example 4 - Multi-Step Data Pipeline (JavaScript):
+              create_session(language="javascript", session_id="pipeline", auto_persist_globals=True)
+              execute_code("_state.data = readJson('/app/input.json'); _state.step = 1;",
+                          session_id="pipeline")
+              execute_code("_state.processed = _state.data.map(x => x * 2); _state.step = 2;",
+                          session_id="pipeline")
+              execute_code("writeJson('/app/output.json', _state.processed);",
+                          session_id="pipeline")
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            ⚙️ PARAMETERS:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            • language (str): "python" or "javascript"
+            • session_id (str|None): Custom session identifier (auto-generated if omitted)
+              - Use descriptive names: "excel-processor", "data-pipeline", "counter"
+              - Reuse same ID to continue existing session
+            • auto_persist_globals (bool): Enable automatic state persistence (default: False)
+              - Python: All global variables persist
+              - JavaScript: _state object persists
+              - Recommended: True for stateful workflows, False for one-off tasks
+
+            Returns: {session_id, language, sandbox_session_id, created_at, auto_persist_globals}
             """,
         )
         async def create_session(
@@ -512,8 +854,10 @@ class MCPServer:
                     info = await self.session_manager.get_session_info(session_id)
 
                     if info:
+                        files = info.get("files", [])
+                        file_count = len(files) if isinstance(files, (list, tuple)) else 0
                         return MCPToolResult(
-                            content=f"Session {session_id}: {info['language']}, {info['execution_count']} executions, {len(info['files'])} files",
+                            content=f"Session {session_id}: {info['language']}, {info['execution_count']} executions, {file_count} files",
                             structured_content=info,
                         )
                     else:

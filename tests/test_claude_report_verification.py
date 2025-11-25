@@ -20,7 +20,7 @@ from sandbox import ExecutionPolicy, RuntimeType, create_sandbox
 class TestPackageSystem:
     """Verify package availability claims from Claude report."""
 
-    def test_data_site_packages_exists(self):
+    def test_data_site_packages_exists(self) -> None:
         """Test if /data/site-packages directory exists in sandbox."""
         sandbox = create_sandbox(runtime=RuntimeType.PYTHON)
         result = sandbox.execute("""
@@ -55,7 +55,7 @@ if exists and is_dir:
         assert "exists=True" in result.stdout, "/data/site-packages should exist"
         assert "is_dir=True" in result.stdout, "/data/site-packages should be a directory"
 
-    def test_tabulate_import(self):
+    def test_tabulate_import(self) -> None:
         """Test if tabulate package can be imported (as advertised in README)."""
         sandbox = create_sandbox(runtime=RuntimeType.PYTHON)
         result = sandbox.execute("""
@@ -77,7 +77,7 @@ except Exception as e:
 
         assert "SUCCESS" in result.stdout, "tabulate should be importable"
 
-    def test_openpyxl_import(self):
+    def test_openpyxl_import(self) -> None:
         """Test if openpyxl package can be imported (as advertised in README)."""
         from sandbox.core.models import ExecutionPolicy
 
@@ -101,7 +101,7 @@ except Exception as e:
 
         assert "SUCCESS" in result.stdout, "openpyxl should be importable"
 
-    def test_markdown_import(self):
+    def test_markdown_import(self) -> None:
         """Test if markdown package can be imported (as advertised in README)."""
         sandbox = create_sandbox(runtime=RuntimeType.PYTHON)
         result = sandbox.execute("""
@@ -122,7 +122,7 @@ except Exception as e:
 
         assert "SUCCESS" in result.stdout, "markdown should be importable"
 
-    def test_dateutil_import(self):
+    def test_dateutil_import(self) -> None:
         """Test if python-dateutil package can be imported (as advertised in README)."""
         sandbox = create_sandbox(runtime=RuntimeType.PYTHON)
         result = sandbox.execute("""
@@ -145,7 +145,7 @@ except Exception as e:
 
         assert "SUCCESS" in result.stdout, "dateutil should be importable"
 
-    def test_pypdf2_import(self):
+    def test_pypdf2_import(self) -> None:
         """Test if PyPDF2 package can be imported (as advertised in README)."""
         from sandbox.core.models import ExecutionPolicy
 
@@ -176,7 +176,7 @@ class TestJavaScriptSessionPersistence:
     @pytest.mark.skip(
         reason="Old API (let/const persistence) not supported - use _state object instead (see test_javascript_state.py)"
     )
-    def test_javascript_auto_persist_basic(self):
+    def test_javascript_auto_persist_basic(self) -> None:
         """Test if JavaScript variables persist with auto_persist_globals=True."""
         sandbox = create_sandbox(runtime=RuntimeType.JAVASCRIPT, auto_persist_globals=True)
 
@@ -211,7 +211,7 @@ console.log("Got: counter=" + counter + ", data=" + JSON.stringify(data) + ", ob
     @pytest.mark.skip(
         reason="Old API (let/const persistence) not supported - use _state object instead (see test_javascript_state.py)"
     )
-    def test_javascript_auto_persist_modification(self):
+    def test_javascript_auto_persist_modification(self) -> None:
         """Test if JavaScript variable modifications persist."""
         sandbox = create_sandbox(runtime=RuntimeType.JAVASCRIPT, auto_persist_globals=True)
 
@@ -236,7 +236,7 @@ console.log("Got: counter=" + counter + ", data=" + JSON.stringify(data) + ", ob
 class TestSuccessFlagBehavior:
     """Verify success flag behavior with exception handling."""
 
-    def test_success_with_caught_exception(self):
+    def test_success_with_caught_exception(self) -> None:
         """Test if success=True when exception is caught with try/except."""
         sandbox = create_sandbox(runtime=RuntimeType.PYTHON)
         result = sandbox.execute("""
@@ -262,7 +262,7 @@ print("Execution completed")
                 "This contradicts normal behavior - caught exceptions should result in success=True."
             )
 
-    def test_success_with_uncaught_exception(self):
+    def test_success_with_uncaught_exception(self) -> None:
         """Test if success=False when exception is uncaught."""
         sandbox = create_sandbox(runtime=RuntimeType.PYTHON)
         result = sandbox.execute("""
@@ -283,7 +283,7 @@ print("This should not print")
 class TestTimeoutParameter:
     """Verify timeout parameter functionality."""
 
-    def test_timeout_parameter_accepted(self):
+    def test_timeout_parameter_accepted(self) -> None:
         """Test if timeout parameter is accepted without error."""
         # Try with timeout in policy
         policy = ExecutionPolicy(
@@ -307,7 +307,7 @@ class TestTimeoutParameter:
 class TestFileSystemCapabilities:
     """Verify file system capabilities and limitations."""
 
-    def test_file_write_capability(self):
+    def test_file_write_capability(self) -> None:
         """Test if file writing is supported within /app."""
         sandbox = create_sandbox(runtime=RuntimeType.PYTHON)
         result = sandbox.execute("""
@@ -327,7 +327,7 @@ except Exception as e:
         if "FAILED" in result.stdout or "Permission denied" in result.stderr:
             print("NOTE: File I/O not supported (expected WASM limitation)")
 
-    def test_file_read_after_write(self):
+    def test_file_read_after_write(self) -> None:
         """Test if files persist within a session."""
         sandbox = create_sandbox(runtime=RuntimeType.PYTHON)
 
@@ -359,7 +359,7 @@ except Exception as e:
 class TestSandboxUtilsAvailability:
     """Verify sandbox_utils library availability."""
 
-    def test_sandbox_utils_import(self):
+    def test_sandbox_utils_import(self) -> None:
         """Test if sandbox_utils can be imported (as advertised in README)."""
         sandbox = create_sandbox(runtime=RuntimeType.PYTHON)
         result = sandbox.execute("""

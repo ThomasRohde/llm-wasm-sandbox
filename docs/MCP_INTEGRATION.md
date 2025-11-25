@@ -159,11 +159,20 @@ env = { "DEMO_GREETING" = "Hello from sandbox!" }
 
 ## MCP Tools
 
-The MCP server provides the following tools:
+The MCP server provides the following tools with comprehensive metadata to guide LLM decision-making:
 
 ### execute_code
 
-Execute code in a secure WebAssembly sandbox.
+Execute code in a secure WebAssembly sandbox with comprehensive capability information.
+
+**Enhanced Tool Description** (visible to LLMs):
+The tool description now includes:
+- ⚙️ **When to use** vs. **when not to use** guidance
+- 🐍 **Python runtime capabilities** (pre-installed packages, import patterns, pitfalls)
+- 🟨 **JavaScript runtime capabilities** (QuickJS modules, global helpers, vendored packages)
+- ⚠️ **Common pitfalls** (fuel limits, path restrictions, tuple returns, C extensions)
+- 🔄 **State persistence patterns** (Python globals, JavaScript _state object)
+- 📋 **Usage patterns** (one-off, file processing, stateful workflows, heavy packages)
 
 **Parameters:**
 - `code` (string): Code to execute
@@ -199,9 +208,170 @@ Execute code in a secure WebAssembly sandbox.
 }
 ```
 
-### list_runtimes
+#### Error Guidance (v0.4.1+)
 
-List available programming language runtimes.
+When execution fails, the `execute_code` tool automatically provides structured error guidance in `structured_content.error_guidance`:
+
+**Error Guidance Structure:**
+```json
+{
+  "error_type": "OutOfFuel",
+  "actionable_guidance": [
+    "Code execution exceeded the fuel budget (instruction limit).",
+    "This typically occurs with:",
+    "  - Heavy package imports (openpyxl: 5-7B, PyPDF2: 5-6B, jinja2: 5-10B fuel on first import)",
+    "  - Large dataset processing (loops over big files/arrays)",
+    "  - Infinite loops or very deep recursion",
+    "Solutions:",
+    "1. Increase fuel_budget when creating session or calling execute_code:",
+    "   - For heavy packages: Use 10B+ for first import, 2B+ for subsequent executions",
+    "   - For large datasets: Estimate ~1B fuel per 100K loop iterations",
+    "2. Use persistent sessions (auto_persist_globals=True) to cache imports across executions",
+    "Concrete recommendation: Increase fuel_budget from 5,000,000,000 to 10,000,000,000 instructions"
+  ],
+  "related_docs": [
+    "docs/PYTHON_CAPABILITIES.md#fuel-requirements",
+    "docs/MCP_INTEGRATION.md#fuel-budgeting"
+  ],
+  "code_examples": [
+    {
+      "before": "sandbox.execute(code)  # Uses default 5B fuel",
+      "after": "sandbox.execute(code, fuel_budget=10_000_000_000)  # 10B for heavy packages",
+      "explanation": "Increase fuel budget for package imports or large computations"
+    }
+  ]
+}
+```
+
+**Supported Error Types:**
+
+| Error Type | When It Occurs | Key Guidance |
+|-----------|---------------|-------------|
+| `OutOfFuel` | Fuel budget exhausted | Increase fuel_budget, use sessions for import caching |
+| `PathRestriction` | File access outside /app | Use /app prefix or relative paths |
+| `QuickJSTupleDestructuring` | JS destructuring error | Use `[a, b] = func()` not `(a, b) = func()` |
+| `MissingVendoredPackage` | Python import error | Add `sys.path.insert(0, '/data/site-packages')` |
+| `MissingRequireVendor` | JS vendored import | Use `requireVendor('package')` not `require()` |
+| `MemoryExhausted` | Memory limit exceeded | Increase memory_bytes or process data in chunks |
+
+**Example Error Response:**
+```json
+{
+  "content": "Execution trapped: OutOfFuel",
+  "structured_content": {
+    "stdout": "",
+    "stderr": "Execution trapped: OutOfFuel",
+    "exit_code": 1,
+    "success": false,
+    "error_guidance": {
+      "error_type": "OutOfFuel",
+      "actionable_guidance": [
+        "Code execution exceeded the fuel budget (instruction limit).",
+        "Detected heavy package(s): openpyxl",
+        "These packages require higher fuel budgets on first import (5-10B).",
+        "Solutions:",
+        "1. Increase fuel_budget when creating session:",
+        "   sandbox.execute(code, fuel_budget=10_000_000_000)",
+        "2. Use persistent sessions to cache imports (100x faster subsequent runs)",
+        "Concrete recommendation: Increase fuel_budget from 5,000,000,000 to 10,000,000,000 instructions"
+      ],
+      "related_docs": [
+        "docs/PYTHON_CAPABILITIES.md#fuel-requirements"
+      ],
+      "code_examples": [...]
+    }
+  }
+}
+```
+
+**Best Practices:**
+1. **Check error_guidance field** when `success: false`
+2. **Follow actionable_guidance** steps in order (most specific first)
+3. **Use code_examples** as templates for fixing errors
+4. **Reference related_docs** for deeper understanding
+5. **Retry with recommendations** (e.g., increased fuel_budget) when applicable
+
+#### Fuel Budget Analysis (v0.5.0+)
+
+All executions now include proactive fuel budget analysis in `structured_content.fuel_analysis`, helping LLMs make informed decisions about resource allocation:
+
+**Fuel Analysis Structure:**
+```json
+{
+  "consumed": 4500000000,
+  "budget": 5000000000,
+  "utilization_percent": 90.0,
+  "status": "critical",
+  "recommendation": "🚨 Fuel usage is critical (90.0%). Increase budget to 9B instructions to avoid exhaustion (current: 5B). Package fuel requirements: openpyxl requires 5-7B for first import. Note: Using a persistent session will cache imports, reducing fuel needs for subsequent executions",
+  "likely_causes": [
+    "Heavy package imports detected: openpyxl",
+    "Note: Subsequent imports in this session will be faster (cached)"
+  ]
+}
+```
+
+**Status Classifications:**
+
+| Status | Utilization | Meaning | Action Required |
+|--------|-------------|---------|----------------|
+| `efficient` | <50% | Budget is appropriate | None - continue using current settings |
+| `moderate` | 50-75% | Budget is adequate | Monitor for similar workloads |
+| `warning` | 75-90% | Approaching limit | Consider increasing for future runs |
+| `critical` | 90-100% | Near exhaustion | Must increase budget for similar code |
+| `exhausted` | 100% | Budget exceeded | Execution failed - increase immediately |
+
+**Example Fuel Analysis Response:**
+```json
+{
+  "content": "Success output here",
+  "structured_content": {
+    "stdout": "Imported openpyxl\nProcessed data\n",
+    "stderr": "",
+    "exit_code": 0,
+    "success": true,
+    "fuel_consumed": 6500000000,
+    "fuel_analysis": {
+      "consumed": 6500000000,
+      "budget": 10000000000,
+      "utilization_percent": 65.0,
+      "status": "moderate",
+      "recommendation": "Fuel usage is moderate (65.0%). Current budget is adequate, but consider increasing if similar tasks are planned",
+      "likely_causes": [
+        "Heavy package imports detected: openpyxl"
+      ]
+    }
+  }
+}
+```
+
+**Proactive Recommendations:**
+
+The `recommendation` field provides concrete, actionable guidance:
+- **Specific numbers**: "Increase to 15B" not "increase budget"
+- **Package requirements**: "openpyxl requires 5-7B for first import"
+- **Session optimization**: Suggests persistent sessions for import caching
+- **Safety margins**: 50-100% buffer to prevent future exhaustion
+
+**Best Practices:**
+1. **Monitor fuel_analysis.status** even on successful executions
+2. **Act on warning/critical status** before hitting OutOfFuel errors
+3. **Use persistent sessions** for heavy packages (100x faster subsequent imports)
+4. **Follow concrete recommendations** (e.g., "Increase to 15B instructions")
+5. **Check likely_causes** to understand fuel consumption patterns
+
+
+### `list_runtimes`
+
+List available programming language runtimes with comprehensive metadata.
+
+**Enhanced Response** (v0.4.0+):
+The tool now returns detailed runtime information including:
+- Version details (Python 3.12, JavaScript ES2023)
+- Feature support (ES2020+, async/await, etc.)
+- Pre-installed package counts and notable packages
+- API patterns (import syntax, file I/O, state access)
+- Helper functions available per runtime
+- Fuel requirements per package/module
 
 **Parameters:** None
 
@@ -216,18 +386,85 @@ List available programming language runtimes.
 **Response:**
 ```json
 {
-  "content": "Available runtimes: python, javascript",
+  "content": "Available runtimes:\n\n🔹 python (3.12)\n   CPython compiled to WebAssembly\n   📦 Packages: 30\n   💡 Notable: openpyxl (Excel .xlsx), PyPDF2 (PDF processing), tabulate (table formatting)\n\n🔹 javascript (ES2023)\n   QuickJS JavaScript engine in WebAssembly\n   📦 Packages: 5\n   💡 Notable: csv.js (CSV parsing/generation), json_path.js (JSONPath queries), string_utils.js (string manipulation)\n\n💡 Tip: Use list_available_packages for complete package list with fuel requirements",
   "structured_content": {
     "runtimes": [
       {
         "name": "python",
-        "version": "3.11",
-        "description": "CPython compiled to WebAssembly"
+        "version": "3.12",
+        "description": "CPython compiled to WebAssembly",
+        "features": {
+          "es_version": "N/A (Python, not JavaScript)",
+          "standard_library": "Full Python 3.12 stdlib",
+          "pre_installed_packages": 30,
+          "notable_packages": [
+            "openpyxl (Excel .xlsx)",
+            "PyPDF2 (PDF processing)",
+            "tabulate (table formatting)",
+            "jinja2 (templating)",
+            "markdown, python-dateutil, attrs"
+          ],
+          "state_persistence": "All global variables (when auto_persist_globals=True)",
+          "import_caching": "Automatic in sessions (100x faster subsequent imports)"
+        },
+        "api_patterns": {
+          "file_io": "Standard Python: open('/app/file.txt', 'r')",
+          "import_syntax": "import openpyxl  # No sys.path needed, automatic",
+          "state_access": "globals().get('var_name', default)  # Recommended pattern",
+          "path_requirement": "All paths must start with /app/ (WASI restriction)"
+        },
+        "helper_functions": [
+          "N/A - Use standard Python built-ins and stdlib",
+          "pathlib.Path for path operations",
+          "json.load/dump, csv.reader/writer for data"
+        ],
+        "fuel_requirements": {
+          "stdlib_modules": "<500M fuel per import",
+          "light_packages": "1-3B fuel (tabulate, markdown, dateutil)",
+          "heavy_packages": "5-10B fuel (openpyxl, PyPDF2, jinja2) - FIRST import only",
+          "cached_imports": "<100M fuel (subsequent imports in same session)"
+        }
       },
       {
         "name": "javascript",
         "version": "ES2023",
-        "description": "QuickJS JavaScript engine in WebAssembly"
+        "description": "QuickJS JavaScript engine in WebAssembly",
+        "features": {
+          "es_version": "ES2020+ (async/await, optional chaining, nullish coalescing, etc.)",
+          "standard_library": "Full ES2023 built-ins (Array, Object, Map, Set, Promise, etc.)",
+          "quickjs_modules": ["std (file I/O)", "os (filesystem operations)"],
+          "vendored_packages": 5,
+          "notable_packages": [
+            "csv.js (CSV parsing/generation)",
+            "json_path.js (JSONPath queries)",
+            "string_utils.js (string manipulation)",
+            "sandbox_utils.js (file I/O helpers - auto-injected)"
+          ],
+          "state_persistence": "_state object (when auto_persist_globals=True)",
+          "global_helpers": "Auto-injected: readJson, writeJson, readText, writeText, listFiles, etc."
+        },
+        "api_patterns": {
+          "file_io_simple": "readJson('/app/data.json')  # Global helper, returns data or null",
+          "file_io_advanced": "import * as std from 'std'; const f = std.open('/app/file.txt', 'r');",
+          "vendored_packages": "const csv = requireVendor('csv.js');  # Function auto-injected",
+          "state_access": "_state.counter = (_state.counter || 0) + 1;  # Always initialize",
+          "path_requirement": "All paths must start with /app/ (WASI restriction)",
+          "tuple_returns": "⚠️ QuickJS functions return [value, error] tuples - check truthiness before use"
+        },
+        "helper_functions": [
+          "readJson(path), writeJson(path, data) - JSON I/O",
+          "readText(path), writeText(path, text) - Text I/O",
+          "readLines(path), writeLines(path, lines) - Line-based I/O",
+          "appendText(path, text) - Append to file",
+          "listFiles(dirPath) - List directory contents",
+          "fileExists(path), fileSize(path) - File info",
+          "copyFile(src, dest), removeFile(path) - File ops"
+        ],
+        "fuel_requirements": {
+          "vendored_packages": "<100M fuel per requireVendor() call",
+          "std_os_modules": "<50M fuel per import",
+          "helper_functions": "<10M fuel per call (negligible overhead)"
+        }
       }
     ]
   }
@@ -236,7 +473,15 @@ List available programming language runtimes.
 
 ### create_session
 
-Create a new workspace session for code execution.
+Create a new workspace session for code execution with comprehensive decision guidance.
+
+**Enhanced Tool Description** (v0.4.0+):
+The tool description now includes:
+- 🤔 **When to create session** vs. **use default** decision tree
+- 🔄 **Auto-persist guidelines** (what gets persisted, limitations, performance)
+- 🔧 **Session lifecycle patterns** (create, execute, check status, cleanup)
+- ⚡ **Custom configuration guidance** (fuel budgets for heavy packages)
+- 📋 **Usage examples** (counter patterns, import caching, multi-step pipelines)
 
 **Parameters:**
 - `language` (string): "python" or "javascript"

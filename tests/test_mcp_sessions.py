@@ -13,7 +13,7 @@ from sandbox import RuntimeType
 class TestWorkspaceSession:
     """Test WorkspaceSession class functionality."""
 
-    def test_workspace_session_creation(self):
+    def test_workspace_session_creation(self) -> None:
         """Test creating a workspace session."""
         session = WorkspaceSession(
             workspace_id="test-123", language="python", sandbox_session_id="sandbox-456"
@@ -27,7 +27,7 @@ class TestWorkspaceSession:
         assert session.imports == []
         assert not session.is_expired
 
-    def test_workspace_session_expiration(self):
+    def test_workspace_session_expiration(self) -> None:
         """Test session expiration logic."""
         # Create session in the past
         past_time = time.time() - 700  # 700 seconds ago
@@ -46,7 +46,7 @@ class TestWorkspaceSession:
         )  # Should not be expired with longer timeout
 
     @patch("mcp_server.sessions.create_sandbox")
-    def test_get_sandbox(self, mock_create_sandbox):
+    def test_get_sandbox(self, mock_create_sandbox) -> None:
         """Test getting sandbox instance."""
         mock_sandbox = MagicMock()
         mock_create_sandbox.return_value = mock_sandbox
@@ -68,7 +68,7 @@ class TestWorkspaceSession:
 
     @patch("mcp_server.sessions.create_sandbox")
     @pytest.mark.asyncio
-    async def test_execute_code(self, mock_create_sandbox):
+    async def test_execute_code(self, mock_create_sandbox) -> None:
         """Test executing code in session."""
         mock_sandbox = MagicMock()
         mock_result = MagicMock()
@@ -93,7 +93,7 @@ class TestWorkspaceSession:
 class TestWorkspaceSessionManager:
     """Test WorkspaceSessionManager functionality."""
 
-    def test_session_manager_creation(self):
+    def test_session_manager_creation(self) -> None:
         """Test creating a session manager."""
         manager = WorkspaceSessionManager()
 
@@ -102,7 +102,7 @@ class TestWorkspaceSessionManager:
 
     @patch("mcp_server.sessions.create_sandbox")
     @pytest.mark.asyncio
-    async def test_get_or_create_session_new(self, mock_create_sandbox):
+    async def test_get_or_create_session_new(self, mock_create_sandbox) -> None:
         """Test getting or creating a new session."""
         mock_sandbox = MagicMock()
         mock_sandbox.session_id = "new-sandbox-id"
@@ -122,7 +122,7 @@ class TestWorkspaceSessionManager:
         assert not call_args.kwargs["auto_persist_globals"]
 
     @pytest.mark.asyncio
-    async def test_get_or_create_session_existing(self):
+    async def test_get_or_create_session_existing(self) -> None:
         """Test getting an existing session."""
         manager = WorkspaceSessionManager()
 
@@ -137,7 +137,7 @@ class TestWorkspaceSessionManager:
         assert session == existing_session
 
     @pytest.mark.asyncio
-    async def test_get_or_create_session_expired(self):
+    async def test_get_or_create_session_expired(self) -> None:
         """Test getting an expired session creates a new one."""
         manager = WorkspaceSessionManager()
 
@@ -167,7 +167,7 @@ class TestWorkspaceSessionManager:
 
     @patch("mcp_server.sessions.create_sandbox")
     @pytest.mark.asyncio
-    async def test_create_session_explicit(self, mock_create_sandbox):
+    async def test_create_session_explicit(self, mock_create_sandbox) -> None:
         """Test creating a session explicitly."""
         mock_sandbox = MagicMock()
         mock_sandbox.session_id = "explicit-sandbox-id"
@@ -188,7 +188,7 @@ class TestWorkspaceSessionManager:
         assert not call_args.kwargs["auto_persist_globals"]
 
     @pytest.mark.asyncio
-    async def test_destroy_session_success(self):
+    async def test_destroy_session_success(self) -> None:
         """Test destroying an existing session."""
         manager = WorkspaceSessionManager()
 
@@ -206,7 +206,7 @@ class TestWorkspaceSessionManager:
             mock_delete.assert_called_once_with("sandbox-destroy")
 
     @pytest.mark.asyncio
-    async def test_destroy_session_not_found(self):
+    async def test_destroy_session_not_found(self) -> None:
         """Test destroying a non-existent session."""
         manager = WorkspaceSessionManager()
 
@@ -215,7 +215,7 @@ class TestWorkspaceSessionManager:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_reset_session_success(self):
+    async def test_reset_session_success(self) -> None:
         """Test resetting a session successfully."""
         manager = WorkspaceSessionManager()
 
@@ -247,7 +247,7 @@ class TestWorkspaceSessionManager:
             assert session.imports == []
 
     @pytest.mark.asyncio
-    async def test_reset_session_not_found(self):
+    async def test_reset_session_not_found(self) -> None:
         """Test resetting a non-existent session."""
         manager = WorkspaceSessionManager()
 
@@ -256,7 +256,7 @@ class TestWorkspaceSessionManager:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_get_session_info_success(self):
+    async def test_get_session_info_success(self) -> None:
         """Test getting session info successfully."""
         manager = WorkspaceSessionManager()
 
@@ -284,7 +284,7 @@ class TestWorkspaceSessionManager:
             mock_list_files.assert_called_once_with("sandbox-info")
 
     @pytest.mark.asyncio
-    async def test_get_session_info_not_found(self):
+    async def test_get_session_info_not_found(self) -> None:
         """Test getting info for non-existent session."""
         manager = WorkspaceSessionManager()
 
@@ -293,7 +293,7 @@ class TestWorkspaceSessionManager:
         assert info is None
 
     @pytest.mark.asyncio
-    async def test_cleanup_expired_sessions(self):
+    async def test_cleanup_expired_sessions(self) -> None:
         """Test cleaning up expired sessions."""
         manager = WorkspaceSessionManager()
 
@@ -317,7 +317,7 @@ class TestWorkspaceSessionManager:
         assert "active" in manager._sessions
 
     @pytest.mark.asyncio
-    async def test_start_stop_cleanup_task(self):
+    async def test_start_stop_cleanup_task(self) -> None:
         """Test starting and stopping cleanup task."""
         manager = WorkspaceSessionManager()
 
@@ -335,7 +335,7 @@ class TestSessionManagerIntegration:
     """Test session manager integration with MCP server."""
 
     @pytest.mark.asyncio
-    async def test_server_uses_session_manager(self):
+    async def test_server_uses_session_manager(self) -> None:
         """Test that MCP server properly integrates with session manager."""
         server = create_mcp_server()
 
@@ -344,7 +344,7 @@ class TestSessionManagerIntegration:
         assert isinstance(server.session_manager, WorkspaceSessionManager)
 
     @pytest.mark.asyncio
-    async def test_server_cleanup_on_shutdown(self):
+    async def test_server_cleanup_on_shutdown(self) -> None:
         """Test that server cleans up sessions on shutdown."""
         server = create_mcp_server()
 

@@ -202,7 +202,34 @@ class SandboxResult(BaseModel):
 
     metadata: dict[str, Any] = Field(
         default_factory=dict,
-        description="Additional runtime-specific or execution metadata (e.g., logs_dir, trap_reason, stdout_truncated)",
+        description="""Additional runtime-specific or execution metadata.
+
+        Standard fields:
+        - logs_dir: Path to temporary log directory (if preserve_logs=True)
+        - trap_reason: Wasmtime trap reason (if execution trapped)
+        - stdout_truncated: Whether stdout was truncated (bool)
+        - stderr_truncated: Whether stderr was truncated (bool)
+
+        Error Guidance (optional):
+        - error_guidance: Structured error analysis and actionable solutions
+          {
+            "error_type": str,  # Classified error category (OutOfFuel, PathRestriction, QuickJSTupleDestructuring, etc.)
+            "actionable_guidance": list[str],  # Concrete solution steps
+            "related_docs": list[str],  # Links to relevant documentation sections
+            "code_examples": list[dict] | None  # Optional corrected code snippets with {"before": str, "after": str, "explanation": str}
+          }
+
+        Fuel Budget Analysis (optional):
+        - fuel_analysis: Proactive fuel utilization monitoring and recommendations
+          {
+            "consumed": int,  # Instructions executed
+            "budget": int,  # Total budget allocated
+            "utilization_percent": float,  # Usage percentage (0-100)
+            "status": str,  # "efficient" | "moderate" | "warning" | "critical" | "exhausted"
+            "recommendation": str,  # Text guidance on budget adjustment
+            "likely_causes": list[str]  # Detected patterns (heavy packages, loops, large datasets, etc.)
+          }
+        """,
     )
 
     model_config = {

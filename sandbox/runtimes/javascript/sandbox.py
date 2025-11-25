@@ -442,6 +442,34 @@ class JavaScriptSandbox(BaseSandbox):
         if trap_message is not None:
             metadata["trap_message"] = trap_message
 
+        # Add error guidance if execution failed
+        if exit_code != 0 or trapped:
+            from sandbox.core.error_templates import get_error_guidance
+
+            error_guidance = get_error_guidance(
+                trap_message=trap_message,
+                stderr=raw_result.stderr,
+                language="javascript",
+                fuel_consumed=raw_result.fuel_consumed,
+                fuel_budget=int(self.policy.fuel_budget),
+                memory_used=raw_result.mem_len,
+                memory_limit=int(self.policy.memory_bytes),
+            )
+            if error_guidance:
+                metadata["error_guidance"] = error_guidance
+
+        # Add fuel analysis for all executions
+        if raw_result.fuel_consumed is not None:
+            from sandbox.core.fuel_patterns import analyze_fuel_usage
+
+            fuel_analysis = analyze_fuel_usage(
+                consumed=raw_result.fuel_consumed,
+                budget=int(self.policy.fuel_budget),
+                stderr=raw_result.stderr,
+                is_cached_import=False,  # TODO: Track import caching in session metadata
+            )
+            metadata["fuel_analysis"] = fuel_analysis
+
         # Determine success based on exit code, traps, and stderr contents
         success = self._determine_success(
             exit_code=exit_code, trapped=trapped, stderr=raw_result.stderr

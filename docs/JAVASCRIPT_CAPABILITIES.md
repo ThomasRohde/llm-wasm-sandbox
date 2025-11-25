@@ -1179,6 +1179,193 @@ _state.counter++;
 
 ---
 
+## QuickJS API Patterns & Common Pitfalls
+
+### Critical Patterns for LLM Code Generation
+
+When generating JavaScript code for the sandbox, follow these patterns to avoid common pitfalls:
+
+#### ✅ Pattern 1: Tuple Returns - Don't Destructure Directly
+
+QuickJS functions often return tuples `[value, error]`. Do NOT destructure these directly.
+
+**❌ WRONG:**
+```javascript
+// This will fail with "TypeError: value is not iterable"
+const [stat, err] = os.stat('/app/file.txt');
+```
+
+**✅ RIGHT:**
+```javascript
+// Call function, check truthiness, then access array elements
+const statResult = os.stat('/app/file.txt');
+if (statResult && statResult[1] === 0) {
+    const stat = statResult[0];
+    console.log('File size:', stat.size);
+}
+```
+
+**Why:** QuickJS tuple returns are actual arrays, but JavaScript destructuring expects iterables. Direct destructuring can fail depending on how the function returns data.
+
+#### ✅ Pattern 2: Always Use /app Prefix for File Paths
+
+All file operations MUST use `/app/` prefix due to WASI capability restrictions.
+
+**❌ WRONG:**
+```javascript
+const data = readJson('config.json');  // Permission denied!
+const f = std.open('data.txt', 'r');   // Permission denied!
+```
+
+**✅ RIGHT:**
+```javascript
+const data = readJson('/app/config.json');  // Works
+const f = std.open('/app/data.txt', 'r');   // Works
+```
+
+**Why:** WASI sandbox only grants access to `/app` directory. Relative paths fail.
+
+#### ✅ Pattern 3: Check File Existence Before Operations
+
+**❌ WRONG:**
+```javascript
+// Crashes if file doesn't exist
+const data = readJson('/app/config.json');
+```
+
+**✅ RIGHT:**
+```javascript
+if (fileExists('/app/config.json')) {
+    const data = readJson('/app/config.json');
+    console.log('Config loaded');
+} else {
+    console.log('Config not found, using defaults');
+    const data = { mode: 'default' };
+}
+```
+
+**Why:** Missing files throw errors. Always validate before reading.
+
+#### ✅ Pattern 4: Initialize State Variables Before Use
+
+When using state persistence (`auto_persist_globals=True`), always initialize.
+
+**❌ WRONG:**
+```javascript
+// Crashes on first run if _state.counter doesn't exist
+_state.counter += 1;
+```
+
+**✅ RIGHT:**
+```javascript
+// Initialize with default if undefined
+_state.counter = (_state.counter || 0) + 1;
+
+// OR use explicit check
+if (typeof _state.counter === 'undefined') {
+    _state.counter = 0;
+}
+_state.counter += 1;
+```
+
+**Why:** `_state` starts as empty object `{}`. Accessing undefined properties fails.
+
+#### ✅ Pattern 5: Use Global Helpers Over std/os Modules
+
+For simple file operations, prefer global helpers (auto-injected) over std/os modules.
+
+**🟡 WORKS BUT VERBOSE:**
+```javascript
+import * as std from 'std';
+
+const f = std.open('/app/data.json', 'r');
+const content = f.readAsString();
+f.close();
+const data = JSON.parse(content);
+```
+
+**✅ BETTER:**
+```javascript
+// No import needed, auto-injected helper
+const data = readJson('/app/data.json');
+```
+
+**Why:** Global helpers handle error checking and resource cleanup automatically.
+
+#### ✅ Pattern 6: Error Handling with try/catch
+
+Always wrap file operations in try/catch to handle errors gracefully.
+
+**❌ WRONG:**
+```javascript
+const data = readJson('/app/data.json');
+processData(data);
+```
+
+**✅ RIGHT:**
+```javascript
+try {
+    const data = readJson('/app/data.json');
+    processData(data);
+} catch (e) {
+    console.error('Error reading file:', e.message);
+    // Fallback behavior
+    const data = { default: true };
+    processData(data);
+}
+```
+
+**Why:** File operations can fail (missing file, permission denied, invalid JSON, etc.).
+
+#### ✅ Pattern 7: Vendored Package Loading
+
+Use `requireVendor()` for vendored packages (not Node.js `require()`).
+
+**❌ WRONG:**
+```javascript
+const csv = require('csv-simple');  // ReferenceError!
+```
+
+**✅ RIGHT:**
+```javascript
+const csv = requireVendor('csv-simple');
+const data = csv.parse(csvString);
+```
+
+**Why:** Node.js `require()` doesn't exist in QuickJS. Use sandbox-provided `requireVendor()`.
+
+#### ✅ Pattern 8: Array/Object Iteration
+
+Use standard JavaScript iteration, avoid Node.js-specific patterns.
+
+**✅ CORRECT:**
+```javascript
+// Array iteration
+const numbers = [1, 2, 3, 4, 5];
+numbers.forEach(n => console.log(n));
+
+// Object iteration
+const obj = { a: 1, b: 2, c: 3 };
+Object.keys(obj).forEach(key => {
+    console.log(key, obj[key]);
+});
+
+// Modern array methods work
+const doubled = numbers.map(n => n * 2);
+const evens = numbers.filter(n => n % 2 === 0);
+const sum = numbers.reduce((acc, n) => acc + n, 0);
+```
+
+**❌ AVOID:**
+```javascript
+// Node.js-specific patterns that don't work
+for await (const item of asyncIterator) { }  // No async/await in this build
+```
+
+**Why:** QuickJS supports ES2020+ standard features but not Node.js-specific APIs.
+
+---
+
 ## Security Considerations
 
 ### Filesystem Isolation

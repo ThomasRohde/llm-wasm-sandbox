@@ -9,7 +9,7 @@ from pydantic import ValidationError
 from mcp_server.server import create_mcp_server
 
 
-def parse_tool_result(result):
+def parse_tool_result(result) -> dict[str, object]:
     """Parse FastMCP tool result from JSON content."""
     return json.loads(result.content[0].text)
 
@@ -18,7 +18,7 @@ class TestMCPSecurityBoundaries:
     """Test MCP server security boundaries and isolation."""
 
     @pytest.mark.asyncio
-    async def test_session_isolation_execute_code(self):
+    async def test_session_isolation_execute_code(self) -> None:
         """Test that execute_code cannot access other sessions."""
         server = create_mcp_server()
 
@@ -50,7 +50,7 @@ class TestMCPSecurityBoundaries:
         mock_session2.execute_code = AsyncMock(return_value=mock_result2)
 
         # Mock get_or_create_session to return appropriate session
-        def mock_get_session(language, session_id=None):
+        def mock_get_session(language: str, session_id: str | None = None) -> object:
             if session_id == "session1":
                 return mock_session1
             elif session_id == "session2":
@@ -80,7 +80,7 @@ class TestMCPSecurityBoundaries:
         assert len(session2_calls) > 0
 
     @pytest.mark.asyncio
-    async def test_invalid_session_access_denied(self):
+    async def test_invalid_session_access_denied(self) -> None:
         """Test that accessing non-existent sessions is denied."""
         server = create_mcp_server()
 
@@ -95,7 +95,7 @@ class TestMCPSecurityBoundaries:
         assert parsed["success"] is not None  # Should have some response
 
     @pytest.mark.asyncio
-    async def test_tool_input_validation(self):
+    async def test_tool_input_validation(self) -> None:
         """Test that tools validate their inputs."""
         server = create_mcp_server()
 
@@ -116,7 +116,7 @@ class TestMCPSecurityBoundaries:
         assert parsed["success"] is False
 
     @pytest.mark.asyncio
-    async def test_destroy_session_security(self):
+    async def test_destroy_session_security(self) -> None:
         """Test that destroying sessions requires proper authorization."""
         server = create_mcp_server()
 
@@ -132,7 +132,7 @@ class TestMCPSecurityBoundaries:
         assert parsed["success"] is False
 
     @pytest.mark.asyncio
-    async def test_get_workspace_info_isolation(self):
+    async def test_get_workspace_info_isolation(self) -> None:
         """Test that workspace info is properly isolated per session."""
         server = create_mcp_server()
 
@@ -157,7 +157,7 @@ class TestMCPSecurityBoundaries:
         server.session_manager.get_session_info.assert_called_with("test-session")
 
     @pytest.mark.asyncio
-    async def test_reset_workspace_isolation(self):
+    async def test_reset_workspace_isolation(self) -> None:
         """Test that reset_workspace only affects the specified session."""
         server = create_mcp_server()
 
@@ -176,7 +176,7 @@ class TestMCPSecurityBoundaries:
         server.session_manager.reset_session.assert_called_with("test-session")
 
     @pytest.mark.asyncio
-    async def test_list_runtimes_no_security_implications(self):
+    async def test_list_runtimes_no_security_implications(self) -> None:
         """Test that list_runtimes doesn't expose sensitive information."""
         server = create_mcp_server()
 
@@ -196,7 +196,7 @@ class TestMCPSecurityBoundaries:
             assert "config" not in runtime
 
     @pytest.mark.asyncio
-    async def test_cancel_execution_not_implemented(self):
+    async def test_cancel_execution_not_implemented(self) -> None:
         """Test that cancel_execution properly indicates it's not supported."""
         server = create_mcp_server()
 
@@ -213,7 +213,7 @@ class TestMCPSecurityBoundaries:
 class TestMCPTransportSecurity:
     """Test MCP transport-level security."""
 
-    def test_stdio_transport_no_network_exposure(self):
+    def test_stdio_transport_no_network_exposure(self) -> None:
         """Test that stdio transport doesn't expose network interfaces."""
         from mcp_server.transports import StdioTransportConfig
 
@@ -223,7 +223,7 @@ class TestMCPTransportSecurity:
         assert not hasattr(config, "port")
         assert not hasattr(config, "cors_origins")
 
-    def test_http_transport_has_security_defaults(self):
+    def test_http_transport_has_security_defaults(self) -> None:
         """Test that HTTP transport has secure defaults."""
         from mcp_server.transports import HTTPTransportConfig
 
@@ -250,7 +250,7 @@ class TestMCPResourceLimits:
     """Test MCP server resource limits and abuse prevention."""
 
     @pytest.mark.asyncio
-    async def test_execution_timeout_handling(self):
+    async def test_execution_timeout_handling(self) -> None:
         """Test that executions are properly limited by underlying sandbox."""
         server = create_mcp_server()
 
@@ -276,7 +276,7 @@ class TestMCPResourceLimits:
         assert parsed["success"] is False
 
     @pytest.mark.asyncio
-    async def test_memory_limit_enforcement(self):
+    async def test_memory_limit_enforcement(self) -> None:
         """Test that memory limits are enforced."""
         server = create_mcp_server()
 

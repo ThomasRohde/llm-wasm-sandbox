@@ -1080,6 +1080,72 @@ print(tabulate(top_sales, headers="keys", tablefmt="grid"))
 
 ## Performance Guidelines
 
+### Fuel Budget Reference Table
+
+Quick reference for fuel requirements across different operations and packages. This table helps you set appropriate fuel budgets for your MCP tool calls or sandbox executions.
+
+#### Package Import Fuel Requirements
+
+| Package | First Import | Subsequent Imports (Cached) | Minimum Budget | Recommended Budget |
+|---------|--------------|----------------------------|----------------|-------------------|
+| **Document Processing** |||||
+| openpyxl | 5-7B | <100M | 10B | 10B |
+| PyPDF2 | 5-6B | <100M | 10B | 10B |
+| jinja2 | 4-5B | <100M | 10B | 10B |
+| mammoth | ~2B | <100M | 5B | 5B |
+| odfpy | 2-4B | <100M | 5B | 5B |
+| **Text/Data Processing** |||||
+| tabulate | ~1.4B | <100M | 2B (default) | 5B |
+| markdown | ~1.8B | <100M | 2B (default) | 5B |
+| python-dateutil | ~1.6B | <100M | 2B (default) | 5B |
+| **Utilities** |||||
+| attrs | ~1B | <100M | 2B (default) | 2B (default) |
+| certifi | ~0.5B | <100M | 2B (default) | 2B (default) |
+| charset-normalizer | ~1B | <100M | 2B (default) | 2B (default) |
+| **Standard Library** |||||
+| json, csv, re | <500M | <100M | 2B (default) | 2B (default) |
+| pathlib, os | <500M | <100M | 2B (default) | 2B (default) |
+| datetime, time | <500M | <100M | 2B (default) | 2B (default) |
+
+**Key Insights:**
+- 🔴 **Heavy packages** (openpyxl, PyPDF2, jinja2): Require 10B fuel for first import
+- 🟡 **Medium packages** (tabulate, markdown, dateutil): Work with default 2B but 5B recommended
+- 🟢 **Light packages**: All work fine with default 2B budget
+- ⚡ **Import caching**: Subsequent imports use cached modules (100x faster, <100M fuel)
+- 💡 **Session benefit**: Create session to cache imports permanently across executions
+
+#### MCP Tool Usage Patterns
+
+When using the MCP `execute_code` tool, fuel requirements vary by use case:
+
+| Use Case | Example Code | Fuel Required | Notes |
+|----------|-------------|---------------|-------|
+| **One-off calculation** | `print(2 + 2)` | <100M | Use default session |
+| **File processing (small)** | `data = open('/app/file.txt').read()` | <500M | Use default session |
+| **Heavy package import** | `import openpyxl; wb = Workbook()` | 5-7B | Create session with 10B budget |
+| **Cached import (session)** | `import openpyxl` (2nd+ time) | <100M | Reuse existing session |
+| **Multi-step workflow** | Multiple imports + processing | Variable | Create session, sum individual costs |
+| **Data transformation (1K rows)** | CSV parsing + filtering | 500M-1B | Default OK |
+| **Data transformation (10K+ rows)** | Large dataset processing | 2-5B | Use 5-10B budget |
+
+**Decision Matrix:**
+
+```
+Will you import openpyxl, PyPDF2, or jinja2?
+  ├─ YES → Create session with 10B budget
+  └─ NO → Will you import tabulate, markdown, dateutil?
+          ├─ YES → Create session with 5B budget (recommended)
+          └─ NO → Use default session (2B budget)
+
+Will you process large datasets (>10K rows)?
+  ├─ YES → Create session with 10B budget
+  └─ NO → Use default session
+
+Will you run multiple related executions?
+  ├─ YES → Create session (import caching saves 100x fuel!)
+  └─ NO → Use default session
+```
+
 ### Fuel Budget Benchmarks
 
 Based on testing with default 2B fuel budget:

@@ -73,7 +73,7 @@ class RateLimiter:
         self.config = config or RateLimitConfig()
         self.logger = SandboxLogger("mcp-rate-limiter")
         self.clients: dict[str, ClientState] = {}
-        self._cleanup_task: asyncio.Task | None = None
+        self._cleanup_task: asyncio.Task[None] | None = None
 
     def get_client_key(self, request: Any) -> str:
         """
