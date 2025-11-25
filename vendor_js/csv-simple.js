@@ -85,7 +85,8 @@ function parse(csv, options = {}) {
  * @param {object} options - Stringification options
  * @param {string} options.delimiter - Field delimiter (default: ',')
  * @param {string} options.quote - Quote character (default: '"')
- * @param {Array<string>} options.headers - Custom headers (auto-detected if not provided)
+ * @param {boolean} options.headers - If true, include auto-detected headers; if false, omit headers (default: true for objects)
+ * @param {Array<string>} options.columns - Custom header names (overrides auto-detection)
  * @returns {string} CSV string
  */
 function stringify(data, options = {}) {
@@ -97,17 +98,34 @@ function stringify(data, options = {}) {
     // Determine if data is objects or arrays
     const isObjects = typeof data[0] === 'object' && !Array.isArray(data[0]);
     
+    // Handle headers option:
+    // - options.columns (array): Use these exact header names
+    // - options.headers (boolean true or omitted for objects): Auto-detect from first object keys
+    // - options.headers (boolean false): No header row
     let headers;
-    if (options.headers) {
+    let includeHeaders = true;
+    
+    if (Array.isArray(options.columns)) {
+        // Custom header names provided
+        headers = options.columns;
+    } else if (Array.isArray(options.headers)) {
+        // Backwards compat: headers as array (deprecated, use columns)
         headers = options.headers;
+    } else if (options.headers === false) {
+        // Explicitly disabled headers
+        includeHeaders = false;
+        if (isObjects) {
+            headers = Object.keys(data[0]); // Still need keys for mapping
+        }
     } else if (isObjects) {
+        // Default: auto-detect headers from object keys
         headers = Object.keys(data[0]);
     }
     
     const rows = [];
     
-    // Add header row if dealing with objects
-    if (headers) {
+    // Add header row if dealing with objects and headers are enabled
+    if (headers && includeHeaders) {
         rows.push(headers.map(h => escapeField(h, delimiter, quote)).join(delimiter));
     }
     
