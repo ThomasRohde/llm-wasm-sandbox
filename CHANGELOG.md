@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.4] - 2025-11-25
+
+### Added
+- **Actionable Error Guidance**: Structured error analysis in `SandboxResult.metadata["error_guidance"]`
+  - 6 error types: OutOfFuel, PathRestriction, QuickJSTupleDestructuring, MissingVendoredPackage, MemoryExhausted, InvalidSessionState
+  - Actionable solution steps for each error type
+  - Related documentation links
+  - Code examples for common fixes
+- **Proactive Fuel Analysis**: Budget monitoring in `SandboxResult.metadata["fuel_analysis"]`
+  - 5-tier status classification: efficient, moderate, warning, critical, exhausted
+  - Utilization percentage tracking
+  - Concrete budget recommendations with safety margins
+  - Pattern detection (heavy packages, large datasets)
+- **Enhanced MCP Tool Descriptions**: Detailed tool schemas with usage patterns and pitfalls
+- **New Documentation**:
+  - `docs/ERROR_GUIDANCE.md` - Complete error catalog with solutions
+  - `docs/FUEL_BUDGETING.md` - Comprehensive fuel budget planning guide
+
+### Changed
+- Improved error messages with context-aware guidance
+- MCP server responses now include structured error guidance and fuel analysis
+
+### Removed
+- Deprecated `HARDENING.md` and `JAVASCRIPT.md` PRD files (implementation complete)
+
 ## [0.2.0] - 2025-11-24
 
 ### Fixed
@@ -93,5 +118,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Code coverage reporting
 - Performance benchmarking tools
 
+[0.3.4]: https://github.com/ThomasRohde/llm-wasm-sandbox/releases/tag/v0.3.4
 [0.2.0]: https://github.com/ThomasRohde/llm-wasm-sandbox/releases/tag/v0.2.0
 [0.1.0]: https://github.com/ThomasRohde/llm-wasm-sandbox/releases/tag/v0.1.0

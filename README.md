@@ -48,6 +48,8 @@ Execute untrusted code safely using WebAssembly sandboxing with multi-layered se
 - **🎯 Type-Safe API**: Pydantic models for policies and results
 - **🔍 Structured Logging**: Observable execution events for monitoring
 - **🧹 Session Pruning**: Automatic cleanup of old sessions with configurable retention policies
+- **💡 Actionable Error Guidance**: Structured error analysis with concrete solutions for common failures
+- **📈 Proactive Fuel Analysis**: Automatic budget monitoring with recommendations to prevent OutOfFuel errors
 
 ![LLM WASM Sandbox Architecture](https://raw.githubusercontent.com/ThomasRohde/llm-wasm-sandbox/main/llm-wasm-sandbox.jpeg)
 
@@ -231,20 +233,25 @@ def execute_llm_code(llm_generated_code: str) -> dict:
     sandbox = create_sandbox(runtime=RuntimeType.PYTHON, policy=policy)
     result = sandbox.execute(llm_generated_code)
     
-    # Provide structured feedback for LLM
+    # Use structured error guidance for actionable feedback
     if not result.success:
+        error_guidance = result.metadata.get("error_guidance", {})
         return {
             "status": "error",
             "feedback": f"Execution failed: {result.stderr}",
-            "suggestion": "Simplify the code and avoid complex operations"
+            "error_type": error_guidance.get("error_type", "Unknown"),
+            "solutions": error_guidance.get("actionable_guidance", []),
+            "related_docs": error_guidance.get("related_docs", [])
         }
     
-    if result.fuel_consumed > 400_000_000:
+    # Use fuel analysis for proactive budget recommendations
+    fuel_analysis = result.metadata.get("fuel_analysis", {})
+    if fuel_analysis.get("status") in ("warning", "critical"):
         return {
             "status": "warning",
-            "feedback": "Code complexity too high",
+            "feedback": fuel_analysis.get("recommendation", "Code complexity high"),
             "fuel_used": result.fuel_consumed,
-            "suggestion": "Optimize algorithm for better efficiency"
+            "suggested_budget": fuel_analysis.get("suggested_budget")
         }
     
     return {
@@ -262,6 +269,44 @@ code = generate_code_from_llm("Calculate fibonacci(10)")
 feedback = execute_llm_code(code)
 print(feedback)
 ```
+
+### Error Guidance & Fuel Analysis
+
+The sandbox automatically provides structured error analysis and fuel budget recommendations:
+
+**Error Guidance** (`result.metadata["error_guidance"]`):
+```python
+# When execution fails, get actionable solutions
+result = sandbox.execute("import nonexistent_package")
+
+if "error_guidance" in result.metadata:
+    guidance = result.metadata["error_guidance"]
+    print(f"Error Type: {guidance['error_type']}")  # e.g., "MissingVendoredPackage"
+    for solution in guidance["actionable_guidance"]:
+        print(f"  - {solution}")
+    # Output: 
+    #   - Add: import sys; sys.path.insert(0, '/data/site-packages')
+    #   - Then import vendored packages normally
+```
+
+**Fuel Analysis** (`result.metadata["fuel_analysis"]`):
+```python
+# Monitor fuel usage to prevent OutOfFuel errors
+result = sandbox.execute("import openpyxl; wb = openpyxl.Workbook()")
+
+analysis = result.metadata.get("fuel_analysis", {})
+print(f"Status: {analysis['status']}")           # efficient/moderate/warning/critical
+print(f"Utilization: {analysis['utilization_percent']:.1f}%")
+print(f"Recommendation: {analysis['recommendation']}")
+# Output:
+#   Status: warning
+#   Utilization: 82.5%
+#   Recommendation: Consider increasing fuel budget to 15B for similar workloads
+```
+
+For detailed error types and fuel planning, see:
+- [`docs/ERROR_GUIDANCE.md`](docs/ERROR_GUIDANCE.md) - Complete error catalog with solutions
+- [`docs/FUEL_BUDGETING.md`](docs/FUEL_BUDGETING.md) - Fuel budget planning guide
 
 ### Multi-Turn Sessions
 
@@ -596,8 +641,9 @@ MCP inherits all sandbox security:
 
 ### Examples & Documentation
 
-- **Quick Start**: [`docs/MCP_QUICKSTART.md`](docs/MCP_QUICKSTART.md) - Get started in 5 minutes
 - **Full Documentation**: [`docs/MCP_INTEGRATION.md`](docs/MCP_INTEGRATION.md) - Complete reference
+- **Error Guidance**: [`docs/ERROR_GUIDANCE.md`](docs/ERROR_GUIDANCE.md) - Actionable solutions for common errors
+- **Fuel Budgeting**: [`docs/FUEL_BUDGETING.md`](docs/FUEL_BUDGETING.md) - Planning fuel budgets for heavy packages
 - **Main MCP Server**: `examples/llm_wasm_mcp.py` - Promiscuous security (production-ready)
 - **Alternative with Filters**: `examples/mcp_stdio_example.py` - Standard security validation
 - **HTTP Example**: `examples/mcp_http_example.py`
