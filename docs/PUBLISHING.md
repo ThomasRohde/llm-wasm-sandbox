@@ -4,6 +4,49 @@ This document provides step-by-step instructions for publishing the `llm-wasm-sa
 
 > **Note**: This project uses `uv` for all packaging operations. The traditional `twine` workflow is no longer used.
 
+---
+
+## Quick Reference
+
+### One-Command Publish
+
+```powershell
+# Test PyPI first (recommended)
+.\scripts\publish.ps1 testpypi
+
+# Production PyPI
+.\scripts\publish.ps1 pypi
+```
+
+### Manual Quick Workflow
+
+```powershell
+# 1. Ensure WASM binaries exist
+.\scripts\fetch_wlr_python.ps1
+.\scripts\fetch_quickjs.ps1
+
+# 2. Run tests
+uv run pytest tests/ -v
+
+# 3. Build package  
+Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue
+uv build --no-sources
+
+# 4. Publish
+uv publish --index testpypi    # Test first
+uv publish                      # Production
+```
+
+### Version Bumping
+
+```powershell
+uv version --bump patch   # 0.1.0 -> 0.1.1
+uv version --bump minor   # 0.1.0 -> 0.2.0
+uv version --bump major   # 0.1.0 -> 1.0.0
+```
+
+---
+
 ## Pre-Release Checklist
 
 - [x] All tests passing (`uv run pytest tests/ -v`)

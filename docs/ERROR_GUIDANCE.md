@@ -155,8 +155,7 @@ const data = readJson("config.json")  // Helper adds /app prefix
         "See docs/JAVASCRIPT_CAPABILITIES.md for API patterns"
     ],
     "related_docs": [
-        "docs/JAVASCRIPT_CAPABILITIES.md#quickjs-api-patterns",
-        "docs/JS_AUGMENT.md#helper-functions"
+        "docs/JAVASCRIPT_CAPABILITIES.md#quickjs-api-patterns"
     ],
     "code_examples": [
         "// ❌ BAD: Direct assignment",
@@ -359,7 +358,7 @@ sandbox = create_sandbox(runtime=RuntimeType.PYTHON, policy=policy)
         "Convert to dict or disable auto_persist_globals"
     ],
     "related_docs": [
-        "docs/JAVASCRIPT_STATE_PERSISTENCE.md",
+        "docs/JAVASCRIPT_CAPABILITIES.md#state-persistence",
         "docs/MCP_INTEGRATION.md#session-management"
     ]
 }

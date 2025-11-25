@@ -1550,11 +1550,11 @@ writeJson('/app/shared.json', { status: 'done' });
 
 ## See Also
 
-- [JAVASCRIPT.md](../JAVASCRIPT.md) - JavaScript runtime overview and design
 - [README.md](../README.md) - Main project documentation
 - [PYTHON_CAPABILITIES.md](PYTHON_CAPABILITIES.md) - Python runtime capabilities
-- [LLM_PROMPT_TEMPLATES.md](LLM_PROMPT_TEMPLATES.md) - Effective prompting patterns
 - [MCP_INTEGRATION.md](MCP_INTEGRATION.md) - Model Context Protocol integration
+- [FUEL_BUDGETING.md](FUEL_BUDGETING.md) - Fuel budget planning
+- [ERROR_GUIDANCE.md](ERROR_GUIDANCE.md) - Error troubleshooting
 
 ---
 

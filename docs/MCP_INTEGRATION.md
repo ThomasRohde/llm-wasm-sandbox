@@ -13,6 +13,23 @@ The Model Context Protocol (MCP) is an emerging standard for tool use in AI appl
 
 The sandbox provides MCP server functionality that exposes secure code execution capabilities to MCP clients.
 
+---
+
+## Development vs Production
+
+### Quick Answer
+
+| Environment | Command | When to Use |
+|-------------|---------|-------------|
+| **Development** | `.\scripts\run-mcp-dev.ps1` | Local development (easiest) |
+| **Development** | `uv run python -m mcp_server` | Local development (direct) |
+| **Production** | `llm-wasm-mcp` | After `pip install llm-wasm-sandbox` |
+| **Production** | `python -m mcp_server` | After `pip install` (alternative) |
+
+The `llm-wasm-mcp` console script is only available **after the package is installed** via `pip install`. In development, use `uv run python -m mcp_server`.
+
+---
+
 ## Quick Start
 
 ### Prerequisites
@@ -876,3 +893,63 @@ When adding new MCP tools:
 - [Model Context Protocol Specification](https://modelcontextprotocol.io/specification)
 - [FastMCP Documentation](https://fastmcp.com/)
 - [Claude Desktop MCP Guide](https://docs.anthropic.com/claude/docs/desktop-mcp)
+
+---
+
+## JavaScript Runtime via MCP
+
+All JavaScript features documented for the Python API are fully functional via MCP:
+
+- ✅ `std` module (file I/O with `std.open()`, `std.loadFile()`, etc.)
+- ✅ `os` module (environment variables, file stats, directory operations)
+- ✅ `requireVendor()` function for loading vendored packages
+- ✅ Helper functions (`readJson`, `writeJson`, `readText`, `listFiles`, etc.)
+- ✅ `_state` object for automatic state persistence (requires `auto_persist_globals=True`)
+
+### JavaScript Usage Patterns
+
+**One-Shot Execution (no session):**
+```javascript
+const data = {message: "Hello, MCP!"};
+writeJson('/app/output.json', data);
+const result = readJson('/app/output.json');
+console.log("Data:", JSON.stringify(result));
+```
+
+**Persistent Session with State:**
+```json
+// Step 1: Create session with auto_persist_globals
+{"tool": "create_session", "arguments": {"language": "javascript", "auto_persist_globals": true}}
+
+// Step 2: Use _state object
+{"tool": "execute_code", "arguments": {"code": "_state.counter = (_state.counter || 0) + 1; console.log(_state.counter);"}}
+```
+
+**Using Vendored Packages:**
+```javascript
+const csv = requireVendor('csv');
+const data = csv.parse("name,age\nAlice,30\nBob,25");
+console.log(JSON.stringify(data));
+```
+
+### JavaScript Pitfalls
+
+| Pitfall | Problem | Fix |
+|---------|---------|-----|
+| Missing `_state` | `ReferenceError: _state is not defined` | Create session with `auto_persist_globals: true` |
+| Node.js APIs | `require('fs')` not available | Use QuickJS `std`/`os` modules |
+| No session reuse | State lost between calls | Pass `session_id` to all `execute_code` calls |
+
+### Feature Parity
+
+| Feature | Python API | MCP Server |
+|---------|-----------|-----------|
+| std module | ✅ | ✅ |
+| os module | ✅ | ✅ |
+| requireVendor() | ✅ | ✅ |
+| Helper functions | ✅ | ✅ |
+| _state persistence | ✅ | ✅ |
+| Vendored packages | ✅ | ✅ |
+| Session reuse | ✅ | ✅ |
+
+See [JAVASCRIPT_CAPABILITIES.md](./JAVASCRIPT_CAPABILITIES.md) for complete JavaScript runtime documentation.

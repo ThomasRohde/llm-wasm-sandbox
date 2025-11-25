@@ -1320,6 +1320,6 @@ A: Some packages (like urllib3) require networking which is not available in WAS
 ## See Also
 
 - [README.md](../README.md) - Main project documentation
-- [LLM_PROMPT_TEMPLATES.md](LLM_PROMPT_TEMPLATES.md) - Effective prompting patterns
-- [WASM_SANDBOX.md](WASM_SANDBOX.md) - Security architecture details
-- [ADDING_NEW_RUNTIMES.md](ADDING_NEW_RUNTIMES.md) - Extend to other languages
+- [MCP_INTEGRATION.md](MCP_INTEGRATION.md) - MCP server integration guide
+- [FUEL_BUDGETING.md](FUEL_BUDGETING.md) - Fuel budget planning
+- [ERROR_GUIDANCE.md](ERROR_GUIDANCE.md) - Error troubleshooting
