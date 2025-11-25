@@ -1,0 +1,472 @@
+# LLM WASM Sandbox - Library Usage Guide for AI Coding Agents
+
+> This document is for AI coding agents (like GitHub Copilot) to understand how to use
+> the `sandbox` module/library for secure code execution. This is NOT about the MCP server.
+
+## Overview
+
+The `sandbox` module provides a production-grade security sandbox for executing untrusted
+Python and JavaScript code using WebAssembly (WASM) with the Wasmtime runtime. It implements
+multi-layered defense: WASM memory safety, WASI capability-based I/O, fuel-based CPU limits,
+and memory caps.
+
+**Package name**: `llm-wasm-sandbox` (PyPI) / import as `sandbox`
+
+## Quick Start
+
+### Basic Execution
+
+```python
+from sandbox import create_sandbox, RuntimeType
+
+# Python execution (default)
+sandbox = create_sandbox(runtime=RuntimeType.PYTHON)
+result = sandbox.execute("print('Hello from WASM!')")
+print(result.stdout)  # "Hello from WASM!\n"
+print(result.success)  # True
+
+# JavaScript execution
+sandbox = create_sandbox(runtime=RuntimeType.JAVASCRIPT)
+result = sandbox.execute("console.log('Hello from QuickJS!')")
+print(result.stdout)  # "Hello from QuickJS!\n"
+```
+
+### With Custom Resource Limits
+
+```python
+from sandbox import create_sandbox, ExecutionPolicy, RuntimeType
+
+policy = ExecutionPolicy(
+    fuel_budget=1_000_000_000,      # WASM instruction limit (default: 5B)
+    memory_bytes=64 * 1024 * 1024,  # Linear memory cap in bytes (default: 128MB)
+    stdout_max_bytes=100_000,       # Stdout capture limit (default: 2MB)
+    stderr_max_bytes=50_000,        # Stderr capture limit (default: 1MB)
+)
+
+sandbox = create_sandbox(runtime=RuntimeType.PYTHON, policy=policy)
+result = sandbox.execute("print('limited execution')")
+```
+
+## Core API
+
+### Factory Function
+
+```python
+def create_sandbox(
+    runtime: RuntimeType = RuntimeType.PYTHON,
+    policy: ExecutionPolicy | None = None,
+    session_id: str | None = None,
+    workspace_root: Path | None = None,
+    storage_adapter: StorageAdapter | None = None,
+    logger: SandboxLogger | None = None,
+    allow_non_uuid: bool = True,
+    auto_persist_globals: bool = False,
+    **kwargs,
+) -> BaseSandbox
+```
+
+**Parameters:**
+- `runtime`: `RuntimeType.PYTHON` or `RuntimeType.JAVASCRIPT`
+- `policy`: `ExecutionPolicy` with resource limits (None = defaults)
+- `session_id`: UUIDv4 string or custom ID (None = auto-generate)
+- `workspace_root`: Root directory for sessions (default: `Path("workspace")`)
+- `storage_adapter`: Custom storage backend (default: `DiskStorageAdapter`)
+- `auto_persist_globals`: If True, automatically save/restore globals between executions
+
+**Returns:** `PythonSandbox` or `JavaScriptSandbox` instance
+
+### ExecutionPolicy Model
+
+```python
+from sandbox import ExecutionPolicy
+
+policy = ExecutionPolicy(
+    fuel_budget=5_000_000_000,      # WASM instruction limit (default: 5B)
+    memory_bytes=128_000_000,       # Linear memory cap (default: 128MB)
+    stdout_max_bytes=2_000_000,     # Stdout limit (default: 2MB)
+    stderr_max_bytes=1_000_000,     # Stderr limit (default: 1MB)
+    timeout_seconds=None,           # OS-level timeout (None = no timeout)
+    preserve_logs=False,            # Keep temp log files after execution
+)
+```
+
+### SandboxResult Model
+
+The `execute()` method returns a `SandboxResult` with these fields:
+
+```python
+result = sandbox.execute("print('test')")
+
+# Core fields
+result.success          # bool: Execution completed without errors
+result.stdout           # str: Captured stdout
+result.stderr           # str: Captured stderr
+result.exit_code        # int: Guest process exit code (0 = success)
+
+# Metrics
+result.fuel_consumed    # int | None: WASM instructions executed
+result.memory_used_bytes # int: Peak memory usage
+result.duration_ms      # float: Wall-clock time in milliseconds
+
+# File tracking
+result.files_created    # list[str]: New files in workspace (relative paths)
+result.files_modified   # list[str]: Modified files (relative paths)
+result.workspace_path   # str: Absolute path to session workspace
+
+# Metadata (dict with runtime-specific info)
+result.metadata["session_id"]        # str: Session identifier
+result.metadata["trapped"]           # bool: If execution hit a WASM trap
+result.metadata["trap_reason"]       # str | None: e.g., "out_of_fuel"
+result.metadata["fuel_analysis"]     # dict: Fuel usage analysis
+result.metadata["error_guidance"]    # dict: Actionable error solutions (if failed)
+```
+
+## Session Management
+
+### Automatic Session IDs
+
+```python
+from sandbox import create_sandbox, RuntimeType
+
+# Auto-generates UUIDv4 session ID
+sandbox = create_sandbox(runtime=RuntimeType.PYTHON)
+print(sandbox.session_id)  # e.g., "550e8400-e29b-41d4-a716-446655440000"
+```
+
+### Resume Existing Session
+
+```python
+# First execution
+sandbox1 = create_sandbox(runtime=RuntimeType.PYTHON)
+session_id = sandbox1.session_id
+sandbox1.execute("with open('/app/data.txt', 'w') as f: f.write('hello')")
+
+# Later: resume same session
+sandbox2 = create_sandbox(session_id=session_id, runtime=RuntimeType.PYTHON)
+result = sandbox2.execute("print(open('/app/data.txt').read())")
+print(result.stdout)  # "hello\n"
+```
+
+### Automatic Global Variable Persistence
+
+For stateful multi-turn workflows without manual file I/O:
+
+```python
+from sandbox import create_sandbox, RuntimeType
+
+# Python: auto_persist_globals saves/restores all serializable globals
+sandbox = create_sandbox(runtime=RuntimeType.PYTHON, auto_persist_globals=True)
+
+sandbox.execute("counter = 0; data = []")
+sandbox.execute("counter += 1; data.append('item'); print(counter, data)")
+# Output: 1 ['item']
+
+# JavaScript: use _state object for persistence
+sandbox = create_sandbox(runtime=RuntimeType.JAVASCRIPT, auto_persist_globals=True)
+
+sandbox.execute("_state.counter = (_state.counter || 0) + 1; console.log(_state.counter);")
+# Output: 1
+sandbox.execute("_state.counter = (_state.counter || 0) + 1; console.log(_state.counter);")
+# Output: 2
+```
+
+### Session File Operations
+
+```python
+from sandbox import (
+    write_session_file, read_session_file, list_session_files,
+    delete_session_path, delete_session_workspace
+)
+
+session_id = sandbox.session_id
+
+# Write file to session from host
+write_session_file(session_id, "input.csv", b"name,age\nAlice,30")
+
+# List all files in session workspace
+files = list_session_files(session_id)  # ['input.csv', 'user_code.py']
+
+# Read file content
+data = read_session_file(session_id, "input.csv")
+print(data.decode('utf-8'))
+
+# Delete specific file
+delete_session_path(session_id, "input.csv")
+
+# Delete entire session workspace
+delete_session_workspace(session_id)
+```
+
+### Session Pruning
+
+```python
+from sandbox import prune_sessions
+
+# Delete sessions inactive for more than 24 hours
+result = prune_sessions(older_than_hours=24.0)
+print(f"Deleted {len(result.deleted_sessions)} sessions")
+print(f"Reclaimed {result.reclaimed_bytes} bytes")
+
+# Dry run (no actual deletions)
+result = prune_sessions(older_than_hours=24.0, dry_run=True)
+```
+
+## File System Access in Guest Code
+
+Guest code runs in an isolated WASI environment with:
+- `/app` → session workspace (read/write)
+- `/data/site-packages` → vendored Python packages (read-only, Python only)
+- `/data_js` → vendored JavaScript utilities (read-only, JavaScript only)
+
+### Python File Operations
+
+```python
+code = """
+# Write to workspace
+with open('/app/output.txt', 'w') as f:
+    f.write('Hello from sandbox')
+
+# Read from workspace
+with open('/app/output.txt', 'r') as f:
+    print(f.read())
+"""
+sandbox.execute(code)
+```
+
+### JavaScript File Operations
+
+```javascript
+// Using injected global helpers
+writeText('/app/output.txt', 'Hello from sandbox');
+const content = readText('/app/output.txt');
+console.log(content);
+
+// JSON helpers
+writeJson('/app/data.json', { key: 'value' });
+const data = readJson('/app/data.json');
+
+// Or using QuickJS std module directly
+const f = std.open('/app/file.txt', 'w');
+f.puts('content');
+f.close();
+```
+
+## Using Vendored Packages
+
+### Python Packages
+
+Vendored packages are auto-mounted at `/data/site-packages`. The sandbox automatically
+injects `sys.path.insert(0, '/data/site-packages')` so imports work directly:
+
+```python
+# These imports work automatically
+import openpyxl
+from tabulate import tabulate
+import PyPDF2
+import mammoth
+import markdown
+from jinja2 import Template
+```
+
+**Available vendored packages:**
+- Document processing: `openpyxl`, `XlsxWriter`, `PyPDF2`, `mammoth`, `odfpy`
+- Text/data: `tabulate`, `markdown`, `jinja2`, `MarkupSafe`
+- Date/time: `python-dateutil`
+- Data modeling: `attrs`
+- Utilities: `certifi`, `charset-normalizer`, `idna`, `urllib3`, `six`, `tomli`
+
+### JavaScript Utilities
+
+Vendored utilities are available via `requireVendor()`:
+
+```javascript
+// Load vendored package
+const csv = requireVendor('csv-simple');
+
+// Global helpers are auto-injected:
+// readJson(), writeJson(), readText(), writeText(),
+// fileExists(), listFiles(), copyFile(), removeFile()
+```
+
+## Error Handling
+
+### Check Execution Success
+
+```python
+result = sandbox.execute(code)
+
+if not result.success:
+    print(f"Execution failed: {result.stderr}")
+    
+    # Get structured error guidance
+    if "error_guidance" in result.metadata:
+        guidance = result.metadata["error_guidance"]
+        print(f"Error type: {guidance['error_type']}")
+        for solution in guidance["actionable_guidance"]:
+            print(f"  - {solution}")
+```
+
+### Handle Fuel Exhaustion
+
+```python
+result = sandbox.execute("while True: pass")  # Infinite loop
+
+if result.metadata.get("trapped"):
+    reason = result.metadata.get("trap_reason")
+    if reason == "out_of_fuel":
+        print("Code exceeded instruction limit")
+```
+
+### Fuel Analysis
+
+```python
+result = sandbox.execute("import openpyxl; wb = openpyxl.Workbook()")
+
+if "fuel_analysis" in result.metadata:
+    analysis = result.metadata["fuel_analysis"]
+    print(f"Status: {analysis['status']}")  # efficient/moderate/warning/critical
+    print(f"Utilization: {analysis['utilization_percent']:.1f}%")
+    print(f"Recommendation: {analysis['recommendation']}")
+```
+
+## Exceptions
+
+```python
+from sandbox import PolicyValidationError, SandboxExecutionError
+
+try:
+    # Invalid policy raises PolicyValidationError
+    policy = ExecutionPolicy(fuel_budget=-1)
+except PolicyValidationError as e:
+    print(f"Invalid policy: {e}")
+
+try:
+    # Runtime errors raise SandboxExecutionError
+    sandbox = create_sandbox()
+    # (rarely thrown - most errors captured in SandboxResult)
+except SandboxExecutionError as e:
+    print(f"Sandbox error: {e}")
+```
+
+## Fuel Budget Guidelines
+
+| Package / Operation | First Import Fuel | Notes |
+|---------------------|-------------------|-------|
+| Standard library (json, csv, re, os) | <10M | ✅ Default budget (5B) |
+| tabulate | ~1.4B | ✅ Default budget |
+| markdown | ~1.8B | ✅ Default budget |
+| python-dateutil | ~800M | ✅ Default budget |
+| jinja2 + MarkupSafe | ~4-5B | ⚠️ Close to default |
+| openpyxl | ~5-7B | ⚠️ Increase to 10B+ |
+| PyPDF2 | ~5-6B | ⚠️ Increase to 10B+ |
+
+**Recommendation:** For document processing (openpyxl, PyPDF2), use:
+```python
+policy = ExecutionPolicy(fuel_budget=10_000_000_000)  # 10B
+```
+
+## Typical LLM Integration Pattern
+
+```python
+from sandbox import create_sandbox, ExecutionPolicy, RuntimeType
+
+def execute_llm_code(llm_generated_code: str) -> dict:
+    """Execute LLM-generated code with safety boundaries."""
+    
+    policy = ExecutionPolicy(
+        fuel_budget=500_000_000,        # Conservative for untrusted code
+        memory_bytes=32 * 1024 * 1024,  # 32 MB
+        stdout_max_bytes=100_000        # 100 KB
+    )
+    
+    sandbox = create_sandbox(runtime=RuntimeType.PYTHON, policy=policy)
+    result = sandbox.execute(llm_generated_code)
+    
+    if not result.success:
+        error_guidance = result.metadata.get("error_guidance", {})
+        return {
+            "status": "error",
+            "feedback": f"Execution failed: {result.stderr}",
+            "solutions": error_guidance.get("actionable_guidance", [])
+        }
+    
+    fuel_analysis = result.metadata.get("fuel_analysis", {})
+    if fuel_analysis.get("status") in ("warning", "critical"):
+        return {
+            "status": "warning",
+            "output": result.stdout,
+            "feedback": fuel_analysis.get("recommendation")
+        }
+    
+    return {
+        "status": "success",
+        "output": result.stdout,
+        "metrics": {
+            "fuel_consumed": result.fuel_consumed,
+            "duration_ms": result.duration_ms
+        }
+    }
+```
+
+## Complete Import Reference
+
+```python
+# Core API
+from sandbox import create_sandbox, RuntimeType
+
+# Policy and result types
+from sandbox import ExecutionPolicy, SandboxResult
+
+# Session management
+from sandbox import (
+    write_session_file,
+    read_session_file,
+    list_session_files,
+    delete_session_path,
+    delete_session_workspace,
+    prune_sessions,
+    PruneResult,
+    SessionMetadata,
+)
+
+# Exceptions
+from sandbox import PolicyValidationError, SandboxExecutionError
+
+# Advanced: Storage adapters
+from sandbox import StorageAdapter, DiskStorageAdapter, StorageBackend
+
+# Advanced: Logging
+from sandbox import SandboxLogger
+
+# Advanced: State persistence utilities
+from sandbox import (
+    wrap_stateful_code,
+    save_state_code,
+    load_state_code,
+    create_state_helpers,
+    is_serializable,
+    filter_serializable_globals,
+)
+
+# Advanced: Runtime implementations (usually use factory instead)
+from sandbox import BaseSandbox, PythonSandbox
+```
+
+## Security Guarantees
+
+1. **Memory Safety**: WASM bounds-checked linear memory prevents buffer overflows
+2. **Filesystem Isolation**: WASI preopens restrict access to `/app` only
+3. **CPU Limits**: Fuel metering prevents infinite loops (configurable budget)
+4. **Memory Limits**: Linear memory cap prevents memory exhaustion
+5. **No Networking**: WASI baseline has no socket capabilities
+6. **No Subprocesses**: Cannot spawn child processes
+7. **Environment Isolation**: Only whitelisted env vars exposed
+
+## Key Limitations
+
+1. **No pip install**: Use pre-vendored packages only
+2. **Pure-Python packages only**: C extensions not supported in WASM
+3. **No networking**: HTTP requests not possible
+4. **Fuel limits on imports**: Heavy packages (openpyxl, PyPDF2) need 10B+ fuel budget
+5. **Single-threaded**: WASM guest is single-threaded
+6. **Blocking host calls**: Fuel cannot preempt sleep/blocking I/O
