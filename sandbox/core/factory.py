@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any
 from sandbox.core.logging import SandboxLogger
 from sandbox.core.models import ExecutionPolicy, RuntimeType
 from sandbox.core.storage import DiskStorageAdapter
-from sandbox.runtime_paths import get_python_wasm_path, get_quickjs_wasm_path
+from sandbox.runtime_paths import get_python_wasm_path, get_quickjs_wasm_path, get_vendor_js_path
 from sandbox.sessions import _validate_session_workspace
 
 if TYPE_CHECKING:
@@ -153,16 +153,23 @@ def create_sandbox(
                     break
         # For JavaScript runtime, look for vendor_js directory
         elif runtime == RuntimeType.JAVASCRIPT:
-            vendor_js_candidates = [
-                storage_adapter.workspace_root.parent / "vendor_js",  # Standard location
-                Path("vendor_js"),  # Fallback to project root
-            ]
-            for candidate in vendor_js_candidates:
-                if candidate.exists() and candidate.is_dir():
-                    # Configure policy to mount vendor_js as read-only at /data_js
-                    policy.mount_data_dir = str(candidate.resolve())
-                    policy.guest_data_path = "/data_js"
-                    break
+            # First try the bundled path (works for both installed and development)
+            vendor_js_path = get_vendor_js_path()
+            if vendor_js_path is not None:
+                policy.mount_data_dir = str(vendor_js_path.resolve())
+                policy.guest_data_path = "/data_js"
+            else:
+                # Fallback: try old search pattern for backward compatibility
+                vendor_js_candidates = [
+                    storage_adapter.workspace_root.parent / "vendor_js",  # Standard location
+                    Path("vendor_js"),  # Fallback to project root
+                ]
+                for candidate in vendor_js_candidates:
+                    if candidate.exists() and candidate.is_dir():
+                        # Configure policy to mount vendor_js as read-only at /data_js
+                        policy.mount_data_dir = str(candidate.resolve())
+                        policy.guest_data_path = "/data_js"
+                        break
 
     # Create session via storage adapter
     if not storage_adapter.session_exists(session_id):

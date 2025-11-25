@@ -101,3 +101,45 @@ def get_quickjs_wasm_path() -> Path:
         FileNotFoundError: If quickjs.wasm cannot be found
     """
     return get_bundled_binary_path("quickjs.wasm")
+
+
+def get_vendor_js_path() -> Path | None:
+    """Get path to bundled JavaScript vendor packages directory.
+
+    Returns the path to the vendor_js directory containing JavaScript packages
+    like sandbox-utils.js, csv-simple.js, etc.
+
+    Returns:
+        Path to vendor_js directory, or None if not found
+
+    Examples:
+        >>> path = get_vendor_js_path()
+        >>> print(path)
+        PosixPath('/usr/local/lib/python3.11/site-packages/vendor_js')
+    """
+    # Strategy 1: Look in package installation directory (PyPI install)
+    package_dir = Path(__file__).parent.parent  # sandbox/ -> project root
+    bundled_path = package_dir / "vendor_js"
+
+    if bundled_path.is_dir():
+        return bundled_path
+
+    # Strategy 2: Look in project vendor_js/ relative to package (development)
+    project_vendor = Path("vendor_js")
+    if project_vendor.is_dir():
+        return project_vendor.resolve()
+
+    # Strategy 3: Look relative to current working directory (backward compat)
+    cwd_vendor = Path.cwd() / "vendor_js"
+    if cwd_vendor.is_dir():
+        return cwd_vendor
+
+    # Strategy 4: Check if running from site-packages (installed package)
+    if "site-packages" in str(Path(__file__)):
+        site_packages = Path(__file__).parent.parent.parent
+        site_vendor = site_packages / "vendor_js"
+        if site_vendor.is_dir():
+            return site_vendor
+
+    # Return None if not found (JavaScript runtime will work without vendor packages)
+    return None
