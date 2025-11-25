@@ -39,7 +39,9 @@ class TestIntegrationE2E:
         assert len(error_guidance["actionable_guidance"]) > 0
         # Check that guidance mentions the error (case insensitive)
         guidance_text = " ".join(error_guidance["actionable_guidance"]).lower()
-        assert "fuel" in guidance_text or "budget" in guidance_text or "instruction" in guidance_text
+        assert (
+            "fuel" in guidance_text or "budget" in guidance_text or "instruction" in guidance_text
+        )
         assert len(error_guidance["related_docs"]) > 0
 
         # Verify fuel analysis present
@@ -134,12 +136,21 @@ print("Success")
         # Should detect heavy package or high usage in likely_causes or recommendation
         # Package detection may vary, so check recommendation for package-specific or high usage mention
         recommendation_text = fuel_analysis["recommendation"].lower()
-        causes_text = " ".join(fuel_analysis["likely_causes"]).lower() if fuel_analysis["likely_causes"] else ""
+        causes_text = (
+            " ".join(fuel_analysis["likely_causes"]).lower()
+            if fuel_analysis["likely_causes"]
+            else ""
+        )
         combined_text = recommendation_text + " " + causes_text
         # Either mentions openpyxl/package OR mentions high usage/computation/dataset
-        assert ("openpyxl" in combined_text or "package" in combined_text or 
-                "high" in combined_text or "heavy" in combined_text or 
-                "dataset" in combined_text or "computation" in combined_text)
+        assert (
+            "openpyxl" in combined_text
+            or "package" in combined_text
+            or "high" in combined_text
+            or "heavy" in combined_text
+            or "dataset" in combined_text
+            or "computation" in combined_text
+        )
 
     def test_efficient_execution_fuel_analysis(self):
         """Test efficient execution generates positive fuel analysis."""
@@ -160,8 +171,12 @@ print("Success")
         assert fuel_analysis["status"] == "efficient"
         # For efficient usage, recommendation should indicate it's appropriate or be empty
         recommendation = fuel_analysis["recommendation"].lower()
-        assert ("appropriate" in recommendation or "sufficient" in recommendation or 
-                recommendation == "" or "no action" in recommendation)
+        assert (
+            "appropriate" in recommendation
+            or "sufficient" in recommendation
+            or recommendation == ""
+            or "no action" in recommendation
+        )
 
     def test_warning_fuel_utilization_triggers_recommendation(self):
         """Test warning-level fuel utilization triggers specific recommendation."""

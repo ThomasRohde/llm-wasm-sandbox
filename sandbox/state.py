@@ -209,7 +209,7 @@ def save_state_code(state_var: str = "globals()", filename: str = STATE_FILENAME
         from pathlib import Path, PurePath
         import datetime
         import base64
-        
+
         def _serialize_value(v):
             if isinstance(v, PurePath):
                 return str(v)
@@ -224,7 +224,7 @@ def save_state_code(state_var: str = "globals()", filename: str = STATE_FILENAME
             elif isinstance(v, (list, tuple)):
                 return [_serialize_value(item) for item in v]
             return v
-        
+
         _state = {}
         for k, v in globals().items():
             if k.startswith('_') or callable(v) or type(v).__name__ == 'module':
@@ -441,7 +441,7 @@ def save_state(state: dict[str, Any], filename: str = ".session_state.json") -> 
     - datetime objects → ISO format string
     - sets → lists
     - bytes → base64 string
-    
+
     Functions, classes, and modules are filtered out.
 
     Args:

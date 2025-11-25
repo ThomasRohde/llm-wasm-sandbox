@@ -90,6 +90,47 @@ class MCPServer:
             )
         return allowed
 
+    # System file names that should be filtered from workspace listings
+    _SYSTEM_FILES = frozenset(
+        {
+            ".metadata.json",  # Session metadata
+            "user_code.py",  # Temporary Python execution file
+            "user_code.js",  # Temporary JavaScript execution file
+            "__state__.json",  # Auto-persist state file
+        }
+    )
+    # System directory prefixes that should be filtered
+    _SYSTEM_DIR_PREFIXES = ("site-packages/",)
+
+    @staticmethod
+    def _filter_system_files(files: list[str]) -> tuple[list[str], list[str]]:
+        """Filter files into client files and system files.
+
+        System files are internal sandbox artifacts that should normally be hidden
+        from MCP clients. Client files are user-created data files.
+
+        Args:
+            files: List of file paths (relative to workspace root)
+
+        Returns:
+            Tuple of (client_files, system_files)
+        """
+        client_files: list[str] = []
+        system_files: list[str] = []
+
+        for f in files:
+            # Check if it's a system file by name or in a system directory
+            filename = f.split("/")[-1] if "/" in f else f
+            is_system = filename in MCPServer._SYSTEM_FILES or any(
+                f.startswith(prefix) for prefix in MCPServer._SYSTEM_DIR_PREFIXES
+            )
+            if is_system:
+                system_files.append(f)
+            else:
+                client_files.append(f)
+
+        return client_files, system_files
+
     def _register_tools(self) -> None:
         """Register all MCP tools."""
 
@@ -308,7 +349,7 @@ class MCPServer:
                     content = result.stdout or result.stderr
                     fuel_analysis = result.metadata.get("fuel_analysis", {})
                     fuel_status = fuel_analysis.get("status", "")
-                    
+
                     # Add fuel guidance to content for warning/critical/exhausted statuses
                     if fuel_status in ("warning", "critical", "exhausted"):
                         fuel_note = fuel_analysis.get("recommendation", "")
@@ -858,19 +899,63 @@ class MCPServer:
 
         @self.app.tool(
             name="get_workspace_info",
-            description="Get information about a workspace session",
+            description="""Get information about a workspace session.
+
+            By default, returns only client files (user-created data files) to keep
+            the response clean. System files (internal sandbox artifacts like
+            user_code.py, .metadata.json, __state__.json, site-packages/) are
+            filtered out unless explicitly requested.
+
+            Parameters:
+            • session_id (str): The session ID to query
+            • include_system_files (bool): If True, also returns system_files list
+              (default: False)
+
+            Returns:
+            • files: List of client files (user-created)
+            • system_files: List of system files (only when include_system_files=True)
+            • execution_count, language, created_at, etc.
+            """,
         )
-        async def get_workspace_info(session_id: str) -> MCPToolResult:
+        async def get_workspace_info(
+            session_id: str,
+            include_system_files: bool = False,
+        ) -> MCPToolResult:
             """Get workspace session information."""
             with self.metrics.time_tool_execution("get_workspace_info"):
                 try:
                     info = await self.session_manager.get_session_info(session_id)
 
                     if info:
-                        files = info.get("files", [])
-                        file_count = len(files) if isinstance(files, (list, tuple)) else 0
+                        all_files = info.get("files", [])
+                        if not isinstance(all_files, (list, tuple)):
+                            all_files = []
+
+                        # Filter files into client and system categories
+                        client_files, system_files = self._filter_system_files(list(all_files))
+
+                        # Update info with filtered files
+                        info["files"] = client_files
+
+                        # Build content string showing both counts
+                        client_count = len(client_files)
+                        system_count = len(system_files)
+                        if include_system_files:
+                            info["system_files"] = system_files
+                            content = (
+                                f"Session {session_id}: {info['language']}, "
+                                f"{info['execution_count']} executions, "
+                                f"{client_count} files ({system_count} system)"
+                            )
+                        else:
+                            content = (
+                                f"Session {session_id}: {info['language']}, "
+                                f"{info['execution_count']} executions, "
+                                f"{client_count} files"
+                            )
+
                         return MCPToolResult(
-                            content=f"Session {session_id}: {info['language']}, {info['execution_count']} executions, {file_count} files",
+                            content=content,
                             structured_content=info,
                         )
                     else:
