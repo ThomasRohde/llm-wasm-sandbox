@@ -1270,14 +1270,13 @@ _state.counter += 1;
 
 **Why:** `_state` starts as empty object `{}`. Accessing undefined properties fails.
 
-#### ✅ Pattern 5: Use Global Helpers Over std/os Modules
+#### ✅ Pattern 5: Use Global Helpers Over std/os Globals
 
-For simple file operations, prefer global helpers (auto-injected) over std/os modules.
+For simple file operations, prefer global helpers (auto-injected) over std/os globals.
 
 **🟡 WORKS BUT VERBOSE:**
 ```javascript
-import * as std from 'std';
-
+// std and os are globals (via --std flag), not ES6 modules
 const f = std.open('/app/data.json', 'r');
 const content = f.readAsString();
 f.close();

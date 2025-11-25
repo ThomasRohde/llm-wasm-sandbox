@@ -146,16 +146,16 @@ class MCPServer:
                • QuickJS os module: Filesystem ops (os.readdir, os.stat, os.now, os.remove)
                • Global helpers (auto-injected): readJson(), writeJson(), readText(),
                  writeText(), listFiles(), fileExists(), copyFile(), etc.
-               • Vendored packages: csv.js, json_path.js, string_utils.js
-                 Usage: const csv = requireVendor('csv.js'); csv.parse(data);
+               • Vendored packages: csv-simple, json-utils, string-utils
+                 Usage: const csv = requireVendor('csv-simple'); csv.parse(data);
 
             💡 Usage Pattern:
                // Option 1: Use global helpers (recommended for simple cases)
                const data = readJson('/app/config.json');
                writeText('/app/output.txt', 'result');
 
-               // Option 2: Use QuickJS std module for advanced I/O
-               import * as std from 'std';
+               // Option 2: Use QuickJS std/os globals for advanced I/O
+               // Note: std and os are global objects (via --std flag), NOT ES6 modules
                const file = std.open('/app/data.csv', 'r');
                const content = file.readAsString();
                file.close();
@@ -169,9 +169,10 @@ class MCPServer:
                  Example: readText('/app/data.txt') ✅  |  readText('data.txt') ❌
 
                • No Node.js APIs: fs, http, child_process, etc. NOT available
-                 Use QuickJS std/os modules or global helpers instead
+                 Use QuickJS std/os globals or auto-injected helpers instead
 
-               • Module syntax: Use import * as std from 'std'; (NOT require())
+               • std/os are globals: Access via std.open(), os.readdir() directly
+                 (NOT import * as std from 'std' - ES6 module imports don't work)
 
             🔄 State Persistence (when auto_persist_globals=True in session):
                • Use _state object to persist data between executions
@@ -382,18 +383,18 @@ class MCPServer:
                                 "quickjs_modules": ["std (file I/O)", "os (filesystem operations)"],
                                 "vendored_packages": 5,
                                 "notable_packages": [
-                                    "csv.js (CSV parsing/generation)",
-                                    "json_path.js (JSONPath queries)",
-                                    "string_utils.js (string manipulation)",
-                                    "sandbox_utils.js (file I/O helpers - auto-injected)",
+                                    "csv-simple (CSV parsing/generation)",
+                                    "json-utils (JSON path access/schema validation)",
+                                    "string-utils (string manipulation)",
+                                    "sandbox-utils (file I/O helpers - auto-injected)",
                                 ],
                                 "state_persistence": "_state object (when auto_persist_globals=True)",
                                 "global_helpers": "Auto-injected: readJson, writeJson, readText, writeText, listFiles, etc.",
                             },
                             "api_patterns": {
                                 "file_io_simple": "readJson('/app/data.json')  # Global helper, returns data or null",
-                                "file_io_advanced": "import * as std from 'std'; const f = std.open('/app/file.txt', 'r');",
-                                "vendored_packages": "const csv = requireVendor('csv.js');  # Function auto-injected",
+                                "file_io_advanced": "const f = std.open('/app/file.txt', 'r');  # std is a global, not ES6 module",
+                                "vendored_packages": "const csv = requireVendor('csv-simple');  # Function auto-injected",
                                 "state_access": "_state.counter = (_state.counter || 0) + 1;  # Always initialize",
                                 "path_requirement": "All paths must start with /app/ (WASI restriction)",
                                 "tuple_returns": "⚠️ QuickJS functions return [value, error] tuples - check truthiness before use",
@@ -737,15 +738,14 @@ class MCPServer:
                             "sqlite3 - In-memory SQL database",
                         ],
                         "javascript_vendored_packages": [
-                            "csv.js - CSV parsing and generation (pure JS)",
-                            "json_path.js - JSONPath queries for JSON navigation",
-                            "json_utils.js - JSON schema validation and utilities",
-                            "string_utils.js - String manipulation (slugify, truncate, palindrome, etc.)",
-                            "sandbox_utils.js - File I/O helpers (readJson, writeJson, readText, listFiles, etc.)",
+                            "csv-simple - CSV parsing and generation (pure JS)",
+                            "json-utils - JSON path access and schema validation",
+                            "string-utils - String manipulation (slugify, truncate, case conversion, etc.)",
+                            "sandbox-utils - File I/O helpers (readJson, writeJson, readText, listFiles, etc.)",
                         ],
                         "javascript_stdlib": [
-                            "std module - File I/O (std.open, FILE operations)",
-                            "os module - Environment variables, file stats, directory operations",
+                            "std global - File I/O (std.open, FILE operations) - access directly, not via import",
+                            "os global - Environment variables, file stats, directory operations",
                             "JSON, Math, Date - Built-in JavaScript objects",
                             "String, Array, Object - Native data structures",
                             "RegExp - Regular expressions",
@@ -778,9 +778,9 @@ class MCPServer:
                         "3. Just import directly: import openpyxl, from tabulate import tabulate\n\n"
                         "✅ JAVASCRIPT USAGE:\n"
                         "1. Vendored packages available via requireVendor() function (auto-injected)\n"
-                        "2. Example: const csv = requireVendor('csv.js'); csv.parse(data)\n"
-                        "3. sandbox_utils.js auto-injected: readJson(), writeJson(), listFiles(), etc.\n"
-                        "4. QuickJS std/os modules available: import * as std from 'std';\n\n"
+                        "2. Example: const csv = requireVendor('csv-simple'); csv.parse(data)\n"
+                        "3. sandbox-utils auto-injected: readJson(), writeJson(), listFiles(), etc.\n"
+                        "4. QuickJS std/os are globals: std.open(), os.readdir() (NOT ES6 modules!)\n\n"
                         "⚠️ FUEL BUDGET REQUIREMENTS (Python):\n"
                         "- DEFAULT budget (5B): Works for tabulate, markdown, dateutil, stdlib\n"
                         "- INCREASE to 10B for: openpyxl, PyPDF2, jinja2 (first import only)\n"
@@ -802,8 +802,8 @@ class MCPServer:
                         "  Python PDF: PyPDF2 (read/write/merge), pdfminer.six (text extraction)\n"
                         "  Python Word: mammoth (read-only, converts to HTML/Markdown)\n"
                         "  Python OpenDocument: odfpy (.odt, .ods, .odp)\n"
-                        "  JavaScript CSV: csv.js (parse/generate CSV data)\n"
-                        "  JavaScript JSON: json_path.js, json_utils.js (queries, validation)"
+                        "  JavaScript CSV: csv-simple (parse/generate CSV data)\n"
+                        "  JavaScript JSON: json-utils (path access, schema validation)"
                     )
 
                     content_lines = []
