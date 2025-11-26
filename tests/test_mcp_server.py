@@ -247,6 +247,49 @@ class TestMCPServerFilesChanged:
             "__state__.json",
         }
 
+    def test_filter_system_files_handles_windows_paths(self) -> None:
+        """Test that Windows backslash paths are correctly filtered (cross-platform fix)."""
+        # Simulate Windows-style paths that might come from os.path operations
+        files = [
+            "data.csv",
+            "__pycache__\\module.cpython-312.pyc",  # Windows backslash
+            "site-packages\\some_package\\module.py",  # Windows backslash
+            "subdir\\output.txt",  # User file in subdirectory
+        ]
+
+        client_files, system_files = MCPServer._filter_system_files(files)
+
+        # User files should be preserved (even with backslash paths)
+        assert "data.csv" in client_files
+        assert "subdir\\output.txt" in client_files
+        assert len(client_files) == 2
+
+        # System files should be detected despite backslashes
+        assert "__pycache__\\module.cpython-312.pyc" in system_files
+        assert "site-packages\\some_package\\module.py" in system_files
+        assert len(system_files) == 2
+
+    def test_filter_system_files_mixed_separators(self) -> None:
+        """Test filtering with mixed path separators (edge case)."""
+        files = [
+            "__pycache__/file1.pyc",  # POSIX
+            "__pycache__\\file2.pyc",  # Windows
+            "site-packages/pkg/mod.py",  # POSIX
+            "site-packages\\pkg\\mod2.py",  # Windows
+            "user_data/file.txt",  # POSIX user file
+            "user_data\\file2.txt",  # Windows user file
+        ]
+
+        client_files, system_files = MCPServer._filter_system_files(files)
+
+        # All user files should be preserved
+        assert len(client_files) == 2
+        assert "user_data/file.txt" in client_files
+        assert "user_data\\file2.txt" in client_files
+
+        # All system files should be detected regardless of separator
+        assert len(system_files) == 4
+
     @pytest.mark.asyncio
     async def test_execute_code_files_changed_structure(self) -> None:
         """Test that execute_code returns files_changed with correct structure."""
@@ -341,3 +384,177 @@ with open('/app/dedup_test.txt', 'a') as f:
         assert "user_code.py" not in filenames
         assert ".metadata.json" not in filenames
         assert "__state__.json" not in filenames
+
+
+class TestMCPServerSessionConfig:
+    """Test session configuration is properly threaded to session manager."""
+
+    def test_session_manager_receives_config_values(self) -> None:
+        """Test that session manager receives config values from MCPConfig."""
+        from mcp_server.config import MCPConfig, SessionsConfig
+
+        config = MCPConfig(
+            sessions=SessionsConfig(
+                default_timeout_seconds=300,
+                max_total_sessions=3,
+                max_memory_mb=512,
+            )
+        )
+        server = create_mcp_server(config)
+
+        # Verify session manager received the config values
+        assert server.session_manager._timeout_seconds == 300
+        assert server.session_manager._max_total_sessions == 3
+        assert server.session_manager._memory_limit_mb == 512
+
+    def test_session_manager_uses_default_config(self) -> None:
+        """Test that session manager uses default config values."""
+        server = create_mcp_server()
+
+        # Verify default values match SessionsConfig defaults
+        assert server.session_manager._timeout_seconds == 600
+        assert server.session_manager._max_total_sessions == 10
+        assert server.session_manager._memory_limit_mb == 256
+
+    @pytest.mark.asyncio
+    async def test_session_limit_enforcement(self) -> None:
+        """Test that session limit is enforced with structured error."""
+        from mcp_server.config import MCPConfig, SessionsConfig
+
+        # Configure very low session limit for testing
+        config = MCPConfig(
+            sessions=SessionsConfig(
+                max_total_sessions=2,
+            )
+        )
+        server = create_mcp_server(config)
+
+        # Create sessions up to the limit
+        session1 = await server.session_manager.create_session("python")
+        assert not isinstance(session1, dict)  # Should be WorkspaceSession
+
+        session2 = await server.session_manager.create_session("javascript")
+        assert not isinstance(session2, dict)  # Should be WorkspaceSession
+
+        # Third session should return structured error
+        result = await server.session_manager.create_session("python")
+        assert isinstance(result, dict)
+        assert result["error"] == "session_limit_exceeded"
+        assert "max_sessions" in result
+        assert result["max_sessions"] == 2
+        assert result["active_sessions"] == 2
+
+        # Cleanup
+        await server.session_manager.destroy_session(session1.workspace_id)
+        await server.session_manager.destroy_session(session2.workspace_id)
+
+    @pytest.mark.asyncio
+    async def test_session_uses_configured_timeout(self) -> None:
+        """Test that sessions use configured timeout for expiry."""
+        from mcp_server.config import MCPConfig, SessionsConfig
+        from mcp_server.sessions import WorkspaceSession
+
+        config = MCPConfig(
+            sessions=SessionsConfig(
+                default_timeout_seconds=120,  # 2 minutes
+            )
+        )
+        server = create_mcp_server(config)
+
+        session = await server.session_manager.create_session("python")
+        assert isinstance(session, WorkspaceSession)
+        assert session.timeout_seconds == 120
+
+        # Cleanup
+        await server.session_manager.destroy_session(session.workspace_id)
+
+    @pytest.mark.asyncio
+    async def test_session_uses_configured_memory_limit(self) -> None:
+        """Test that sessions use configured memory limit."""
+        from mcp_server.config import MCPConfig, SessionsConfig
+        from mcp_server.sessions import WorkspaceSession
+
+        config = MCPConfig(
+            sessions=SessionsConfig(
+                max_memory_mb=128,
+            )
+        )
+        server = create_mcp_server(config)
+
+        session = await server.session_manager.create_session("python")
+        assert isinstance(session, WorkspaceSession)
+        assert session.memory_limit_mb == 128
+
+        # Cleanup
+        await server.session_manager.destroy_session(session.workspace_id)
+
+    @pytest.mark.asyncio
+    async def test_create_session_tool_handles_limit_error(self) -> None:
+        """Test that create_session tool returns proper error when limit exceeded."""
+        from mcp_server.config import MCPConfig, SessionsConfig
+
+        # Configure very low session limit
+        config = MCPConfig(
+            sessions=SessionsConfig(
+                max_total_sessions=1,
+            )
+        )
+        server = create_mcp_server(config)
+
+        # Get the create_session tool function
+        tools = server.app._tool_manager._tools
+        create_session_tool = tools["create_session"]
+
+        # Create first session (should succeed)
+        result1 = await create_session_tool.fn(language="python")
+        assert result1.success is True
+        assert result1.structured_content is not None
+        session_id = result1.structured_content["session_id"]
+
+        # Try to create second session (should fail with structured error)
+        result2 = await create_session_tool.fn(language="javascript")
+        assert result2.success is False
+        assert "session_limit_exceeded" in result2.content or "Maximum sessions" in result2.content
+        assert result2.structured_content is not None
+        assert result2.structured_content.get("error") == "session_limit_exceeded"
+
+        # Cleanup
+        await server.session_manager.destroy_session(session_id)
+
+    @pytest.mark.asyncio
+    async def test_execute_code_tool_handles_limit_error(self) -> None:
+        """Test that execute_code tool returns proper error when session limit exceeded."""
+        from mcp_server.config import MCPConfig, SessionsConfig
+
+        # Configure very low session limit
+        config = MCPConfig(
+            sessions=SessionsConfig(
+                max_total_sessions=1,
+            )
+        )
+        server = create_mcp_server(config)
+
+        # Get the tools
+        tools = server.app._tool_manager._tools
+        execute_code_tool = tools["execute_code"]
+
+        # First execution creates a session (should succeed)
+        result1 = await execute_code_tool.fn(code="print('hello')", language="python")
+        assert result1.success is True
+
+        # Second execution with different language would need a new session (should fail)
+        # Note: This won't trigger the limit since we reuse the same default session
+        # We need to force creation of a new session by using a different session_id
+        # that doesn't exist yet, causing get_or_create to try to create one
+
+        # Create a session explicitly to use up the limit
+        create_session_tool = tools["create_session"]
+        await create_session_tool.fn(language="javascript")
+
+        # Now try to execute with a non-existent session_id (would create new session)
+        result2 = await execute_code_tool.fn(
+            code="print('world')", language="python", session_id="nonexistent-session-id"
+        )
+        assert result2.success is False
+        assert result2.structured_content is not None
+        assert result2.structured_content.get("error") == "session_limit_exceeded"

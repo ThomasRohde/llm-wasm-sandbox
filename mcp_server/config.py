@@ -85,7 +85,12 @@ class SessionsConfig(BaseModel):
     """Configuration for session management."""
 
     default_timeout_seconds: int = Field(default=600, ge=60, le=3600)
-    max_sessions_per_client: int = Field(default=5, ge=1, le=20)
+    max_total_sessions: int = Field(
+        default=10,
+        ge=1,
+        le=100,
+        description="Maximum total concurrent sessions across all clients. Prevents resource exhaustion.",
+    )
     max_memory_mb: int = Field(default=256, ge=64, le=1024)
     external_files: list[str] = Field(
         default_factory=list,

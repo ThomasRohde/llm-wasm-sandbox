@@ -53,7 +53,12 @@ class MCPServer:
         self.config = config or MCPConfig()
         self.logger = SandboxLogger()
         self.audit_logger = AuditLogger()
-        self.session_manager = WorkspaceSessionManager(external_mount_dir=external_mount_dir)
+        self.session_manager = WorkspaceSessionManager(
+            external_mount_dir=external_mount_dir,
+            timeout_seconds=self.config.sessions.default_timeout_seconds,
+            max_total_sessions=self.config.sessions.max_total_sessions,
+            memory_limit_mb=self.config.sessions.max_memory_mb,
+        )
         self.metrics = MCPMetricsCollector()
         self._external_mount_dir = external_mount_dir
 
@@ -64,11 +69,13 @@ class MCPServer:
         )
         self.rate_limiter = RateLimiter(rate_limit_config)
 
-        # Initialize FastMCP app
+        # Initialize FastMCP app with lifespan for background task management
+        # FastMCP expects Callable[[FastMCP], AsyncContextManager], so we wrap _lifespan
         self.app = FastMCP(
             name=self.config.server.name,
             version=self.config.server.version,
             instructions=self.config.server.instructions,
+            lifespan=lambda _mcp: self._lifespan(),
         )
 
         # Register tools
@@ -128,10 +135,12 @@ class MCPServer:
         system_files: list[str] = []
 
         for f in files:
+            # Normalize path to POSIX format for consistent filtering across platforms
+            normalized = f.replace("\\", "/")
             # Check if it's a system file by name or in a system directory
-            filename = f.split("/")[-1] if "/" in f else f
+            filename = normalized.split("/")[-1] if "/" in normalized else normalized
             is_system = filename in MCPServer._SYSTEM_FILES or any(
-                f.startswith(prefix) for prefix in MCPServer._SYSTEM_DIR_PREFIXES
+                normalized.startswith(prefix) for prefix in MCPServer._SYSTEM_DIR_PREFIXES
             )
             if is_system:
                 system_files.append(f)
@@ -311,9 +320,21 @@ class MCPServer:
                         )
 
                     # Get or create session
-                    session = await self.session_manager.get_or_create_session(
+                    session_result = await self.session_manager.get_or_create_session(
                         language=language, session_id=session_id
                     )
+
+                    # Check if session limit was exceeded (returns dict with error)
+                    if isinstance(session_result, dict) and "error" in session_result:
+                        return MCPToolResult(
+                            content=str(session_result.get("message", "Session limit exceeded")),
+                            structured_content=session_result,
+                            success=False,
+                        )
+
+                    session = session_result
+                    # Type narrowing: session is WorkspaceSession here
+                    assert not isinstance(session, dict)
 
                     # Execute code
                     result = await session.execute_code(code, timeout=timeout_value)
@@ -719,11 +740,23 @@ class MCPServer:
                             success=False,
                         )
 
-                    session = await self.session_manager.create_session(
+                    session_result = await self.session_manager.create_session(
                         language=language,
                         session_id=session_id,
                         auto_persist_globals=auto_persist_globals,
                     )
+
+                    # Check if session limit was exceeded (returns dict with error)
+                    if isinstance(session_result, dict) and "error" in session_result:
+                        return MCPToolResult(
+                            content=str(session_result.get("message", "Session limit exceeded")),
+                            structured_content=session_result,
+                            success=False,
+                        )
+
+                    session = session_result
+                    # Type narrowing: session is WorkspaceSession here
+                    assert not isinstance(session, dict)
 
                     # Record session creation
                     self.metrics.record_session_created()
@@ -1124,6 +1157,24 @@ class MCPServer:
             uvicorn_config=uvicorn_config,
         )
 
+    @asynccontextmanager
+    async def _lifespan(self) -> AsyncGenerator[None, None]:
+        """FastMCP lifespan context manager for background task management.
+
+        This is wired up via FastMCP's lifespan parameter to ensure cleanup tasks
+        run during the server's lifetime and are properly stopped on shutdown.
+        """
+        self.logger._emit(logging.DEBUG, "Starting MCP server lifespan")
+
+        # Start background cleanup tasks
+        await self.rate_limiter.start_cleanup_task()
+        await self.session_manager.start_cleanup_task()
+
+        try:
+            yield
+        finally:
+            await self.shutdown()
+
     async def shutdown(self) -> None:
         """Shutdown the MCP server and cleanup resources."""
         self.logger._emit(logging.INFO, "Shutting down MCP server")
@@ -1132,22 +1183,21 @@ class MCPServer:
         metrics_summary = self.metrics.get_summary()
         self.logger._emit(logging.INFO, "Final MCP metrics", metrics=metrics_summary)
 
-        # Stop rate limiter cleanup
+        # Stop background cleanup tasks
         await self.rate_limiter.stop_cleanup_task()
+        await self.session_manager.stop_cleanup_task()
 
+        # Clean up expired sessions
         await self.session_manager.cleanup()
 
 
+# Legacy standalone lifespan function - kept for backwards compatibility
+# New code should use MCPServer._lifespan which is automatically wired to FastMCP
 @asynccontextmanager
 async def lifespan(server: MCPServer) -> AsyncGenerator[None, None]:
-    """FastMCP lifespan context manager."""
-    # Start background tasks
-    await server.rate_limiter.start_cleanup_task()
-    await server.session_manager.start_cleanup_task()
-
-    yield
-
-    await server.shutdown()
+    """FastMCP lifespan context manager (legacy - use server._lifespan instead)."""
+    async with server._lifespan():
+        yield
 
 
 def create_mcp_server(

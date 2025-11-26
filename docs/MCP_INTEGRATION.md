@@ -145,7 +145,7 @@ max_request_size_mb = 10
 
 [sessions]
 default_timeout_seconds = 600
-max_sessions_per_client = 5
+max_total_sessions = 10  # Maximum concurrent sessions across all clients
 max_memory_mb = 256
 
 [logging]

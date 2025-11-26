@@ -122,11 +122,13 @@ class WorkspaceSession:
     variables: list[str] = field(default_factory=list)
     imports: list[str] = field(default_factory=list)
     external_mount_dir: Path | None = None
+    timeout_seconds: int = 600  # Session expiry timeout
+    memory_limit_mb: int = 256  # Memory limit for sandbox
 
     @property
     def is_expired(self) -> bool:
         """Check if session has expired."""
-        return time.time() - self.last_used_at > 600  # Default 10 minutes
+        return time.time() - self.last_used_at > self.timeout_seconds
 
     def get_sandbox(self) -> Any:
         """Get the sandbox instance for this session."""
@@ -140,7 +142,7 @@ class WorkspaceSession:
 
         policy = ExecutionPolicy(
             fuel_budget=10_000_000_000,  # 10B fuel for document processing packages
-            memory_bytes=256 * 1024 * 1024,  # 256 MB
+            memory_bytes=self.memory_limit_mb * 1024 * 1024,  # Use configured memory limit
             additional_readonly_mounts=additional_mounts,
         )
 
@@ -167,28 +169,56 @@ class WorkspaceSessionManager:
     """
     Manages workspace sessions for MCP clients.
 
-    Each MCP client gets one workspace session per language that persists
-    across tool calls.
+    Sessions persist across tool calls and are subject to a global limit
+    to prevent resource exhaustion.
     """
 
-    def __init__(self, external_mount_dir: Path | None = None) -> None:
+    def __init__(
+        self,
+        external_mount_dir: Path | None = None,
+        timeout_seconds: int = 600,
+        max_total_sessions: int = 10,
+        memory_limit_mb: int = 256,
+    ) -> None:
         self.logger = SandboxLogger("mcp-sessions")
         self._sessions: dict[str, WorkspaceSession] = {}
         self._cleanup_task: asyncio.Task[None] | None = None
         self._external_mount_dir = external_mount_dir
+        self._timeout_seconds = timeout_seconds
+        self._max_total_sessions = max_total_sessions
+        self._memory_limit_mb = memory_limit_mb
 
     async def get_or_create_session(
         self, language: str, session_id: str | None = None, auto_persist_globals: bool = False
-    ) -> WorkspaceSession:
+    ) -> WorkspaceSession | dict[str, object]:
         """
         Get or create a workspace session.
 
         Creates a persistent sandbox session for state management.
+
+        Returns:
+            WorkspaceSession if successful, or dict with error details if session limit exceeded.
         """
         if session_id and session_id in self._sessions:
             session = self._sessions[session_id]
             if not session.is_expired:
                 return session
+
+        # Check session limit before creating new session
+        active_session_count = sum(1 for s in self._sessions.values() if not s.is_expired)
+        if active_session_count >= self._max_total_sessions:
+            self.logger._emit(
+                logging.WARNING,
+                "Session limit exceeded",
+                active_sessions=active_session_count,
+                max_sessions=self._max_total_sessions,
+            )
+            return {
+                "error": "session_limit_exceeded",
+                "message": f"Maximum sessions ({self._max_total_sessions}) reached. Destroy existing sessions first.",
+                "active_sessions": active_session_count,
+                "max_sessions": self._max_total_sessions,
+            }
 
         # Create new sandbox session with higher fuel budget for package imports
         runtime = RuntimeType.PYTHON if language == "python" else RuntimeType.JAVASCRIPT
@@ -201,7 +231,7 @@ class WorkspaceSessionManager:
         # Use 10B fuel budget to support openpyxl, PyPDF2, jinja2 imports
         policy = ExecutionPolicy(
             fuel_budget=10_000_000_000,  # 10B fuel for document processing
-            memory_bytes=256 * 1024 * 1024,  # 256 MB
+            memory_bytes=self._memory_limit_mb * 1024 * 1024,  # Use configured memory limit
             additional_readonly_mounts=additional_mounts,
         )
 
@@ -220,6 +250,8 @@ class WorkspaceSessionManager:
             sandbox_session_id=sandbox_session_id,
             auto_persist_globals=auto_persist_globals,
             external_mount_dir=self._external_mount_dir,
+            timeout_seconds=self._timeout_seconds,
+            memory_limit_mb=self._memory_limit_mb,
         )
 
         self._sessions[workspace_id] = session
@@ -235,8 +267,28 @@ class WorkspaceSessionManager:
 
     async def create_session(
         self, language: str, session_id: str | None = None, auto_persist_globals: bool = False
-    ) -> WorkspaceSession:
-        """Create a new workspace session explicitly."""
+    ) -> WorkspaceSession | dict[str, object]:
+        """Create a new workspace session explicitly.
+
+        Returns:
+            WorkspaceSession if successful, or dict with error details if session limit exceeded.
+        """
+        # Check session limit before creating new session
+        active_session_count = sum(1 for s in self._sessions.values() if not s.is_expired)
+        if active_session_count >= self._max_total_sessions:
+            self.logger._emit(
+                logging.WARNING,
+                "Session limit exceeded",
+                active_sessions=active_session_count,
+                max_sessions=self._max_total_sessions,
+            )
+            return {
+                "error": "session_limit_exceeded",
+                "message": f"Maximum sessions ({self._max_total_sessions}) reached. Destroy existing sessions first.",
+                "active_sessions": active_session_count,
+                "max_sessions": self._max_total_sessions,
+            }
+
         # Create new sandbox session with higher fuel budget for package imports
         runtime = RuntimeType.PYTHON if language == "python" else RuntimeType.JAVASCRIPT
 
@@ -248,7 +300,7 @@ class WorkspaceSessionManager:
         # Use 10B fuel budget to support openpyxl, PyPDF2, jinja2 imports
         policy = ExecutionPolicy(
             fuel_budget=10_000_000_000,  # 10B fuel for document processing
-            memory_bytes=256 * 1024 * 1024,  # 256 MB
+            memory_bytes=self._memory_limit_mb * 1024 * 1024,  # Use configured memory limit
             additional_readonly_mounts=additional_mounts,
         )
 
@@ -267,6 +319,8 @@ class WorkspaceSessionManager:
             sandbox_session_id=sandbox_session_id,
             auto_persist_globals=auto_persist_globals,
             external_mount_dir=self._external_mount_dir,
+            timeout_seconds=self._timeout_seconds,
+            memory_limit_mb=self._memory_limit_mb,
         )
 
         self._sessions[workspace_id] = session

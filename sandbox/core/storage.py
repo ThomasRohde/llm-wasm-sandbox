@@ -619,8 +619,9 @@ class DiskStorageAdapter(StorageAdapter):
 
         for file in workspace.rglob("*"):
             if file.is_file():
-                relative = str(file.relative_to(workspace))
-                snapshot[relative] = file.stat().st_mtime
+                relative = file.relative_to(workspace)
+                # Convert to POSIX path (forward slashes) for consistency across platforms
+                snapshot[relative.as_posix()] = file.stat().st_mtime
 
         return snapshot
 
