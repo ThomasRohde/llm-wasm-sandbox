@@ -109,7 +109,7 @@ class MCPServer:
         }
     )
     # System directory prefixes that should be filtered
-    _SYSTEM_DIR_PREFIXES = ("site-packages/",)
+    _SYSTEM_DIR_PREFIXES = ("site-packages/", "__pycache__/")
 
     @staticmethod
     def _filter_system_files(files: list[str]) -> tuple[list[str], list[str]]:
@@ -345,6 +345,37 @@ class MCPServer:
                         "fuel_consumed": result.fuel_consumed,
                         "success": result.success,
                     }
+
+                    # Add files_changed to structured content
+                    # Combine files_created and files_modified, deduplicate, and filter system files
+                    all_changed_files = list(
+                        dict.fromkeys(result.files_created + result.files_modified)
+                    )
+                    client_files, _ = self._filter_system_files(all_changed_files)
+
+                    # Build structured file objects with absolute/relative/filename
+                    # TODO: Consider moving workspace root resolution to MCPConfig
+                    workspace_root = Path(result.workspace_path)
+                    cwd = Path.cwd()
+                    files_changed: list[dict[str, str]] = []
+                    for rel_path in client_files:
+                        # rel_path is like "data.csv" or "subdir/file.txt"
+                        filename = rel_path.split("/")[-1] if "/" in rel_path else rel_path
+                        abs_path = workspace_root / rel_path
+                        # Compute path relative to current working directory
+                        try:
+                            relative_to_cwd = abs_path.relative_to(cwd)
+                        except ValueError:
+                            # If not relative to cwd, use absolute path
+                            relative_to_cwd = abs_path
+                        files_changed.append(
+                            {
+                                "absolute": str(abs_path),
+                                "relative": str(relative_to_cwd),
+                                "filename": filename,
+                            }
+                        )
+                    structured_content["files_changed"] = files_changed
 
                     # Add error guidance to structured content if available
                     if "error_guidance" in result.metadata:

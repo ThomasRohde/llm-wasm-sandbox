@@ -1,0 +1,7 @@
+project_id,project_name,lead_employee_id,budget,status,start_date,end_date
+P001,Cloud Migration,E003,250000,Completed,2023-01-15,2023-06-30
+P002,Mobile App v2,E001,180000,In Progress,2023-07-01,2024-01-31
+P003,Marketing Campaign Q4,E002,95000,Completed,2023-10-01,2023-12-31
+P004,Sales CRM Integration,E007,120000,In Progress,2023-09-01,2024-03-31
+P005,HR Portal Upgrade,E009,85000,Planned,2024-01-01,2024-04-30
+P006,Data Analytics Platform,E008,320000,In Progress,2023-04-01,2024-06-30
