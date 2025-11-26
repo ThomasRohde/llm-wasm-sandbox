@@ -315,9 +315,6 @@ class JavaScriptSandbox(BaseSandbox):
                 except esprima.Error:
                     return False
         """
-        # TODO: Consider adding esprima or similar parser for pre-execution validation
-        # For v1, we defer validation to runtime execution where syntax errors
-        # will be caught and reported in stderr
         return True
 
     def _write_untrusted_code(self, code: str, inject_setup: bool = True) -> str:
