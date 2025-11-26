@@ -11,6 +11,7 @@ import logging
 import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from fastmcp import FastMCP
@@ -44,12 +45,17 @@ class MCPServer:
     WebAssembly sandbox with automatic session management.
     """
 
-    def __init__(self, config: MCPConfig | None = None):
+    def __init__(
+        self,
+        config: MCPConfig | None = None,
+        external_mount_dir: Path | None = None,
+    ):
         self.config = config or MCPConfig()
         self.logger = SandboxLogger()
         self.audit_logger = AuditLogger()
-        self.session_manager = WorkspaceSessionManager()
+        self.session_manager = WorkspaceSessionManager(external_mount_dir=external_mount_dir)
         self.metrics = MCPMetricsCollector()
+        self._external_mount_dir = external_mount_dir
 
         # Initialize rate limiter
         rate_limit_config = RateLimitConfig(
@@ -68,7 +74,10 @@ class MCPServer:
         # Register tools
         self._register_tools()
 
-        self.logger._emit(logging.INFO, "MCP server initialized", config=self.config.model_dump())
+        log_extra: dict[str, Any] = {"config": self.config.model_dump()}
+        if external_mount_dir:
+            log_extra["external_mount_dir"] = str(external_mount_dir)
+        self.logger._emit(logging.INFO, "MCP server initialized", **log_extra)
 
     async def _check_rate_limit(self, client_key: str = "default") -> bool:
         """Check rate limit for a client."""
@@ -1110,6 +1119,19 @@ async def lifespan(server: MCPServer) -> AsyncGenerator[None, None]:
     await server.shutdown()
 
 
-def create_mcp_server(config: MCPConfig | None = None) -> MCPServer:
-    """Create and configure an MCP server instance."""
-    return MCPServer(config)
+def create_mcp_server(
+    config: MCPConfig | None = None,
+    external_mount_dir: Path | None = None,
+) -> MCPServer:
+    """Create and configure an MCP server instance.
+
+    Args:
+        config: MCP server configuration. If None, uses defaults.
+        external_mount_dir: Path to directory containing external files to mount
+            read-only at /external in all sessions. Use stage_external_files() to
+            prepare this directory from a list of file paths.
+
+    Returns:
+        Configured MCPServer instance.
+    """
+    return MCPServer(config, external_mount_dir=external_mount_dir)

@@ -8,15 +8,18 @@ Command-line interface to run the MCP server with promiscuous security
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import contextlib
 import sys
 import warnings
+from pathlib import Path
 from typing import Any, ClassVar
 
 from .config import MCPConfig
 from .security import SecurityValidator
 from .server import create_mcp_server
+from .sessions import stage_external_files
 
 # Suppress python-dotenv warnings when it's installed as a transitive dependency
 # (e.g., from openai-example extras) but not actually used by the MCP server
@@ -103,7 +106,47 @@ class PromiscuousSecurityValidator(SecurityValidator):
         return True, ""
 
 
-async def async_main() -> None:
+def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(
+        prog="llm-wasm-mcp",
+        description="LLM WASM Sandbox MCP Server - Secure code execution via Model Context Protocol",
+    )
+    parser.add_argument(
+        "--external-files",
+        nargs="*",
+        default=[],
+        metavar="FILE",
+        help="External files to copy to ./storage and mount read-only at /external in sessions. "
+        "Files are copied flat (no subdirectory structure). All filenames must be unique.",
+    )
+    parser.add_argument(
+        "--max-external-file-size-mb",
+        type=int,
+        default=50,
+        metavar="MB",
+        help="Maximum size in MB for each external file (default: 50)",
+    )
+    parser.add_argument(
+        "--storage-dir",
+        type=Path,
+        default=Path("./storage"),
+        metavar="DIR",
+        help="Directory to copy external files into (default: ./storage)",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+    )
+    return parser.parse_args()
+
+
+async def async_main(
+    external_files: list[str],
+    max_external_file_size_mb: int,
+    storage_dir: Path,
+) -> None:
     """Async main entry point with proper signal handling."""
     # Monkey-patch the security module to use promiscuous validator
     import mcp_server.security
@@ -112,8 +155,24 @@ async def async_main() -> None:
     mcp_server.security.SecurityValidator = PromiscuousSecurityValidator  # type: ignore[misc]
     mcp_server.server.SecurityValidator = PromiscuousSecurityValidator  # type: ignore[misc]
 
+    # Stage external files if provided
+    external_mount_dir: Path | None = None
+    if external_files:
+        print(f"Staging {len(external_files)} external files to {storage_dir}...", file=sys.stderr)
+        try:
+            external_mount_dir = stage_external_files(
+                file_paths=external_files,
+                storage_dir=storage_dir,
+                max_size_mb=max_external_file_size_mb,
+            )
+            print(f"External files staged at {external_mount_dir}", file=sys.stderr)
+            print("Files will be available at /external/ in sessions", file=sys.stderr)
+        except (FileNotFoundError, ValueError, IsADirectoryError) as e:
+            print(f"ERROR: Failed to stage external files: {e}", file=sys.stderr)
+            sys.exit(1)
+
     config = MCPConfig()
-    server = create_mcp_server(config)
+    server = create_mcp_server(config, external_mount_dir=external_mount_dir)
 
     print("Available tools: execute_code, list_runtimes, create_session, etc.", file=sys.stderr)
 
@@ -130,10 +189,19 @@ async def async_main() -> None:
 
 def main() -> None:
     """Main CLI entry point."""
+    args = parse_args()
+
     print(f"LLM WASM Sandbox MCP Server v{__version__}", file=sys.stderr)
     print("Starting MCP server with PROMISCUOUS security (ALL CODE ALLOWED)...", file=sys.stderr)
     print("WARNING: All security filters disabled!", file=sys.stderr)
     print("Security relies entirely on WASM sandbox boundaries.", file=sys.stderr)
+
+    if args.external_files:
+        print(
+            f"External files: {len(args.external_files)} file(s) will be mounted at /external/",
+            file=sys.stderr,
+        )
+
     print("", file=sys.stderr)
 
     # Install the smart stdout filter to redirect banners to stderr
@@ -142,7 +210,13 @@ def main() -> None:
     sys.stdout = ProtocolFilterIO(original_stdout, sys.stderr)
 
     try:
-        asyncio.run(async_main())
+        asyncio.run(
+            async_main(
+                external_files=args.external_files,
+                max_external_file_size_mb=args.max_external_file_size_mb,
+                storage_dir=args.storage_dir,
+            )
+        )
     except KeyboardInterrupt:
         print("\nGraceful shutdown complete.", file=sys.stderr)
 

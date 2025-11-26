@@ -100,6 +100,12 @@ class ExecutionPolicy(BaseModel):
         description="If True, retain temporary stdout/stderr log directories instead of cleaning them up after execution",
     )
 
+    additional_readonly_mounts: list[tuple[str, str]] = Field(
+        default_factory=list,
+        description="Additional read-only mounts as list of (host_path, guest_path) tuples. "
+        "Example: [('/path/to/storage', '/external')] mounts host storage at /external in guest.",
+    )
+
     @model_validator(mode="before")
     @classmethod
     def set_guest_data_default(cls, values: Any) -> Any:

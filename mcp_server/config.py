@@ -87,6 +87,16 @@ class SessionsConfig(BaseModel):
     default_timeout_seconds: int = Field(default=600, ge=60, le=3600)
     max_sessions_per_client: int = Field(default=5, ge=1, le=20)
     max_memory_mb: int = Field(default=256, ge=64, le=1024)
+    external_files: list[str] = Field(
+        default_factory=list,
+        description="List of file paths to copy to ./storage and mount read-only at /external",
+    )
+    max_external_file_size_mb: int = Field(
+        default=50,
+        ge=1,
+        le=500,
+        description="Maximum size in MB for each external file",
+    )
 
 
 class LoggingConfig(BaseModel):

@@ -153,6 +153,19 @@ def run_untrusted_python(
                     FilePerms.READ_ONLY,
                 )
 
+        # Handle additional read-only mounts (e.g., external files at /external)
+        for mount_host_path, mount_guest_path in policy.additional_readonly_mounts:
+            mount_abs_path = os.path.abspath(mount_host_path)
+            if os.path.exists(mount_abs_path):
+                readonly_mount_dir, temp_mount_root = _prepare_readonly_data_dir(mount_abs_path)
+                cleanup_paths.append(temp_mount_root)
+                wasi.preopen_dir(
+                    readonly_mount_dir,
+                    mount_guest_path,
+                    DirPerms.READ_ONLY,
+                    FilePerms.READ_ONLY,
+                )
+
         wasi.argv = tuple(policy.argv)
         wasi.env = [(k, v) for k, v in policy.env.items()]
         wasi.stdout_file = out_log
@@ -392,6 +405,19 @@ def run_untrusted_javascript(
                 wasi.preopen_dir(
                     readonly_data_dir,
                     policy.guest_data_path,
+                    DirPerms.READ_ONLY,
+                    FilePerms.READ_ONLY,
+                )
+
+        # Handle additional read-only mounts (e.g., external files at /external)
+        for mount_host_path, mount_guest_path in policy.additional_readonly_mounts:
+            mount_abs_path = os.path.abspath(mount_host_path)
+            if os.path.exists(mount_abs_path):
+                readonly_mount_dir, temp_mount_root = _prepare_readonly_data_dir(mount_abs_path)
+                cleanup_paths.append(temp_mount_root)
+                wasi.preopen_dir(
+                    readonly_mount_dir,
+                    mount_guest_path,
                     DirPerms.READ_ONLY,
                     FilePerms.READ_ONLY,
                 )

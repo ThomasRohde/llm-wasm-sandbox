@@ -10,14 +10,102 @@ from __future__ import annotations
 import asyncio
 import logging
 import secrets
+import shutil
 import time
 from contextlib import suppress
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from sandbox import RuntimeType, create_sandbox
 from sandbox.core.logging import SandboxLogger
 from sandbox.core.models import ExecutionPolicy, SandboxResult
+
+
+def stage_external_files(
+    file_paths: list[str],
+    storage_dir: Path,
+    max_size_mb: int = 50,
+) -> Path:
+    """Stage external files to a storage directory for read-only mounting.
+
+    Files are copied flat to storage_dir (no subdirectory structure).
+    The storage directory is cleared on each call to ensure fresh state.
+
+    Args:
+        file_paths: List of source file paths to copy.
+        storage_dir: Target directory to copy files into.
+        max_size_mb: Maximum file size in MB. Files exceeding this are rejected.
+
+    Returns:
+        Path to the storage directory containing staged files.
+
+    Raises:
+        FileNotFoundError: If a source file does not exist.
+        ValueError: If a file exceeds max_size_mb, is a symlink, or has duplicate filename.
+        IsADirectoryError: If a path points to a directory instead of a file.
+    """
+    logger = SandboxLogger("mcp-external-files")
+    max_size_bytes = max_size_mb * 1024 * 1024
+
+    # Clear storage directory for fresh state
+    if storage_dir.exists():
+        shutil.rmtree(storage_dir)
+    storage_dir.mkdir(parents=True, exist_ok=True)
+
+    seen_filenames: set[str] = set()
+
+    for file_path_str in file_paths:
+        source = Path(file_path_str)
+
+        # Validate file exists
+        if not source.exists():
+            raise FileNotFoundError(f"External file not found: {source}")
+
+        # Reject symlinks for security
+        if source.is_symlink():
+            raise ValueError(f"Symlinks not allowed for external files: {source}")
+
+        # Reject directories
+        if source.is_dir():
+            raise IsADirectoryError(f"Expected file but got directory: {source}")
+
+        # Check file size
+        file_size = source.stat().st_size
+        if file_size > max_size_bytes:
+            size_mb = file_size / (1024 * 1024)
+            raise ValueError(
+                f"External file exceeds size limit ({size_mb:.1f}MB > {max_size_mb}MB): {source}"
+            )
+
+        # Check for duplicate filenames (flat structure means collisions possible)
+        filename = source.name
+        if filename in seen_filenames:
+            raise ValueError(
+                f"Duplicate filename '{filename}' from different paths. "
+                f"External files are copied flat - all filenames must be unique."
+            )
+        seen_filenames.add(filename)
+
+        # Copy file to storage
+        dest = storage_dir / filename
+        shutil.copy2(source, dest)
+        logger._emit(
+            logging.DEBUG,
+            "Staged external file",
+            source=str(source),
+            dest=str(dest),
+            size_bytes=file_size,
+        )
+
+    logger._emit(
+        logging.INFO,
+        "Staged external files",
+        file_count=len(file_paths),
+        storage_dir=str(storage_dir),
+    )
+
+    return storage_dir
 
 
 @dataclass
@@ -33,6 +121,7 @@ class WorkspaceSession:
     execution_count: int = 0
     variables: list[str] = field(default_factory=list)
     imports: list[str] = field(default_factory=list)
+    external_mount_dir: Path | None = None
 
     @property
     def is_expired(self) -> bool:
@@ -45,9 +134,14 @@ class WorkspaceSession:
 
         # Use higher fuel budget for MCP sessions to support package imports
         # openpyxl, PyPDF2, jinja2 require 5-10B fuel for first import
+        additional_mounts: list[tuple[str, str]] = []
+        if self.external_mount_dir is not None and self.external_mount_dir.exists():
+            additional_mounts.append((str(self.external_mount_dir), "/external"))
+
         policy = ExecutionPolicy(
             fuel_budget=10_000_000_000,  # 10B fuel for document processing packages
             memory_bytes=256 * 1024 * 1024,  # 256 MB
+            additional_readonly_mounts=additional_mounts,
         )
 
         return create_sandbox(
@@ -77,10 +171,11 @@ class WorkspaceSessionManager:
     across tool calls.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, external_mount_dir: Path | None = None) -> None:
         self.logger = SandboxLogger("mcp-sessions")
         self._sessions: dict[str, WorkspaceSession] = {}
         self._cleanup_task: asyncio.Task[None] | None = None
+        self._external_mount_dir = external_mount_dir
 
     async def get_or_create_session(
         self, language: str, session_id: str | None = None, auto_persist_globals: bool = False
@@ -98,10 +193,16 @@ class WorkspaceSessionManager:
         # Create new sandbox session with higher fuel budget for package imports
         runtime = RuntimeType.PYTHON if language == "python" else RuntimeType.JAVASCRIPT
 
+        # Build additional mounts for external files
+        additional_mounts: list[tuple[str, str]] = []
+        if self._external_mount_dir is not None and self._external_mount_dir.exists():
+            additional_mounts.append((str(self._external_mount_dir), "/external"))
+
         # Use 10B fuel budget to support openpyxl, PyPDF2, jinja2 imports
         policy = ExecutionPolicy(
             fuel_budget=10_000_000_000,  # 10B fuel for document processing
             memory_bytes=256 * 1024 * 1024,  # 256 MB
+            additional_readonly_mounts=additional_mounts,
         )
 
         sandbox = create_sandbox(
@@ -118,6 +219,7 @@ class WorkspaceSessionManager:
             language=language,
             sandbox_session_id=sandbox_session_id,
             auto_persist_globals=auto_persist_globals,
+            external_mount_dir=self._external_mount_dir,
         )
 
         self._sessions[workspace_id] = session
@@ -138,10 +240,16 @@ class WorkspaceSessionManager:
         # Create new sandbox session with higher fuel budget for package imports
         runtime = RuntimeType.PYTHON if language == "python" else RuntimeType.JAVASCRIPT
 
+        # Build additional mounts for external files
+        additional_mounts: list[tuple[str, str]] = []
+        if self._external_mount_dir is not None and self._external_mount_dir.exists():
+            additional_mounts.append((str(self._external_mount_dir), "/external"))
+
         # Use 10B fuel budget to support openpyxl, PyPDF2, jinja2 imports
         policy = ExecutionPolicy(
             fuel_budget=10_000_000_000,  # 10B fuel for document processing
             memory_bytes=256 * 1024 * 1024,  # 256 MB
+            additional_readonly_mounts=additional_mounts,
         )
 
         sandbox = create_sandbox(
@@ -158,6 +266,7 @@ class WorkspaceSessionManager:
             language=language,
             sandbox_session_id=sandbox_session_id,
             auto_persist_globals=auto_persist_globals,
+            external_mount_dir=self._external_mount_dir,
         )
 
         self._sessions[workspace_id] = session

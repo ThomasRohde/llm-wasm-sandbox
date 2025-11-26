@@ -592,6 +592,122 @@ The MCP server exposes these tools to LLM clients:
 - CORS configuration for web applications
 - Rate limiting and authentication options
 
+### External Files
+
+Mount external files read-only at `/external/` in all sessions. Files are copied to `./storage` on server startup and made available to sandbox code.
+
+**Command Line:**
+```bash
+# Single file
+llm-wasm-mcp --external-files /path/to/data.csv
+
+# Multiple files
+llm-wasm-mcp --external-files /path/to/data.csv /path/to/config.json
+
+# With custom size limit (default: 50MB per file)
+llm-wasm-mcp --external-files /path/to/large.bin --max-external-file-size-mb 100
+
+# Custom storage directory (default: ./storage)
+llm-wasm-mcp --external-files data.csv --storage-dir /tmp/mcp-storage
+```
+
+**Claude Desktop Configuration:**
+```json
+{
+  "mcpServers": {
+    "llm-wasm-sandbox": {
+      "command": "llm-wasm-mcp",
+      "args": [
+        "--external-files",
+        "C:\\Data\\dataset.csv",
+        "C:\\Config\\settings.json"
+      ]
+    }
+  }
+}
+```
+
+**Accessing Files in Sandbox Code:**
+
+```python
+# Python - files available at /external/
+import json
+
+with open('/external/dataset.csv', 'r') as f:
+    data = f.read()
+
+with open('/external/settings.json', 'r') as f:
+    config = json.load(f)
+```
+
+```javascript
+// JavaScript - files available at /external/
+const data = readText('/external/dataset.csv');
+const config = readJson('/external/settings.json');
+```
+
+**Notes:**
+- Files are mounted **read-only** (writes will fail with `PermissionError`)
+- Files are copied **flat** - all filenames must be unique (no subdirectory structure)
+- The `./storage` directory is **cleared on each server start** for fresh state
+- Symlinks are rejected for security reasons
+
+### File Processing Pipeline
+
+A common use case is reading external files, processing them in the sandbox, and retrieving the output. Here's the complete pattern using OpenAI Agents SDK:
+
+```python
+from agents import Agent, Runner
+from agents.mcp import MCPServerStdio
+import json
+
+async def process_file_with_agent():
+    async with MCPServerStdio(
+        name="llm-wasm-sandbox",
+        params={
+            "command": "llm-wasm-mcp",
+            "args": ["--external-files", "/path/to/input.json"],
+        },
+        client_session_timeout_seconds=60.0,
+    ) as mcp_server:
+        # Step 1: Create a session for file persistence
+        session_result = await mcp_server.call_tool("create_session", {"language": "python"})
+        session_id = json.loads(session_result.content[0].text)["structured_content"]["session_id"]
+        
+        # Step 2: Run agent to process external data and save results
+        agent = Agent(
+            name="Data Processor",
+            instructions=f"""
+            Read data from /external/, process it, and save results to /app/output.json.
+            Use session_id='{session_id}' in all execute_code calls.
+            """,
+            mcp_servers=[mcp_server],
+        )
+        await Runner.run(agent, input="Process the input file and save analysis")
+        
+        # Step 3: Retrieve the processed output file
+        read_result = await mcp_server.call_tool("execute_code", {
+            "code": "print(open('/app/output.json').read())",
+            "language": "python",
+            "session_id": session_id,
+        })
+        
+        # Step 4: Parse and use the result
+        parsed = json.loads(read_result.content[0].text)
+        output_content = parsed["structured_content"]["stdout"]
+        print("Processed output:", output_content)
+        
+        # Clean up
+        await mcp_server.call_tool("destroy_session", {"session_id": session_id})
+```
+
+**Key Points:**
+- Create a session first to ensure file persistence across executions
+- External files are read from `/external/` (read-only)
+- Agent writes processed results to `/app/`
+- After agent completes, harness retrieves output using same `session_id`
+- See `examples/openai_agents/mcp_external_files_agent.py` for a complete working example
+
 ### Session Management
 
 MCP clients automatically get isolated workspaces with optional automatic variable persistence:

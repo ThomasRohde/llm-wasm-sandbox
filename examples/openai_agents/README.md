@@ -89,7 +89,7 @@ python stateful_agent.py
 - ✅ Error recovery (syntax errors, fuel exhaustion)
 - ✅ Automatic debugging and retry logic
 
-### Shell Utils Agent (NEW: Advanced Features)
+### Shell Utils Agent (Advanced Features)
 
 Execute data processing and file operations using shell-like utilities:
 
@@ -106,7 +106,66 @@ python shell_utils_agent.py
 - ✅ Vendored packages (tabulate, python-dateutil, markdown)
 - ✅ Complete workflows (log analysis, report generation, data transformation)
 
+### MCP External Files Agent (NEW: MCP Integration)
+
+Connect to the llm-wasm-mcp server via MCP protocol with external file access:
+
+```powershell
+cd examples/openai_agents
+python mcp_external_files_agent.py
+```
+
+**What it demonstrates:**
+- ✅ MCPServerStdio connection to llm-wasm-mcp
+- ✅ External files mounted read-only at `/external/`
+- ✅ Agent reading and processing external data files
+- ✅ MCP tool discovery and invocation
+- ✅ Read-only protection verification
+- ✅ Full MCP protocol integration with OpenAI Agents SDK
+
 ## How It Works
+
+### MCP Server Pattern (Recommended for External Files)
+
+Use MCPServerStdio to connect to the llm-wasm-mcp server:
+
+```python
+from agents import Agent, ModelSettings, Runner
+from agents.mcp import MCPServerStdio
+
+async def main():
+    # Start MCP server with external files
+    async with MCPServerStdio(
+        name="llm-wasm-sandbox",
+        params={
+            "command": "llm-wasm-mcp",
+            "args": [
+                "--external-files", "/path/to/data.json", "/path/to/config.yaml",
+                "--max-external-file-size-mb", "50",
+            ],
+        },
+    ) as mcp_server:
+        # Create agent with MCP server access
+        agent = Agent(
+            name="Data Analysis Agent",
+            instructions=(
+                "You can execute code in a secure WASM sandbox.\n"
+                "External files are available at /external/ (read-only).\n"
+                "Use execute_code tool with language='python' or 'javascript'."
+            ),
+            model="gpt-4.1",
+            mcp_servers=[mcp_server],  # Agent gets MCP tools automatically
+        )
+        
+        result = await Runner.run(agent, input="Analyze /external/data.json")
+        print(result.final_output)
+```
+
+**Key Points:**
+- External files are copied to storage and mounted read-only at `/external/`
+- All MCP tools (execute_code, create_session, etc.) are exposed automatically
+- Agent can read external data but cannot modify it
+- Works with Claude Desktop, Cursor, and other MCP-compatible clients
 
 ### Function Tool Pattern
 
