@@ -1,0 +1,14 @@
+{
+  "sales_data": [
+    {"product": "Widget A", "quantity": 150, "unit_price": 29.99},
+    {"product": "Widget B", "quantity": 85, "unit_price": 49.99},
+    {"product": "Gadget X", "quantity": 200, "unit_price": 19.99},
+    {"product": "Gadget Y", "quantity": 45, "unit_price": 99.99},
+    {"product": "Tool Pro", "quantity": 120, "unit_price": 39.99}
+  ],
+  "metadata": {
+    "quarter": "Q4-2025",
+    "region": "North America",
+    "currency": "USD"
+  }
+}

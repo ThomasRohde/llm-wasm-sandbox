@@ -1,0 +1,11 @@
+employee_id,name,department,salary,hire_date,performance_score
+E001,Alice Johnson,Engineering,95000,2021-03-15,4.5
+E002,Bob Smith,Marketing,72000,2020-07-22,3.8
+E003,Carol Williams,Engineering,105000,2019-01-10,4.9
+E004,David Brown,Sales,68000,2022-05-01,4.2
+E005,Eva Martinez,Engineering,88000,2021-09-12,4.0
+E006,Frank Lee,Marketing,75000,2020-11-30,3.5
+E007,Grace Chen,Sales,82000,2019-06-18,4.7
+E008,Henry Wilson,Engineering,112000,2018-02-28,4.8
+E009,Ivy Taylor,HR,65000,2022-01-15,3.9
+E010,Jack Davis,Sales,71000,2021-04-20,4.1
