@@ -865,10 +865,10 @@ class MCPServer:
                             "sqlite3 - In-memory SQL database",
                         ],
                         "javascript_vendored_packages": [
-                            "csv-simple - CSV parsing and generation (pure JS)",
-                            "json-utils - JSON path access and schema validation",
-                            "string-utils - String manipulation (slugify, truncate, case conversion, etc.)",
-                            "sandbox-utils - File I/O helpers (readJson, writeJson, readText, listFiles, etc.)",
+                            "csv-simple - CSV parsing: parse(csvString), stringify(data, headers?)",
+                            "json-utils - JSON helpers: get(obj, path), set(obj, path, value), validate(obj, schema)",
+                            "string-utils - String ops: slugify(text), truncate(text, len), capitalize(text), camelCase(text), snakeCase(text), kebabCase(text), pad(text, len), trim(text), split(text, sep), join(arr, sep)",
+                            "sandbox-utils - File I/O: readJson(path), writeJson(path, obj), readText(path), writeText(path, text), listFiles(path), fileExists(path), copyFile(src, dst), removeFile(path)",
                         ],
                         "javascript_stdlib": [
                             "std global - File I/O (std.open, FILE operations) - access directly, not via import",
@@ -1101,6 +1101,103 @@ class MCPServer:
                     )
                     return MCPToolResult(content=f"Failed to get metrics: {e!s}", success=False)
 
+        @self.app.tool(
+            name="get_active_sessions",
+            description="""List all active sessions with metadata for debugging.
+
+            Returns a list of sessions with:
+            • session_id: The session identifier
+            • language: "python" or "javascript"
+            • created_at: Unix timestamp when session was created
+            • last_used_at: Unix timestamp of last execution
+            • execution_count: Number of code executions
+            • is_expired: Whether session has timed out
+            • auto_persist_globals: Whether state persistence is enabled
+            """,
+        )
+        async def get_active_sessions() -> MCPToolResult:
+            """List all active sessions for debugging."""
+            with self.metrics.time_tool_execution("get_active_sessions"):
+                try:
+                    sessions = self.session_manager.get_active_sessions()
+
+                    # Build summary stats
+                    total = len(sessions)
+                    expired = sum(1 for s in sessions if s.get("is_expired", False))
+                    active = total - expired
+
+                    content = f"Active sessions: {active} active, {expired} expired, {total} total"
+
+                    return MCPToolResult(
+                        content=content,
+                        structured_content={
+                            "sessions": sessions,
+                            "summary": {
+                                "active_count": active,
+                                "expired_count": expired,
+                                "total_count": total,
+                            },
+                        },
+                    )
+
+                except Exception as e:
+                    self.logger._emit(
+                        logging.ERROR,
+                        "Tool execution failed",
+                        tool="get_active_sessions",
+                        error=str(e),
+                    )
+                    return MCPToolResult(
+                        content=f"Failed to get active sessions: {e!s}", success=False
+                    )
+
+        @self.app.tool(
+            name="reset_all_sessions",
+            description="""Reset all sessions, clearing memory state and optionally disk workspaces.
+
+            Use this to recover from orphaned sessions or perform a clean reset.
+
+            Parameters:
+            • cleanup_disk (bool): If True, also delete sandbox workspace directories on disk.
+              If False (default), only clears in-memory session tracking.
+
+            Returns:
+            • cleared_count: Number of sessions cleared from memory
+            • disk_cleanup: Whether disk cleanup was performed
+            • disk_errors: List of any disk cleanup errors (if cleanup_disk=True)
+            """,
+        )
+        async def reset_all_sessions(cleanup_disk: bool = False) -> MCPToolResult:
+            """Reset all sessions."""
+            with self.metrics.time_tool_execution("reset_all_sessions"):
+                try:
+                    result = await self.session_manager.reset_all_sessions(
+                        cleanup_disk=cleanup_disk
+                    )
+
+                    cleared_count = result.get("cleared_count", 0)
+                    disk_errors = result.get("disk_errors", [])
+
+                    if disk_errors:
+                        error_count = len(disk_errors) if isinstance(disk_errors, list) else 0
+                        content = f"Reset {cleared_count} sessions with {error_count} disk cleanup errors"
+                    else:
+                        content = f"Reset {cleared_count} sessions successfully"
+
+                    return MCPToolResult(
+                        content=content,
+                        structured_content=result,
+                    )
+
+                except Exception as e:
+                    self.logger._emit(
+                        logging.ERROR,
+                        "Tool execution failed",
+                        tool="reset_all_sessions",
+                        error=str(e),
+                    )
+                    return MCPToolResult(content=f"Failed to reset sessions: {e!s}", success=False)
+
     async def start_stdio(self) -> None:
         """Start the MCP server with stdio transport."""
         self.logger._emit(logging.INFO, "Starting MCP server with stdio transport")
@@ -1165,6 +1262,17 @@ class MCPServer:
         run during the server's lifetime and are properly stopped on shutdown.
         """
         self.logger._emit(logging.DEBUG, "Starting MCP server lifespan")
+
+        # Clear any orphaned sessions from previous server runs
+        # This ensures a fresh start and prevents "Maximum sessions reached" errors
+        orphaned_count = len(self.session_manager._sessions)
+        if orphaned_count > 0:
+            self.logger._emit(
+                logging.WARNING,
+                "Clearing orphaned sessions from previous server run",
+                orphaned_count=orphaned_count,
+            )
+            await self.session_manager.reset_all_sessions(cleanup_disk=False)
 
         # Start background cleanup tasks
         await self.rate_limiter.start_cleanup_task()

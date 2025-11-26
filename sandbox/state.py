@@ -6,7 +6,7 @@ in the session workspace and survives across multiple execute() calls.
 
 Key Features:
 - Automatic serialization of primitive types (int, str, list, dict, bool, float, None)
-- Filtering of non-serializable objects (functions, modules, classes)
+- Filtering of non-serializable objects (functions, modules, classes, file handles)
 - Session-aware storage (state isolated per session)
 - Helper functions that can be injected into sandbox code
 
@@ -79,6 +79,7 @@ Security Considerations
 ----------------------
 - Only JSON-serializable types are persisted (no arbitrary pickle)
 - Functions, modules, classes are filtered out automatically
+- File handles (TextIOWrapper, BufferedReader, etc.) are filtered automatically
 - State file is workspace-scoped (no cross-session access)
 - No code execution during deserialization (JSON.parse is safe)
 
@@ -89,6 +90,12 @@ Supported Types
 - Paths: pathlib.Path, PosixPath, WindowsPath (converted to strings)
 - Dates: datetime.datetime, date, time (converted to ISO format strings)
 - Binary: bytes (converted to base64 with 'b64:' prefix)
+
+Filtered Types (silently skipped)
+---------------------------------
+- Functions, modules, classes
+- File handles: TextIOWrapper, BufferedReader, BufferedWriter, FileIO, etc.
+- I/O objects with read/write/close/fileno methods
 
 Limitations
 ----------
@@ -141,6 +148,7 @@ def filter_serializable_globals(globals_dict: dict[str, Any]) -> dict[str, Any]:
     - Private variables (starting with _)
     - Functions, classes, modules
     - Built-in objects
+    - File handles and I/O objects
     - Non-serializable types
 
     Args:
@@ -176,11 +184,47 @@ def filter_serializable_globals(globals_dict: dict[str, Any]) -> dict[str, Any]:
         if type(value).__name__ == "module":
             continue
 
+        # Skip I/O objects (file handles, etc.)
+        if _is_io_object(value):
+            continue
+
         # Only include serializable types
         if is_serializable(value):
             filtered[key] = value
 
     return filtered
+
+
+def _is_io_object(obj: Any) -> bool:
+    """Check if object is a file handle or I/O object.
+
+    Detects file handles (TextIOWrapper, BufferedReader, etc.) and other
+    I/O objects that cannot be serialized to JSON.
+
+    Args:
+        obj: Python object to check
+
+    Returns:
+        bool: True if obj is a file handle or I/O object
+    """
+    # Check common I/O type names
+    io_type_names = (
+        "TextIOWrapper",
+        "BufferedReader",
+        "BufferedWriter",
+        "BufferedRandom",
+        "FileIO",
+        "BytesIO",
+        "StringIO",
+        "_IOBase",
+    )
+    type_name = type(obj).__name__
+    if type_name in io_type_names:
+        return True
+
+    # Check for file-like duck typing (has read/write/close but isn't a common type)
+    # Be careful not to catch dicts or other objects with these methods
+    return hasattr(obj, "read") and hasattr(obj, "close") and hasattr(obj, "fileno")
 
 
 def save_state_code(state_var: str = "globals()", filename: str = STATE_FILENAME) -> str:
@@ -194,6 +238,11 @@ def save_state_code(state_var: str = "globals()", filename: str = STATE_FILENAME
     - datetime.datetime/date/time → ISO format string
     - sets → lists
     - bytes → base64 string (prefixed with 'b64:')
+
+    Filters out non-serializable types:
+    - File handles (TextIOWrapper, BufferedReader, etc.)
+    - Functions, classes, modules
+    - Private variables (starting with _)
 
     Args:
         state_var: Python expression that returns dict to save (default: globals())
@@ -209,8 +258,20 @@ def save_state_code(state_var: str = "globals()", filename: str = STATE_FILENAME
         from pathlib import Path, PurePath
         import datetime
         import base64
+        import io
+
+        def _is_io_object(v):
+            io_types = ('TextIOWrapper', 'BufferedReader', 'BufferedWriter',
+                        'BufferedRandom', 'FileIO', 'BytesIO', 'StringIO')
+            if type(v).__name__ in io_types:
+                return True
+            if hasattr(v, 'read') and hasattr(v, 'close') and hasattr(v, 'fileno'):
+                return True
+            return False
 
         def _serialize_value(v):
+            if _is_io_object(v):
+                return None  # Skip file handles
             if isinstance(v, PurePath):
                 return str(v)
             elif isinstance(v, (datetime.datetime, datetime.date, datetime.time)):
@@ -229,13 +290,15 @@ def save_state_code(state_var: str = "globals()", filename: str = STATE_FILENAME
         for k, v in globals().items():
             if k.startswith('_') or callable(v) or type(v).__name__ == 'module':
                 continue
+            if _is_io_object(v):
+                continue
             try:
                 _state[k] = _serialize_value(v)
             except:
                 pass
         with open('/app/.session_state.json', 'w') as _f:
             json.dump(_state, _f)
-        del _state, _f, _serialize_value
+        del _state, _f, _serialize_value, _is_io_object
     """
     return f"""
 import json
@@ -243,7 +306,18 @@ from pathlib import Path, PurePath
 import datetime
 import base64
 
+def _is_io_object(v):
+    io_types = ('TextIOWrapper', 'BufferedReader', 'BufferedWriter',
+                'BufferedRandom', 'FileIO', 'BytesIO', 'StringIO')
+    if type(v).__name__ in io_types:
+        return True
+    if hasattr(v, 'read') and hasattr(v, 'close') and hasattr(v, 'fileno'):
+        return True
+    return False
+
 def _serialize_value(v):
+    if _is_io_object(v):
+        return None  # Skip file handles
     if isinstance(v, PurePath):
         return str(v)
     elif isinstance(v, (datetime.datetime, datetime.date, datetime.time)):
@@ -253,14 +327,16 @@ def _serialize_value(v):
     elif isinstance(v, bytes):
         return 'b64:' + base64.b64encode(v).decode('ascii')
     elif isinstance(v, dict):
-        return {{k: _serialize_value(val) for k, val in v.items()}}
+        return {{k: _serialize_value(val) for k, val in v.items() if not _is_io_object(val)}}
     elif isinstance(v, (list, tuple)):
-        return [_serialize_value(item) for item in v]
+        return [_serialize_value(item) for item in v if not _is_io_object(item)]
     return v
 
 _state = {{}}
-for k, v in {state_var}.items():
+for k, v in list({state_var}.items()):
     if k.startswith('_') or callable(v) or type(v).__name__ == 'module':
+        continue
+    if _is_io_object(v):
         continue
     try:
         _state[k] = _serialize_value(v)
@@ -268,7 +344,7 @@ for k, v in {state_var}.items():
         pass
 with open('/app/{filename}', 'w') as _f:
     json.dump(_state, _f)
-del _state, _f, _serialize_value
+del _state, _f, _serialize_value, _is_io_object
 """.strip()
 
 
@@ -407,6 +483,10 @@ Handles common non-JSON types by converting them:
 - datetime.datetime/date/time → ISO format string
 - sets → lists
 - bytes → base64 string (prefixed with 'b64:')
+
+Filters out non-serializable types:
+- File handles (TextIOWrapper, BufferedReader, etc.)
+- Functions, classes, modules
 """
 
 import json
@@ -416,8 +496,21 @@ import datetime
 import base64
 
 
+def _is_io_object(v: Any) -> bool:
+    """Check if value is a file handle or I/O object."""
+    io_types = ('TextIOWrapper', 'BufferedReader', 'BufferedWriter',
+                'BufferedRandom', 'FileIO', 'BytesIO', 'StringIO')
+    if type(v).__name__ in io_types:
+        return True
+    if hasattr(v, 'read') and hasattr(v, 'close') and hasattr(v, 'fileno'):
+        return True
+    return False
+
+
 def _serialize_value(v: Any) -> Any:
     """Convert non-JSON-serializable types to JSON-compatible values."""
+    if _is_io_object(v):
+        return None  # Skip file handles
     if isinstance(v, PurePath):
         return str(v)
     elif isinstance(v, (datetime.datetime, datetime.date, datetime.time)):
@@ -427,9 +520,9 @@ def _serialize_value(v: Any) -> Any:
     elif isinstance(v, bytes):
         return 'b64:' + base64.b64encode(v).decode('ascii')
     elif isinstance(v, dict):
-        return {k: _serialize_value(val) for k, val in v.items()}
+        return {k: _serialize_value(val) for k, val in v.items() if not _is_io_object(val)}
     elif isinstance(v, (list, tuple)):
-        return [_serialize_value(item) for item in v]
+        return [_serialize_value(item) for item in v if not _is_io_object(item)]
     return v
 
 
@@ -442,7 +535,7 @@ def save_state(state: dict[str, Any], filename: str = ".session_state.json") -> 
     - sets → lists
     - bytes → base64 string
 
-    Functions, classes, and modules are filtered out.
+    Functions, classes, modules, and file handles are filtered out.
 
     Args:
         state: Dictionary with values to save
@@ -462,6 +555,8 @@ def save_state(state: dict[str, Any], filename: str = ".session_state.json") -> 
     filtered = {}
     for k, v in state.items():
         if k.startswith('_') or callable(v) or type(v).__name__ == 'module':
+            continue
+        if _is_io_object(v):
             continue
         try:
             filtered[k] = _serialize_value(v)

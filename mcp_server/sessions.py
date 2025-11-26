@@ -177,7 +177,7 @@ class WorkspaceSessionManager:
         self,
         external_mount_dir: Path | None = None,
         timeout_seconds: int = 600,
-        max_total_sessions: int = 10,
+        max_total_sessions: int = 50,
         memory_limit_mb: int = 256,
     ) -> None:
         self.logger = SandboxLogger("mcp-sessions")
@@ -426,6 +426,82 @@ class WorkspaceSessionManager:
 
         if expired:
             self.logger._emit(logging.INFO, "Session cleanup completed", cleaned_count=len(expired))
+
+    async def reset_all_sessions(self, cleanup_disk: bool = False) -> dict[str, object]:
+        """Reset all sessions, clearing memory state and optionally disk workspaces.
+
+        Use this to recover from orphaned sessions after server restarts or to
+        perform a clean reset of all state.
+
+        Args:
+            cleanup_disk: If True, also delete sandbox workspace directories on disk.
+                         If False, only clears in-memory session tracking.
+
+        Returns:
+            dict with reset statistics:
+                - cleared_count: Number of sessions cleared from memory
+                - disk_cleanup: Whether disk cleanup was performed
+                - disk_errors: List of any disk cleanup errors (if cleanup_disk=True)
+        """
+        cleared_count = len(self._sessions)
+        sandbox_session_ids = [s.sandbox_session_id for s in self._sessions.values()]
+
+        # Clear memory state
+        self._sessions.clear()
+
+        disk_errors: list[str] = []
+
+        # Optionally clean up disk workspaces
+        if cleanup_disk:
+            from sandbox import delete_session_workspace
+
+            for sandbox_id in sandbox_session_ids:
+                try:
+                    delete_session_workspace(sandbox_id)
+                except Exception as e:
+                    disk_errors.append(f"{sandbox_id}: {e!s}")
+
+        self.logger._emit(
+            logging.INFO,
+            "Reset all sessions",
+            cleared_count=cleared_count,
+            cleanup_disk=cleanup_disk,
+            disk_errors_count=len(disk_errors),
+        )
+
+        return {
+            "cleared_count": cleared_count,
+            "disk_cleanup": cleanup_disk,
+            "disk_errors": disk_errors if disk_errors else None,
+        }
+
+    def get_active_sessions(self) -> list[dict[str, object]]:
+        """Get list of all active sessions with metadata.
+
+        Returns:
+            List of session info dicts containing:
+                - session_id: Workspace session ID
+                - language: "python" or "javascript"
+                - created_at: Unix timestamp
+                - last_used_at: Unix timestamp
+                - execution_count: Number of executions
+                - is_expired: Whether session has timed out
+                - auto_persist_globals: Whether state persistence is enabled
+        """
+        sessions = []
+        for wid, session in self._sessions.items():
+            sessions.append(
+                {
+                    "session_id": wid,
+                    "language": session.language,
+                    "created_at": session.created_at,
+                    "last_used_at": session.last_used_at,
+                    "execution_count": session.execution_count,
+                    "is_expired": session.is_expired,
+                    "auto_persist_globals": session.auto_persist_globals,
+                }
+            )
+        return sessions
 
     async def start_cleanup_task(self) -> None:
         """Start background cleanup task."""

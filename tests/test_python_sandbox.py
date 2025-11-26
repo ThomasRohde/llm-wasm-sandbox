@@ -548,3 +548,89 @@ print("B" * 200, file=sys.stderr)
         assert len(result.stderr) <= policy.stderr_max_bytes
         assert result.metadata.get("stdout_truncated") is True
         assert result.metadata.get("stderr_truncated") is True
+
+
+class TestPythonSandboxStatePersistence:
+    """Test state persistence with auto_persist_globals."""
+
+    def test_file_handle_not_serialized_with_context_manager(self, temp_workspace):
+        """Test that file handles from 'with open()' pattern don't break state serialization.
+
+        Regression test for bug where file handles remaining in globals after
+        a context manager block would cause state serialization to fail with:
+        TypeError: Object of type TextIOWrapper is not JSON serializable
+        """
+        from sandbox import RuntimeType, create_sandbox
+
+        sandbox = create_sandbox(
+            runtime=RuntimeType.PYTHON,
+            auto_persist_globals=True,
+            workspace_root=temp_workspace,
+        )
+
+        # This pattern would previously fail due to 'f' remaining in globals
+        code = """
+with open('/app/test.txt', 'w') as f:
+    f.write('hello')
+counter = 42
+"""
+        result = sandbox.execute(code)
+
+        assert result.success is True
+        assert result.exit_code == 0
+        # Verify file was created
+        assert "test.txt" in result.files_created
+
+    def test_file_handle_not_serialized_explicit_open(self, temp_workspace):
+        """Test that explicit file handles are filtered from state serialization."""
+        from sandbox import RuntimeType, create_sandbox
+
+        sandbox = create_sandbox(
+            runtime=RuntimeType.PYTHON,
+            auto_persist_globals=True,
+            workspace_root=temp_workspace,
+        )
+
+        # Explicit open/close, 'f' variable still exists in globals
+        code = """
+f = open('/app/test2.txt', 'w')
+f.write('world')
+f.close()
+counter = 42
+"""
+        result = sandbox.execute(code)
+
+        assert result.success is True
+        assert result.exit_code == 0
+
+    def test_state_persists_after_file_operations(self, temp_workspace):
+        """Test that state is correctly persisted across file I/O operations."""
+        from sandbox import RuntimeType, create_sandbox
+
+        sandbox = create_sandbox(
+            runtime=RuntimeType.PYTHON,
+            auto_persist_globals=True,
+            workspace_root=temp_workspace,
+        )
+
+        # First execution: file I/O with state
+        code1 = """
+with open('/app/data.txt', 'w') as f:
+    f.write('test data')
+counter = 1
+items = ['a', 'b']
+"""
+        result1 = sandbox.execute(code1)
+        assert result1.success is True
+
+        # Second execution: verify state persisted
+        code2 = """
+counter += 1
+items.append('c')
+print(f'counter={counter}')
+print(f'items={items}')
+"""
+        result2 = sandbox.execute(code2)
+        assert result2.success is True
+        assert "counter=2" in result2.stdout
+        assert "items=['a', 'b', 'c']" in result2.stdout
