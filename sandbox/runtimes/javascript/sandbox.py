@@ -315,8 +315,7 @@ class JavaScriptSandbox(BaseSandbox):
                 except esprima.Error:
                     return False
         """
-        # TODO: Consider adding esprima or similar parser for pre-execution validation
-        # For v1, we defer validation to runtime execution where syntax errors
+        # Validation is deferred to runtime execution where syntax errors
         # will be caught and reported in stderr
         return True
 
@@ -466,7 +465,7 @@ class JavaScriptSandbox(BaseSandbox):
                 consumed=raw_result.fuel_consumed,
                 budget=int(self.policy.fuel_budget),
                 stderr=raw_result.stderr,
-                is_cached_import=False,  # TODO: Track import caching in session metadata
+                is_cached_import=False,
             )
             metadata["fuel_analysis"] = fuel_analysis
 
