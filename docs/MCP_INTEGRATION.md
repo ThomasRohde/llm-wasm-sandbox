@@ -218,12 +218,48 @@ The tool description now includes:
     "exit_code": 0,
     "execution_time_ms": 45.2,
     "fuel_consumed": 125000,
-    "success": true
+    "success": true,
+    "files_changed": []
   },
   "execution_time_ms": 45.2,
   "success": true
 }
 ```
+
+#### Files Changed (v0.5.1+)
+
+When code creates or modifies files, the response includes a `files_changed` array with structured file information:
+
+```json
+{
+  "structured_content": {
+    "stdout": "File created\n",
+    "success": true,
+    "files_changed": [
+      {
+        "absolute": "C:\\Users\\user\\project\\workspace\\session-id\\data.csv",
+        "relative": "workspace\\session-id\\data.csv",
+        "filename": "data.csv"
+      },
+      {
+        "absolute": "C:\\Users\\user\\project\\workspace\\session-id\\report.json",
+        "relative": "workspace\\session-id\\report.json",
+        "filename": "report.json"
+      }
+    ]
+  }
+}
+```
+
+**File Path Fields:**
+- `absolute`: Full filesystem path to the file
+- `relative`: Path relative to the project/server working directory
+- `filename`: Just the filename without any path components
+
+**Notes:**
+- System files (`.metadata.json`, `user_code.py`, `__state__.json`, `site-packages/`, `__pycache__/`) are automatically filtered out
+- Files appearing in both `files_created` and `files_modified` are deduplicated
+- Useful for LLMs to know which files were affected and where to find them
 
 #### Error Guidance (v0.4.1+)
 

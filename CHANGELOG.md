@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.9] - 2025-11-26
+
+### Added
+- **Files Changed Response**: MCP `execute_code` response now includes `files_changed` array
+  - Structured file objects with `absolute`, `relative`, and `filename` fields
+  - Automatically combines and deduplicates `files_created` and `files_modified`
+  - System files filtered out (`.metadata.json`, `user_code.py`, `__state__.json`, `site-packages/`, `__pycache__/`)
+- Extended system file filtering to exclude `__pycache__/` directories
+
+### Changed
+- Updated `docs/MCP_INTEGRATION.md` with `files_changed` documentation
+
 ## [0.3.4] - 2025-11-25
 
 ### Added
