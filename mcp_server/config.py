@@ -86,10 +86,10 @@ class SessionsConfig(BaseModel):
 
     default_timeout_seconds: int = Field(default=600, ge=60, le=3600)
     max_total_sessions: int = Field(
-        default=10,
+        default=50,
         ge=1,
-        le=100,
-        description="Maximum total concurrent sessions across all clients. Prevents resource exhaustion.",
+        le=200,
+        description="Maximum total concurrent sessions across all clients. Expired sessions are auto-cleaned before enforcing limit.",
     )
     max_memory_mb: int = Field(default=256, ge=64, le=1024)
     external_files: list[str] = Field(

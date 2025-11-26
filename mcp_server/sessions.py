@@ -195,6 +195,7 @@ class WorkspaceSessionManager:
         Get or create a workspace session.
 
         Creates a persistent sandbox session for state management.
+        Automatically cleans up expired sessions before enforcing limits.
 
         Returns:
             WorkspaceSession if successful, or dict with error details if session limit exceeded.
@@ -204,7 +205,10 @@ class WorkspaceSessionManager:
             if not session.is_expired:
                 return session
 
-        # Check session limit before creating new session
+        # Auto-cleanup expired sessions before checking limit
+        await self.cleanup()
+
+        # Check session limit after cleanup
         active_session_count = sum(1 for s in self._sessions.values() if not s.is_expired)
         if active_session_count >= self._max_total_sessions:
             self.logger._emit(
@@ -218,6 +222,7 @@ class WorkspaceSessionManager:
                 "message": f"Maximum sessions ({self._max_total_sessions}) reached. Destroy existing sessions first.",
                 "active_sessions": active_session_count,
                 "max_sessions": self._max_total_sessions,
+                "hint": "Use destroy_session to remove unused sessions, or wait for sessions to expire.",
             }
 
         # Create new sandbox session with higher fuel budget for package imports
@@ -270,10 +275,15 @@ class WorkspaceSessionManager:
     ) -> WorkspaceSession | dict[str, object]:
         """Create a new workspace session explicitly.
 
+        Automatically cleans up expired sessions before enforcing limits.
+
         Returns:
             WorkspaceSession if successful, or dict with error details if session limit exceeded.
         """
-        # Check session limit before creating new session
+        # Auto-cleanup expired sessions before checking limit
+        await self.cleanup()
+
+        # Check session limit after cleanup
         active_session_count = sum(1 for s in self._sessions.values() if not s.is_expired)
         if active_session_count >= self._max_total_sessions:
             self.logger._emit(
@@ -287,6 +297,7 @@ class WorkspaceSessionManager:
                 "message": f"Maximum sessions ({self._max_total_sessions}) reached. Destroy existing sessions first.",
                 "active_sessions": active_session_count,
                 "max_sessions": self._max_total_sessions,
+                "hint": "Use destroy_session to remove unused sessions, or wait for sessions to expire.",
             }
 
         # Create new sandbox session with higher fuel budget for package imports

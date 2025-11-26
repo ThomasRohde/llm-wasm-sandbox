@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.2] - 2025-11-26
+
+### Fixed
+- **State Persistence**: Fixed file handle serialization bug in `auto_persist_globals`
+  - Open file handles in global variables no longer cause state serialization failures
+  - Enhanced I/O object detection to catch more edge cases (IOBase, fileno duck typing)
+  - Added `_is_json_serializable` fallback check for unknown types
+  - State persistence now gracefully degrades (writes empty state) instead of failing completely
+  - Nested file handles in dicts/lists are properly filtered out
+
+### Changed
+- **Session Limit**: Increased default `max_total_sessions` from 10 to 50
+  - Sessions now auto-cleanup expired sessions before enforcing limit
+  - Error response includes `hint` field with recovery instructions
+  - Upper limit increased from 100 to 200 in configuration validation
+
 ## [0.3.9] - 2025-11-26
 
 ### Added

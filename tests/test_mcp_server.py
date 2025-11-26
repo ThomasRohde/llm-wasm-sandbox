@@ -413,7 +413,7 @@ class TestMCPServerSessionConfig:
 
         # Verify default values match SessionsConfig defaults
         assert server.session_manager._timeout_seconds == 600
-        assert server.session_manager._max_total_sessions == 10
+        assert server.session_manager._max_total_sessions == 50  # Increased from 10 to 50
         assert server.session_manager._memory_limit_mb == 256
 
     @pytest.mark.asyncio

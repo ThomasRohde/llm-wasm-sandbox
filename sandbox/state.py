@@ -307,15 +307,36 @@ import datetime
 import base64
 
 def _is_io_object(v):
+    # Check common I/O type names (file handles, streams, etc.)
     io_types = ('TextIOWrapper', 'BufferedReader', 'BufferedWriter',
-                'BufferedRandom', 'FileIO', 'BytesIO', 'StringIO')
-    if type(v).__name__ in io_types:
+                'BufferedRandom', 'FileIO', 'BytesIO', 'StringIO',
+                '_IOBase', 'IOBase', 'RawIOBase', 'BufferedIOBase', 'TextIOBase')
+    type_name = type(v).__name__
+    if type_name in io_types:
         return True
-    if hasattr(v, 'read') and hasattr(v, 'close') and hasattr(v, 'fileno'):
+    # Check for file-like duck typing (has fileno method = real file handle)
+    if hasattr(v, 'fileno') and callable(getattr(v, 'fileno', None)):
+        try:
+            v.fileno()  # Will raise if closed, but type is still I/O
+            return True
+        except:
+            return True  # Even closed file handles should be skipped
+    # Check for stream-like objects (read + close but not common types)
+    if hasattr(v, 'read') and hasattr(v, 'close') and hasattr(v, 'closed'):
         return True
     return False
 
+def _is_json_serializable(v):
+    # Quick check if value is JSON-serializable
+    try:
+        json.dumps(v)
+        return True
+    except (TypeError, ValueError, OverflowError):
+        return False
+
 def _serialize_value(v):
+    if v is None:
+        return None
     if _is_io_object(v):
         return None  # Skip file handles
     if isinstance(v, PurePath):
@@ -323,13 +344,33 @@ def _serialize_value(v):
     elif isinstance(v, (datetime.datetime, datetime.date, datetime.time)):
         return v.isoformat()
     elif isinstance(v, set):
-        return list(v)
+        return [_serialize_value(item) for item in v if not _is_io_object(item)]
     elif isinstance(v, bytes):
         return 'b64:' + base64.b64encode(v).decode('ascii')
     elif isinstance(v, dict):
-        return {{k: _serialize_value(val) for k, val in v.items() if not _is_io_object(val)}}
+        result = {{}}
+        for dk, dv in v.items():
+            if _is_io_object(dv):
+                continue
+            serialized = _serialize_value(dv)
+            if serialized is not None or dv is None:  # Keep explicit None values
+                result[dk] = serialized
+        return result
     elif isinstance(v, (list, tuple)):
-        return [_serialize_value(item) for item in v if not _is_io_object(item)]
+        result = []
+        for item in v:
+            if _is_io_object(item):
+                continue
+            serialized = _serialize_value(item)
+            if serialized is not None or item is None:  # Keep explicit None values
+                result.append(serialized)
+        return result
+    # Check if primitive is serializable
+    if isinstance(v, (str, int, float, bool)):
+        return v
+    # Unknown type - try to serialize, skip if fails
+    if not _is_json_serializable(v):
+        return None
     return v
 
 _state = {{}}
@@ -339,12 +380,30 @@ for k, v in list({state_var}.items()):
     if _is_io_object(v):
         continue
     try:
-        _state[k] = _serialize_value(v)
+        serialized = _serialize_value(v)
+        if serialized is not None or v is None:
+            _state[k] = serialized
     except:
-        pass
-with open('/app/{filename}', 'w') as _f:
-    json.dump(_state, _f)
-del _state, _f, _serialize_value, _is_io_object
+        pass  # Skip any value that fails serialization
+
+# Final safety: wrap json.dump in try/except
+try:
+    # Filter out any remaining None values from failed serialization
+    _clean_state = {{k: v for k, v in _state.items() if v is not None or {state_var}.get(k) is None}}
+    with open('/app/{filename}', 'w') as _f:
+        json.dump(_clean_state, _f)
+except Exception as _e:
+    import sys
+    print(f"Warning: State persistence failed: {{_e}}", file=sys.stderr)
+    # Write empty state rather than failing
+    with open('/app/{filename}', 'w') as _f:
+        json.dump({{}}, _f)
+
+del _state, _f, _serialize_value, _is_io_object, _is_json_serializable
+try:
+    del _clean_state, _e
+except:
+    pass
 """.strip()
 
 
@@ -490,6 +549,7 @@ Filters out non-serializable types:
 """
 
 import json
+import sys
 from typing import Any
 from pathlib import PurePath
 import datetime
@@ -498,17 +558,39 @@ import base64
 
 def _is_io_object(v: Any) -> bool:
     """Check if value is a file handle or I/O object."""
+    # Check common I/O type names (file handles, streams, etc.)
     io_types = ('TextIOWrapper', 'BufferedReader', 'BufferedWriter',
-                'BufferedRandom', 'FileIO', 'BytesIO', 'StringIO')
-    if type(v).__name__ in io_types:
+                'BufferedRandom', 'FileIO', 'BytesIO', 'StringIO',
+                '_IOBase', 'IOBase', 'RawIOBase', 'BufferedIOBase', 'TextIOBase')
+    type_name = type(v).__name__
+    if type_name in io_types:
         return True
-    if hasattr(v, 'read') and hasattr(v, 'close') and hasattr(v, 'fileno'):
+    # Check for file-like duck typing (has fileno method = real file handle)
+    if hasattr(v, 'fileno') and callable(getattr(v, 'fileno', None)):
+        try:
+            v.fileno()  # Will raise if closed, but type is still I/O
+            return True
+        except:
+            return True  # Even closed file handles should be skipped
+    # Check for stream-like objects (read + close + closed attribute)
+    if hasattr(v, 'read') and hasattr(v, 'close') and hasattr(v, 'closed'):
         return True
     return False
 
 
+def _is_json_serializable(v: Any) -> bool:
+    """Quick check if value is JSON-serializable."""
+    try:
+        json.dumps(v)
+        return True
+    except (TypeError, ValueError, OverflowError):
+        return False
+
+
 def _serialize_value(v: Any) -> Any:
     """Convert non-JSON-serializable types to JSON-compatible values."""
+    if v is None:
+        return None
     if _is_io_object(v):
         return None  # Skip file handles
     if isinstance(v, PurePath):
@@ -516,13 +598,33 @@ def _serialize_value(v: Any) -> Any:
     elif isinstance(v, (datetime.datetime, datetime.date, datetime.time)):
         return v.isoformat()
     elif isinstance(v, set):
-        return list(v)
+        return [_serialize_value(item) for item in v if not _is_io_object(item)]
     elif isinstance(v, bytes):
         return 'b64:' + base64.b64encode(v).decode('ascii')
     elif isinstance(v, dict):
-        return {k: _serialize_value(val) for k, val in v.items() if not _is_io_object(val)}
+        result = {}
+        for dk, dv in v.items():
+            if _is_io_object(dv):
+                continue
+            serialized = _serialize_value(dv)
+            if serialized is not None or dv is None:
+                result[dk] = serialized
+        return result
     elif isinstance(v, (list, tuple)):
-        return [_serialize_value(item) for item in v if not _is_io_object(item)]
+        result = []
+        for item in v:
+            if _is_io_object(item):
+                continue
+            serialized = _serialize_value(item)
+            if serialized is not None or item is None:
+                result.append(serialized)
+        return result
+    # Check if primitive is serializable
+    if isinstance(v, (str, int, float, bool)):
+        return v
+    # Unknown type - try to serialize, skip if fails
+    if not _is_json_serializable(v):
+        return None
     return v
 
 
@@ -559,12 +661,23 @@ def save_state(state: dict[str, Any], filename: str = ".session_state.json") -> 
         if _is_io_object(v):
             continue
         try:
-            filtered[k] = _serialize_value(v)
+            serialized = _serialize_value(v)
+            if serialized is not None or v is None:
+                filtered[k] = serialized
         except:
-            pass
+            pass  # Skip any value that fails serialization
 
-    with open(f'/app/{filename}', 'w') as f:
-        json.dump(filtered, f, indent=2)
+    # Final safety: wrap json.dump in try/except
+    try:
+        # Filter out any remaining None values from failed serialization
+        clean_state = {k: v for k, v in filtered.items() if v is not None or state.get(k) is None}
+        with open(f'/app/{filename}', 'w') as f:
+            json.dump(clean_state, f, indent=2)
+    except Exception as e:
+        print(f"Warning: State persistence failed: {e}", file=sys.stderr)
+        # Write empty state rather than failing
+        with open(f'/app/{filename}', 'w') as f:
+            json.dump({}, f)
 
 
 def load_state(filename: str = ".session_state.json", default: dict | None = None) -> dict:
